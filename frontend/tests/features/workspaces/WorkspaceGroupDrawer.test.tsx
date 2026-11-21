@@ -51,15 +51,20 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
-import WorkspaceGroupTab from '@/src/features/workspaces/ui/WorkspaceGroupTab';
+import { AccordionGroup } from '@bcgov/design-system-react-components';
+import WorkspaceGroupDrawer from '@/src/features/workspaces/ui/WorkspaceGroupDrawer';
 
-const renderTab = () =>
-  renderSignedIn(<WorkspaceGroupTab dict={dict} workspaceId={WORKSPACE_ID} />);
+const renderDrawer = () =>
+  renderSignedIn(
+    <AccordionGroup defaultExpandedKeys={['workspace-groups']}>
+      <WorkspaceGroupDrawer dict={dict} drawerName="workspace-groups" workspaceId={WORKSPACE_ID} />
+    </AccordionGroup>,
+  );
 
 /** The query of the most recent list read. */
 const lastListQuery = () => mockApi.listWorkspaceGroups.mock.calls.at(-1)?.[2];
 
-describe('WorkspaceGroupTab', () => {
+describe('WorkspaceGroupDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.replaceState(null, '', '/en/workspace/ws-1');
@@ -68,8 +73,19 @@ describe('WorkspaceGroupTab', () => {
     mockApi.listWorkspaceRoles.mockResolvedValue(ROLES);
   });
 
+  it('is its own drawer, named for groups', async () => {
+    renderDrawer();
+    await screen.findByText('Form administrators');
+
+    expect(screen.getByTestId('accordion-workspace-groups')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: dict.workspaces.groupsTab })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+
   it('reads the first page by name in the app language and lists each group with its roles', async () => {
-    renderTab();
+    renderDrawer();
 
     expect(await screen.findByText('Form administrators')).toBeInTheDocument();
     expect(mockApi.listWorkspaceGroups).toHaveBeenCalledWith('token', WORKSPACE_ID, {
@@ -93,7 +109,7 @@ describe('WorkspaceGroupTab', () => {
     mockApi.listWorkspaceGroups.mockResolvedValue(
       groupsPage([group({ id: 'grp-audit', name: 'Auditors', roles: [AUDITOR.roleCode] })]),
     );
-    renderTab();
+    renderDrawer();
 
     expect(await screen.findByTestId(`group-role-grp-audit-${AUDITOR.roleCode}`)).toHaveTextContent(
       t.customRoleName.replace('{name}', AUDITOR.name),
@@ -103,7 +119,7 @@ describe('WorkspaceGroupTab', () => {
 
   it('asks the server for the other order when the name header is pressed', async () => {
     const user = userEvent.setup();
-    const view = renderTab();
+    const view = renderDrawer();
     await screen.findByText('Form administrators');
 
     await user.click(screen.getByTestId('datatable-sort-name'));
@@ -114,7 +130,7 @@ describe('WorkspaceGroupTab', () => {
 
   it('sends a submitted search to the server, trimmed', async () => {
     const user = userEvent.setup();
-    const view = renderTab();
+    const view = renderDrawer();
     await screen.findByText('Form administrators');
 
     await user.click(within(screen.getByTestId('search-ws-groups-text')).getByRole('textbox'));
@@ -128,7 +144,7 @@ describe('WorkspaceGroupTab', () => {
   it('reads the next page from the server', async () => {
     const user = userEvent.setup();
     mockApi.listWorkspaceGroups.mockResolvedValue(groupsPage([ADMINS, REVIEWERS], { total: 25 }));
-    const view = renderTab();
+    const view = renderDrawer();
     await screen.findByText('Form administrators');
 
     await user.click(screen.getByTestId('datatable-next-page-button'));
@@ -139,7 +155,7 @@ describe('WorkspaceGroupTab', () => {
 
   it('says the groups could not load rather than that there are none', async () => {
     mockApi.listWorkspaceGroups.mockRejectedValue(new ApiError('Request failed (500)', 500));
-    renderTab();
+    renderDrawer();
 
     expect(await screen.findByTestId('datatable-error')).toHaveTextContent(t.loadError);
     expect(screen.queryByText(t.empty)).not.toBeInTheDocument();
@@ -147,7 +163,7 @@ describe('WorkspaceGroupTab', () => {
 
   it('shows a group without roles as having none', async () => {
     mockApi.listWorkspaceGroups.mockResolvedValue(groupsPage([group({ id: 'grp-empty' })]));
-    renderTab();
+    renderDrawer();
 
     expect(await screen.findByText(t.noRolesSelected)).toBeInTheDocument();
   });
@@ -159,7 +175,7 @@ describe('WorkspaceGroupTab', () => {
         group({ id: 'grp-audit', name: 'Auditors', roles: [AUDITOR.roleCode, 'form_designer'] }),
       ]),
     );
-    renderTab();
+    renderDrawer();
 
     const custom = await screen.findByTestId(`group-role-grp-audit-${AUDITOR.roleCode}`);
     expect(custom).toHaveTextContent(t.customRoleFallback);
@@ -172,7 +188,7 @@ describe('WorkspaceGroupTab', () => {
   it('removes a group once confirmed, then re-reads the list', async () => {
     const user = userEvent.setup();
     mockApi.deleteWorkspaceGroup.mockResolvedValue(undefined);
-    renderTab();
+    renderDrawer();
     await screen.findByText('Form Reviewers');
     const readsBefore = mockApi.listWorkspaceGroups.mock.calls.length;
 
@@ -192,7 +208,7 @@ describe('WorkspaceGroupTab', () => {
     const user = userEvent.setup();
     mockApi.getWorkspaceGroup.mockResolvedValue(REVIEWERS);
     mockApi.deleteWorkspaceGroup.mockResolvedValue(undefined);
-    renderTab();
+    renderDrawer();
     await screen.findByText('Form Reviewers');
 
     await user.click(screen.getByTestId('edit-group-button-grp-reviewers'));
@@ -208,7 +224,7 @@ describe('WorkspaceGroupTab', () => {
   it('leaves an open create form alone when another group is removed', async () => {
     const user = userEvent.setup();
     mockApi.deleteWorkspaceGroup.mockResolvedValue(undefined);
-    renderTab();
+    renderDrawer();
     await screen.findByText('Form Reviewers');
 
     await user.click(screen.getByTestId('create-ws-group-button'));
@@ -225,7 +241,7 @@ describe('WorkspaceGroupTab', () => {
   it('reports a refused removal as a failure', async () => {
     const user = userEvent.setup();
     mockApi.deleteWorkspaceGroup.mockRejectedValue(new ApiError('Request failed (403)', 403));
-    renderTab();
+    renderDrawer();
     await screen.findByText('Form Reviewers');
 
     await user.click(screen.getByTestId('delete-group-button-grp-reviewers'));
@@ -243,7 +259,7 @@ describe('WorkspaceGroupTab', () => {
 
   it('opens the create form under the table and closes it on cancel', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await screen.findByText('Form administrators');
 
     await user.click(screen.getByTestId('create-ws-group-button'));
@@ -263,7 +279,7 @@ describe('WorkspaceGroupTab', () => {
     // jsdom has no layout, so the method is not there to spy on.
     Element.prototype.scrollIntoView = scrollIntoView;
     mockApi.getWorkspaceGroup.mockResolvedValue(REVIEWERS);
-    renderTab();
+    renderDrawer();
     await screen.findByText('Form Reviewers');
 
     await user.click(screen.getByTestId(button));
@@ -281,7 +297,7 @@ describe('WorkspaceGroupTab', () => {
   it('opens the edit form on the group read by its id, not the row', async () => {
     const user = userEvent.setup();
     mockApi.getWorkspaceGroup.mockResolvedValue({ ...REVIEWERS, name: 'Reviewers (renamed)' });
-    renderTab();
+    renderDrawer();
     await screen.findByText('Form Reviewers');
 
     await user.click(screen.getByTestId('edit-group-button-grp-reviewers'));

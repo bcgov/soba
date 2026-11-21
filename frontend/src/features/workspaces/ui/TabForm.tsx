@@ -10,7 +10,7 @@ interface TabFormSectionProps {
   children: ReactNode;
 }
 
-/** A create or edit form opened under a tab's table. */
+/** A create or edit form opened under a list's table. */
 export function TabFormSection({ heading, testId, children }: Readonly<TabFormSectionProps>) {
   const sectionRef = useRevealOnOpen();
   const headingId = useId();
@@ -33,7 +33,7 @@ export function TabFormSection({ heading, testId, children }: Readonly<TabFormSe
 /**
  * The form opens under the table, which on a long list is below the fold. Bring it into view and
  * move focus to it, so the press visibly did something and a keyboard or screen reader user lands
- * on it rather than on the button above. Runs once per opening: the tab remounts the form for each.
+ * on it rather than on the button above. Runs once per opening: the list remounts the form.
  */
 function useRevealOnOpen() {
   const ref = useRef<HTMLElement>(null);

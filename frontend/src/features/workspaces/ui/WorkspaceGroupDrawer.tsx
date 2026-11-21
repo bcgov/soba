@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Button, ButtonGroup } from '@bcgov/design-system-react-components';
+import { Accordion, Button, ButtonGroup } from '@bcgov/design-system-react-components';
 import { ListPageToolbar } from '@/src/components/ListPageLayout';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { RowActionButton } from '@/src/components/RowActionButton';
@@ -21,15 +21,21 @@ import { useWorkspaceRoles } from '../data/useWorkspaceRoles';
 import { assignableRoleLabel, groupRoleLabel } from '../groupRoleLabel';
 import WorkspaceGroupForm from './WorkspaceGroupForm';
 
-export interface WorkspaceGroupTabProps {
+export interface WorkspaceGroupDrawerProps {
   dict: Dictionary;
+  /** The drawer's id in its AccordionGroup. */
+  drawerName: string;
   workspaceId: string;
 }
 
 /** What opens under the table: nothing, the create form, or the edit form for one group's id. */
 type FormView = null | 'new' | { groupId: string };
 
-export function WorkspaceGroupTab({ dict, workspaceId }: Readonly<WorkspaceGroupTabProps>) {
+export function WorkspaceGroupDrawer({
+  dict,
+  drawerName,
+  workspaceId,
+}: Readonly<WorkspaceGroupDrawerProps>) {
   const t = dict.workspaces.groups;
   const { token } = useKeycloak();
   const { addNotification } = useNotificationStore();
@@ -134,57 +140,63 @@ export function WorkspaceGroupTab({ dict, workspaceId }: Readonly<WorkspaceGroup
   const editingId = formView && formView !== 'new' ? formView.groupId : undefined;
 
   return (
-    <div data-testid="workspace-groups-tab-content">
-      <ListPageToolbar>
-        <ListPageSearchField
-          value={query.searchInput}
-          onChange={query.setSearchInput}
-          onSubmit={query.commitSearch}
-          testIdPrefix="ws-groups"
-        />
-        <Button
-          variant="primary"
-          data-testid="create-ws-group-button"
-          onPress={() => setFormView((view) => (view === 'new' ? null : 'new'))}
-        >
-          {t.addGroup}
-        </Button>
-      </ListPageToolbar>
+    <Accordion
+      id={drawerName}
+      data-testid={`accordion-${drawerName}`}
+      label={dict.workspaces.groupsTab}
+    >
+      <div className="d-block w-100" data-testid="workspace-groups-drawer-content">
+        <ListPageToolbar>
+          <ListPageSearchField
+            value={query.searchInput}
+            onChange={query.setSearchInput}
+            onSubmit={query.commitSearch}
+            testIdPrefix="ws-groups"
+          />
+          <Button
+            variant="primary"
+            data-testid="create-ws-group-button"
+            onPress={() => setFormView((view) => (view === 'new' ? null : 'new'))}
+          >
+            {t.addGroup}
+          </Button>
+        </ListPageToolbar>
 
-      <DataTable<WorkspaceGroup>
-        {...table}
-        columns={columns}
-        emptyMessage={t.empty}
-        loadingMessage={dict.general.loading}
-        itemName="items"
-        keyExtractor={(item) => item.id}
-      />
-
-      {formView && (
-        <WorkspaceGroupForm
-          key={editingId ?? 'new'}
-          dict={dict}
-          workspaceId={workspaceId}
-          groupId={editingId}
-          onDone={() => setFormView(null)}
+        <DataTable<WorkspaceGroup>
+          {...table}
+          columns={columns}
+          emptyMessage={t.empty}
+          loadingMessage={dict.general.loading}
+          itemName="items"
+          keyExtractor={(item) => item.id}
         />
-      )}
 
-      {pendingDelete && (
-        <ConfirmModal
-          show
-          title={t.deleteConfirmTitle}
-          message={t.deleteConfirmMessage.replace('{name}', () => pendingDelete.name)}
-          confirmLabel={t.deleteGroup}
-          onConfirm={() => void confirmDelete()}
-          onCancel={() => {
-            if (!isDeleting) setPendingDelete(null);
-          }}
-          pending={isDeleting}
-        />
-      )}
-    </div>
+        {formView && (
+          <WorkspaceGroupForm
+            key={editingId ?? 'new'}
+            dict={dict}
+            workspaceId={workspaceId}
+            groupId={editingId}
+            onDone={() => setFormView(null)}
+          />
+        )}
+
+        {pendingDelete && (
+          <ConfirmModal
+            show
+            title={t.deleteConfirmTitle}
+            message={t.deleteConfirmMessage.replace('{name}', () => pendingDelete.name)}
+            confirmLabel={t.deleteGroup}
+            onConfirm={() => void confirmDelete()}
+            onCancel={() => {
+              if (!isDeleting) setPendingDelete(null);
+            }}
+            pending={isDeleting}
+          />
+        )}
+      </div>
+    </Accordion>
   );
 }
 
-export default WorkspaceGroupTab;
+export default WorkspaceGroupDrawer;
