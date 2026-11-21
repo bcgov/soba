@@ -40,10 +40,12 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
+    modal: { dialogActions: 'Dialog actions' },
     general: {
       sessionExpired: 'Your session has ended.',
       noAccess: 'You do not have access.',
       version: 'Version',
+      unsavedChanges: { title: 'Leave?', message: 'Not saved.', confirm: 'Leave', stay: 'Stay' },
     },
     form: {
       loading: 'Loading...',
@@ -769,6 +771,31 @@ describe('FormioV5NewSubmissionClient', () => {
       expect(h.form).toEqual(changed);
       expect(screen.getByTestId('submission-fill-version')).toHaveTextContent(/^Version: 2$/);
       expect(screen.getByTestId('submission-fill-save-draft')).toBeInTheDocument();
+    });
+
+    it('asks before a link leaves the answers it moved over, as they are not saved', async () => {
+      h.getSubmitForm.mockReset();
+      h.getSubmitForm
+        .mockResolvedValueOnce({ ...form, allowSubmitterDrafts: false })
+        .mockResolvedValue({ ...form, publishedVersionId: 'ver-2', allowSubmitterDrafts: true });
+      h.getSubmitFormVersionSchema.mockImplementation(async (_token: unknown, id: string) =>
+        id === 'ver-2'
+          ? version(id, 'hash-2', { components: [{ key: 'email', type: 'email' }] })
+          : version(id, 'hash-1'),
+      );
+      await renderPage();
+      await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+      await submit({ name: 'Ada' });
+      await userEvent.click(screen.getByTestId('submission-fill-continue-updated'));
+      await waitFor(() => expect(h.mounts).toBe(2));
+
+      const link = document.body.appendChild(document.createElement('a'));
+      link.href = '/en/forms';
+      // jsdom cannot navigate; the guard listens earlier, on the document.
+      link.addEventListener('click', (event) => event.preventDefault());
+      await userEvent.click(link);
+      expect(await screen.findByText('Leave?')).toBeInTheDocument();
+      link.remove();
     });
 
     it('counts answers carried to the new version as unsaved until a save lands', async () => {

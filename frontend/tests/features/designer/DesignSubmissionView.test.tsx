@@ -9,12 +9,7 @@ import { ApiErrorCodes } from '@soba/lib';
 import { navLink } from '@/src/shared/list/listQueryMemory';
 import { SubmissionReviewStatuses } from '@/src/types/submissionReview';
 
-const { mockPush, leaveWarning } = vi.hoisted(() => ({
-  mockPush: vi.fn(),
-  leaveWarning: vi.fn(),
-}));
-
-vi.mock('@/src/shared/hooks/useLeaveWarning', () => ({ useLeaveWarning: leaveWarning }));
+const { mockPush } = vi.hoisted(() => ({ mockPush: vi.fn() }));
 
 vi.mock('@/app/[lang]/Providers', async () => {
   const dict = { ...(await import('@/dictionaries/en.json')).default, locale: 'en' };
@@ -906,7 +901,6 @@ describe('DesignSubmissionView staff edits', () => {
 
       expect(screen.queryByTestId('confirm-modal-confirm')).toBeNull();
       expect(mockPush).toHaveBeenCalledWith(navLink('/en/build/f1?tab=submissions'));
-      expect(leaveWarning).toHaveBeenLastCalledWith(false);
     });
 
     it('asks before Back or a refresh loses changed answers, and keeps them on staying', async () => {
@@ -915,7 +909,6 @@ describe('DesignSubmissionView staff edits', () => {
 
       await user.click(await screen.findByTestId('submission-edit'));
       await user.click(screen.getByTestId('submission-edit-form'));
-      expect(leaveWarning).toHaveBeenLastCalledWith(true);
 
       await user.click(screen.getByTestId('design-submission-back'));
       expect(mockPush).not.toHaveBeenCalled();
@@ -923,6 +916,26 @@ describe('DesignSubmissionView staff edits', () => {
 
       expect(mockPush).not.toHaveBeenCalled();
       expect(screen.getByTestId('submission-edit-update')).toBeEnabled();
+    });
+
+    it('asks before a link elsewhere loses changed answers', async () => {
+      const user = userEvent.setup();
+      await renderView({ submissionId: SUBMISSION_ID });
+      const link = document.body.appendChild(document.createElement('a'));
+      link.href = '/en/forms';
+      // Records the link being followed; a held click never reaches it.
+      const followed = vi.fn((event: MouseEvent) => event.preventDefault());
+      link.addEventListener('click', followed);
+
+      await user.click(await screen.findByTestId('submission-edit'));
+      await user.click(screen.getByTestId('submission-edit-form'));
+      await user.click(link);
+
+      expect(await screen.findByTestId('confirm-modal-confirm')).toBeInTheDocument();
+      expect(followed).not.toHaveBeenCalled();
+      await user.click(screen.getByTestId('confirm-modal-confirm'));
+      expect(followed).toHaveBeenCalledTimes(1);
+      link.remove();
     });
 
     it('goes back once the loss is confirmed', async () => {
@@ -945,7 +958,6 @@ describe('DesignSubmissionView staff edits', () => {
       await user.click(screen.getByTestId('submission-edit-form'));
       await user.click(screen.getByTestId('submission-edit-cancel'));
 
-      expect(leaveWarning).toHaveBeenLastCalledWith(false);
       await user.click(screen.getByTestId('design-submission-back'));
       expect(screen.queryByTestId('confirm-modal-confirm')).toBeNull();
       expect(mockPush).toHaveBeenCalled();

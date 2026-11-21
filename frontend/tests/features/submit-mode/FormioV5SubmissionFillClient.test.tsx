@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
@@ -35,10 +35,17 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
+    modal: { dialogActions: 'Dialog actions' },
     general: {
       sessionExpired: 'Your session has ended.',
       noAccess: 'You do not have access.',
       version: 'Version',
+      unsavedChanges: {
+        title: 'Leave without saving?',
+        message: 'Not saved.',
+        confirm: 'Leave',
+        stay: 'Stay',
+      },
     },
     submission: { notFound: 'Submission not found.', loadError: 'Could not load this submission.' },
     form: {
@@ -766,6 +773,106 @@ describe('FormioV5SubmissionFillClient', () => {
 
     beforeEach(() => {
       h.getSubmitFillBundle.mockResolvedValue(bundle());
+    });
+
+    describe('leaving with unsaved answers', () => {
+      afterEach(() => {
+        for (const link of document.querySelectorAll('a[href="/en/forms"]')) link.remove();
+      });
+      // A link in the page; its own listener records it being followed, which a held click never is.
+      const clickNav = async () => {
+        const link = document.body.appendChild(document.createElement('a'));
+        link.href = '/en/forms';
+        const followed = vi.fn((event: MouseEvent) => event.preventDefault());
+        link.addEventListener('click', followed);
+        await userEvent.click(link);
+        return followed;
+      };
+      const asked = () => screen.queryByText('Leave without saving?') !== null;
+      const edit = () => act(() => h.onChange?.({ data: { a: 2 } }, {}, true));
+      const savedDraft = () => bundle({ content: { data: { a: 1 } } });
+
+      it('lets the filler leave a blank new form', async () => {
+        await renderLoaded();
+        await clickNav();
+        expect(asked()).toBe(false);
+      });
+
+      it('does not count the answers loading as an edit', async () => {
+        h.getSubmitFillBundle.mockResolvedValue(savedDraft());
+        await renderLoaded();
+        act(() => h.onChange?.({ data: { a: 1 } }, {}, false));
+        await clickNav();
+        expect(asked()).toBe(false);
+      });
+
+      // Validate On: Blur reports a change, without `modified`, when a field the filler entered is left.
+      it('does not count a change that leaves the answers as they were', async () => {
+        h.getSubmitFillBundle.mockResolvedValue(savedDraft());
+        await renderLoaded();
+        act(() => h.onChange?.({ data: { a: 1 } }, {}, false));
+        fireEvent.pointerDown(screen.getByTestId('submission-fill'));
+        act(() => h.onChange?.({ data: { a: 1 } }, {}, false));
+        await clickNav();
+        expect(asked()).toBe(false);
+      });
+
+      it('asks once an answer changes, and stays when told to', async () => {
+        await renderLoaded();
+        edit();
+        const followed = await clickNav();
+        expect(asked()).toBe(true);
+        await userEvent.click(screen.getByTestId('confirm-modal-cancel'));
+        await waitFor(() => expect(asked()).toBe(false));
+        expect(followed).not.toHaveBeenCalled();
+      });
+
+      it('follows the link once the loss is confirmed', async () => {
+        await renderLoaded();
+        edit();
+        const followed = await clickNav();
+        await userEvent.click(screen.getByTestId('confirm-modal-confirm'));
+        expect(followed).toHaveBeenCalledTimes(1);
+      });
+
+      it('lets the filler leave once the draft is saved', async () => {
+        h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-1'));
+        await renderLoaded();
+        edit();
+        await saveDraft();
+        await waitFor(() => expect(saveStatus().textContent).toMatch(/^Draft saved at/));
+        await clickNav();
+        expect(asked()).toBe(false);
+      });
+
+      it('still asks while a save is in flight', async () => {
+        h.saveSobaFormSubmission.mockReturnValue(new Promise(() => undefined));
+        await renderLoaded();
+        edit();
+        await saveDraft();
+        await clickNav();
+        expect(asked()).toBe(true);
+      });
+
+      it('still asks when the save is held', async () => {
+        h.saveSobaFormSubmission.mockResolvedValue(saveResponse('rev-x', 'pending', 'conflict'));
+        await renderLoaded();
+        edit();
+        await saveDraft();
+        await waitFor(() => expect(saveStatus().textContent).toBe('Draft not saved.'));
+        await clickNav();
+        expect(asked()).toBe(true);
+      });
+
+      it('does not start asking when a save of unchanged answers fails', async () => {
+        h.getSubmitFillBundle.mockResolvedValue(savedDraft());
+        h.saveSobaFormSubmission.mockRejectedValue(networkFailure());
+        await renderLoaded();
+        await saveDraft();
+        await waitFor(() => expect(saveStatus().textContent).not.toBe(''));
+        await clickNav();
+        expect(asked()).toBe(false);
+      });
     });
 
     it('shows no save action when the form does not accept drafts', async () => {
