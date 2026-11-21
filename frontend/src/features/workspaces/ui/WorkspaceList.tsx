@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useCallback } from 'react';
-import { Button as DSButton } from '@bcgov/design-system-react-components';
+import { ButtonGroup, Button as DSButton } from '@bcgov/design-system-react-components';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { ListPageToolbar, ListPageAuthGate } from '@/src/components/ListPageLayout';
 import { ListPageSearchField } from '@/src/components/ListPageSearchField';
@@ -27,10 +27,12 @@ const WorkspaceActionButtons = ({
   workspace,
   onAction,
   dictActions,
+  groupLabel,
 }: {
   workspace: WorkspaceItem;
   onAction: (name: string, id: string) => void;
   dictActions: { manage: string; forms: string };
+  groupLabel: string;
 }) => {
   const actions = [];
   if (isWorkspaceManageRole(workspace.role)) {
@@ -39,7 +41,7 @@ const WorkspaceActionButtons = ({
   actions.push({ name: 'forms', title: dictActions.forms });
 
   return (
-    <div className="d-flex gap-2 justify-content-start">
+    <ButtonGroup ariaLabel={groupLabel}>
       {actions.map((action) => (
         <RowActionButton
           key={action.name}
@@ -49,7 +51,7 @@ const WorkspaceActionButtons = ({
           {action.title}
         </RowActionButton>
       ))}
-    </div>
+    </ButtonGroup>
   );
 };
 
@@ -124,6 +126,7 @@ function WorkspaceList() {
             workspace={workspace}
             onAction={handleAction}
             dictActions={dictWorkspaces.actions}
+            groupLabel={dictWorkspaces.columns.actions}
           />
         ),
       },

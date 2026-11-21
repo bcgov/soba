@@ -247,9 +247,16 @@ test('User can validate job status, type and form dropdowns for a workspace', as
   await expect(resetFiltersButton).toBeEnabled();
 });
 
-test('User can manage access tab settings for a workspace', async ({ page }) => {
-  await page.getByTestId('workspace-access-tab').click();
-  await expect(page.getByTestId('workspace-access-tab')).toHaveAttribute('aria-selected', 'true');
+test('User can manage access drawer settings for a workspace', async ({ page }) => {
+  await page.getByTestId('workspace-permissions-tab').click();
+  await expect(page.getByTestId('workspace-permissions-tab')).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  const accessDrawer = page.getByTestId('accordion-workspace-access');
+  await expect(
+    accessDrawer.getByRole('button', { name: dictionaries.workspaces.accessTab, exact: true }),
+  ).toHaveAttribute('aria-expanded', 'true');
   await expect(page.getByRole('textbox', { name: 'Search' })).toBeVisible();
   await page.getByTestId('search-ws-access-button').click();
   await page.getByRole('textbox', { name: 'Search' }).fill('nimya');
@@ -258,10 +265,10 @@ test('User can manage access tab settings for a workspace', async ({ page }) => 
   const existingMember = page.getByRole('row').filter({
     has: page.getByRole('cell', { name: 'nimya.1.john@gov.bc.ca', exact: true }),
   });
-  await expect(existingMember.or(page.getByTestId('datatable-empty'))).toBeVisible();
+  await expect(existingMember.or(accessDrawer.getByTestId('datatable-empty'))).toBeVisible();
   const alreadyMember = (await existingMember.count()) > 0;
   if (!alreadyMember) {
-    await expect(page.getByTestId('datatable-empty')).toHaveText(
+    await expect(accessDrawer.getByTestId('datatable-empty')).toHaveText(
       'No one in a group matches your search. Show all workspace members to search everyone.',
     );
   }
@@ -349,5 +356,5 @@ test('User can manage access tab settings for a workspace', async ({ page }) => 
   await memberRow.getByRole('button', { name: 'Remove' }).click();
   await page.getByTestId('confirm-modal-confirm').click();
   await expect(memberRow).not.toBeVisible();
-  await expect(page.getByTestId('datatable-empty')).toBeVisible();
+  await expect(accessDrawer.getByTestId('datatable-empty')).toBeVisible();
 });

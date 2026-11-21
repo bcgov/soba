@@ -64,13 +64,19 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
-import WorkspaceAccessTab from '@/src/features/workspaces/ui/WorkspaceAccessTab';
+import { AccordionGroup } from '@bcgov/design-system-react-components';
+import WorkspaceAccessDrawer from '@/src/features/workspaces/ui/WorkspaceAccessDrawer';
 import { useWorkspaceGroupsWriter } from '@/src/features/workspaces/data/useWorkspaceGroupsWriter';
 
-const renderTab = () =>
-  renderSignedIn(<WorkspaceAccessTab dict={dict} workspaceId={WORKSPACE_ID} />);
+/** The drawer, opened as the Permissions tab opens it. */
+const OpenDrawer = () => (
+  <AccordionGroup defaultExpandedKeys={['workspace-access']}>
+    <WorkspaceAccessDrawer dict={dict} drawerName="workspace-access" workspaceId={WORKSPACE_ID} />
+  </AccordionGroup>
+);
 
-/** Renames a group as the Groups tab does, beside the Access tab and sharing its cache. */
+const renderDrawer = () => renderSignedIn(<OpenDrawer />);
+
 function RenameGroup() {
   const writer = useWorkspaceGroupsWriter(WORKSPACE_ID);
   return (
@@ -97,7 +103,7 @@ const chooseShow = async (user: ReturnType<typeof userEvent.setup>, label: strin
 /** The query of the most recent list read. */
 const lastListQuery = () => mockAccessApi.listWorkspaceAccess.mock.calls.at(-1)?.[2];
 
-describe('WorkspaceAccessTab', () => {
+describe('WorkspaceAccessDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     search.allowed = true;
@@ -108,8 +114,19 @@ describe('WorkspaceAccessTab', () => {
     mockGroupsApi.listWorkspaceGroups.mockResolvedValue(groupsPage([ADMINS, REVIEWERS]));
   });
 
+  it('is its own drawer, named for the people with access', async () => {
+    renderDrawer();
+    await screen.findByText('Rita Reviewer');
+
+    expect(screen.getByTestId('accordion-workspace-access')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: dict.workspaces.accessTab })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+
   it('reads people in a group by name and lists each with their email, role and groups', async () => {
-    renderTab();
+    renderDrawer();
 
     expect(await screen.findByText('Rita Reviewer')).toBeInTheDocument();
     expect(mockAccessApi.listWorkspaceAccess).toHaveBeenCalledWith('token', WORKSPACE_ID, {
@@ -128,7 +145,7 @@ describe('WorkspaceAccessTab', () => {
   });
 
   it('offers no Remove for the owner or for the signed-in user', async () => {
-    renderTab();
+    renderDrawer();
     await screen.findByText('Rita Reviewer');
 
     expect(screen.queryByTestId('remove-member-button-m-owner')).not.toBeInTheDocument();
@@ -139,7 +156,7 @@ describe('WorkspaceAccessTab', () => {
 
   it('asks for every workspace member when the filter says so, and shows one with no groups', async () => {
     const user = userEvent.setup();
-    const view = renderTab();
+    const view = renderDrawer();
     await screen.findByText('Rita Reviewer');
     mockAccessApi.listWorkspaceAccess.mockResolvedValue(
       accessPage([member({ membershipId: 'm-new', displayLabel: 'Nia New' })]),
@@ -156,7 +173,7 @@ describe('WorkspaceAccessTab', () => {
 
   it('opens on every workspace member when the URL says so', async () => {
     visitWithInclude('all');
-    renderTab();
+    renderDrawer();
 
     await waitFor(() => expect(lastListQuery()).toMatchObject({ include: 'all' }));
     expect(
@@ -167,7 +184,7 @@ describe('WorkspaceAccessTab', () => {
   it('drops the filter from the URL when going back to people in a group', async () => {
     const user = userEvent.setup();
     visitWithInclude('all');
-    const view = renderTab();
+    const view = renderDrawer();
     await screen.findByText('Rita Reviewer');
 
     await chooseShow(user, t.showGrouped);
@@ -179,7 +196,7 @@ describe('WorkspaceAccessTab', () => {
 
   it('drops a filter value it does not offer and reads people in a group', async () => {
     visitWithInclude('everyone');
-    const view = renderTab();
+    const view = renderDrawer();
     await screen.findByText('Rita Reviewer');
     await view.rerender();
 
@@ -191,7 +208,7 @@ describe('WorkspaceAccessTab', () => {
 
   it('says no one is in a group, rather than that the workspace is empty', async () => {
     mockAccessApi.listWorkspaceAccess.mockResolvedValue(accessPage([]));
-    renderTab();
+    renderDrawer();
 
     expect(await screen.findByText(t.emptyGrouped)).toBeInTheDocument();
   });
@@ -202,7 +219,7 @@ describe('WorkspaceAccessTab', () => {
   ])('says a search of %s matched no one', async (_view, include, message) => {
     const user = userEvent.setup();
     if (include) visitWithInclude(include);
-    const view = renderTab();
+    const view = renderDrawer();
     await screen.findByText('Rita Reviewer');
     mockAccessApi.listWorkspaceAccess.mockResolvedValue(accessPage([]));
 
@@ -220,7 +237,7 @@ describe('WorkspaceAccessTab', () => {
   ])('asks before removing %s', async (_label, role, roleName) => {
     const user = userEvent.setup();
     mockAccessApi.listWorkspaceAccess.mockResolvedValue(accessPage([{ ...REVIEWER, role }]));
-    renderTab();
+    renderDrawer();
     await screen.findByText('Rita Reviewer');
 
     await user.click(screen.getByTestId('remove-member-button-m-reviewer'));
@@ -233,19 +250,19 @@ describe('WorkspaceAccessTab', () => {
 
   it('offers no Remove until it knows who is signed in', async () => {
     session.actorId = undefined;
-    renderTab();
+    renderDrawer();
     await screen.findByText('Rita Reviewer');
 
     expect(screen.queryByTestId('remove-member-button-m-reviewer')).not.toBeInTheDocument();
     expect(screen.queryByTestId('remove-member-button-m-self')).not.toBeInTheDocument();
   });
 
-  it('reads the people again when a group is renamed on the Groups tab', async () => {
+  it('reads the people again when a group is renamed on the Permissions tab groups drawer', async () => {
     const user = userEvent.setup();
     mockGroupsApi.renameWorkspaceGroup.mockResolvedValue(REVIEWERS);
     renderSignedIn(
       <>
-        <WorkspaceAccessTab dict={dict} workspaceId={WORKSPACE_ID} />
+        <OpenDrawer />
         <RenameGroup />
       </>,
     );
@@ -261,7 +278,7 @@ describe('WorkspaceAccessTab', () => {
 
   it('sends a submitted search to the server, trimmed', async () => {
     const user = userEvent.setup();
-    const view = renderTab();
+    const view = renderDrawer();
     await screen.findByText('Rita Reviewer');
 
     await user.click(within(screen.getByTestId('search-ws-access-text')).getByRole('textbox'));
@@ -274,7 +291,7 @@ describe('WorkspaceAccessTab', () => {
 
   it('says the people could not load rather than that there are none', async () => {
     mockAccessApi.listWorkspaceAccess.mockRejectedValue(new ApiError('Request failed (500)', 500));
-    renderTab();
+    renderDrawer();
 
     expect(await screen.findByTestId('datatable-error')).toHaveTextContent(t.loadError);
     expect(screen.queryByText(t.empty)).not.toBeInTheDocument();
@@ -282,7 +299,7 @@ describe('WorkspaceAccessTab', () => {
 
   it('offers Add only where user search is allowed', async () => {
     search.allowed = false;
-    renderTab();
+    renderDrawer();
     await screen.findByText('Rita Reviewer');
 
     expect(screen.queryByTestId('add-ws-member-button')).not.toBeInTheDocument();
@@ -290,7 +307,7 @@ describe('WorkspaceAccessTab', () => {
 
   it('opens the add form under the table, with the list still shown', async () => {
     const user = userEvent.setup();
-    renderTab();
+    renderDrawer();
     await screen.findByText('Rita Reviewer');
 
     await user.click(screen.getByTestId('add-ws-member-button'));
@@ -303,7 +320,7 @@ describe('WorkspaceAccessTab', () => {
   it('removes a person once confirmed, then re-reads the list', async () => {
     const user = userEvent.setup();
     mockAccessApi.removeWorkspaceAccess.mockResolvedValue(undefined);
-    renderTab();
+    renderDrawer();
     await screen.findByText('Rita Reviewer');
     const readsBefore = mockAccessApi.listWorkspaceAccess.mock.calls.length;
 
@@ -327,7 +344,7 @@ describe('WorkspaceAccessTab', () => {
     const user = userEvent.setup();
     mockAccessApi.getWorkspaceAccess.mockResolvedValue(REVIEWER);
     mockAccessApi.removeWorkspaceAccess.mockResolvedValue(undefined);
-    renderTab();
+    renderDrawer();
     await screen.findByText('Rita Reviewer');
 
     await user.click(screen.getByTestId('edit-member-button-m-reviewer'));
@@ -345,7 +362,7 @@ describe('WorkspaceAccessTab', () => {
     mockAccessApi.removeWorkspaceAccess.mockRejectedValue(
       new ApiError('Form administrators must keep at least one member', 409, 'last_form_admin'),
     );
-    renderTab();
+    renderDrawer();
     await screen.findByText('Rita Reviewer');
 
     await user.click(screen.getByTestId('remove-member-button-m-reviewer'));

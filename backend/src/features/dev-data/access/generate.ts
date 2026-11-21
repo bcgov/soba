@@ -487,7 +487,7 @@ function recordOf<K extends string, V, R>(
   ) as Record<K, R>;
 }
 
-/** Form and version deletes, and versions published over the old, once the submissions exist. */
+/** Form deletes, and versions published over the old, once the submissions exist. */
 async function applyChanges(
   ctx: CoverageContext,
   plannedForms: PlannedCoverageForm[],
@@ -502,9 +502,6 @@ async function applyChanges(
       switch (planned.afterSubmissions) {
         case 'deleteForm':
           await formService.delete({ workspaceId, formId, ...actor });
-          break;
-        case 'deleteVersion':
-          await formVersionService.delete({ workspaceId, formVersionId: versionId, ...actor });
           break;
         case 'publishNewVersion': {
           const { version } = await formVersionService.createDraft({

@@ -26,7 +26,6 @@ backend:
       cpu: 500m
       memory: 512Mi
   config:
-    nodeEnv: production
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
     credentialIssuerDefaultCode: aps-credential-issuer-v3

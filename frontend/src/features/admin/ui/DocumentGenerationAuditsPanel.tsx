@@ -75,7 +75,7 @@ export function DocumentGenerationAuditsPanel() {
         key: 'durationMs',
         label: dictAudits.columns.duration,
         sortField: 'durationMs',
-        align: 'end',
+        align: 'start',
         render: (audit) => `${audit.durationMs} ms`,
       },
       {

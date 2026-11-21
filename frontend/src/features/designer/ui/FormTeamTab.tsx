@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { Button, InlineAlert } from '@bcgov/design-system-react-components';
+import { Button, ButtonGroup, InlineAlert } from '@bcgov/design-system-react-components';
 
 import type { Dictionary } from '@/src/types/dictionary';
 import type { TeamMember } from '@/src/types/formTeam';
@@ -87,7 +87,7 @@ export default function FormTeamTab({ dict, formId }: Readonly<FormTeamTabProps>
         key: 'actions',
         label: t.actions,
         render: (member) => (
-          <div className="d-flex gap-2 justify-content-start">
+          <ButtonGroup ariaLabel={t.actions}>
             <RowActionButton data-testid={`${member.id}-edit-link`} onPress={() => setView(member)}>
               {t.edit}
             </RowActionButton>
@@ -97,7 +97,7 @@ export default function FormTeamTab({ dict, formId }: Readonly<FormTeamTabProps>
             >
               {t.remove}
             </RowActionButton>
-          </div>
+          </ButtonGroup>
         ),
       },
     ],

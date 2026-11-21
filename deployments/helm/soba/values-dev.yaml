@@ -23,7 +23,6 @@ backend:
       memory: 512Mi
   config:
     logLevel: debug
-    nodeEnv: development
     cacheDefaultCode: cache-redis
     messagebusDefaultCode: messagebus-redis
     eventStreamDefaultCode: eventstream-redis
