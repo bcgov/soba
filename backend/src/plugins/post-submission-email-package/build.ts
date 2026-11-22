@@ -12,13 +12,7 @@ import {
 } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import type { TempResource } from '../../core/integrations/temp-storage/TempStorageAdapter';
 import { type UploadInAnswers, uploadsIn } from '../../core/submissionUploads';
-import {
-  documentExtension,
-  type LeftOut,
-  missingFilesText,
-  packageName,
-  uploadNamer,
-} from './entries';
+import { attachmentName, type LeftOut, missingFilesText, packageName, reportName } from './entries';
 import type { PackageSettings } from './settings';
 import { openZip, type ZipWriter } from './zip';
 
@@ -92,7 +86,8 @@ interface Packing {
   bytes: number;
   leftOut: LeftOut[];
   staged: TempResource[];
-  nameUpload: (name: string) => string;
+  /** Uploads added so far; the next one's position is one more. */
+  attached: number;
 }
 
 /** An upload staged to learn its size, or one that passed the file limit while staging. */
@@ -126,13 +121,18 @@ const unstage = async (context: Context, packing: Packing) => {
   await Promise.all(staged.map((resource) => context.services.tempStorage.remove(resource)));
 };
 
-/** Adds one upload, or lists it as left out; a package that would pass its limit ends dead. */
+/**
+ * Adds one upload, or lists it as left out; a package that would pass its limit ends dead. An
+ * upload goes by the name it had when it was uploaded, as the answers keep it; storage's name for
+ * it only when the answers have none.
+ */
 const addUpload = async (context: Context, packing: Packing, upload: UploadInAnswers) => {
   const opened = await context.services.files.open(upload.id);
   if (opened === 'missing') {
     packing.leftOut.push({ name: upload.name ?? 'file', reason: 'deleted' });
     return;
   }
+  const originalName = upload.name ?? opened.filename;
   let entryStream: Readable | undefined;
   try {
     const sized =
@@ -140,16 +140,17 @@ const addUpload = async (context: Context, packing: Packing, upload: UploadInAns
         ? await stage(context, packing, opened.stream)
         : { stream: opened.stream, size: opened.size };
     if (sized === 'too-large' || sized.size > packing.maxFileBytes) {
-      packing.leftOut.push({ name: opened.filename, reason: 'too-large' });
+      packing.leftOut.push({ name: originalName, reason: 'too-large' });
       return;
     }
     entryStream = sized.stream;
     if (packing.bytes + sized.size > packing.limitBytes) {
       throw new JobFailedError(packageTooLarge(packing.limitBytes));
     }
-    const name = `files/${packing.nameUpload(opened.filename)}`;
+    const name = `attachments/${attachmentName(packing.attached + 1, originalName)}`;
     await writing(context, () => packing.zip.addStream(sized.stream, name, sized.size));
     packing.bytes += sized.size;
+    packing.attached += 1;
   } finally {
     opened.stream.destroy();
     entryStream?.destroy();
@@ -183,13 +184,12 @@ const renderDocument = async ({ job, services, signal }: Context) => {
 };
 
 /**
- * Writes the package named `name` to `zipFile`: the document, each upload under files/, and
- * missing-files.txt when an upload was left out.
+ * Writes the package to `zipFile`: the document, named after its template, each upload under
+ * attachments/, and missing-files.txt when an upload was left out.
  */
 const writePackage = async (
   context: Context,
   settings: PackageSettings,
-  name: string,
   zipFile: TempResource,
   staged: TempResource[],
 ): Promise<void> => {
@@ -204,11 +204,15 @@ const writePackage = async (
     bytes: document.data.length,
     leftOut: [],
     staged,
-    nameUpload: uploadNamer(),
+    attached: 0,
   };
+  const { confirmationCode } = context.submission;
   let size: number | undefined;
   try {
-    packing.zip.addBuffer(document.data, `${name}.${documentExtension(document.contentType)}`);
+    packing.zip.addBuffer(
+      document.data,
+      reportName(document.templateFilename, confirmationCode, document.contentType),
+    );
     context.reportProgress(1, uploads.length + 1);
     await addUploads(context, packing, uploads);
     if (packing.leftOut.length > 0) {
@@ -244,7 +248,7 @@ const store = async (context: Context, zipFile: TempResource, name: string) => {
 
 /**
  * The build step: waits while no email could be sent, renders the submitted revision, and stores
- * `<form name> <confirmation code>.zip` as the job's result.
+ * `<form name>-<confirmation code>.zip` as the job's result.
  */
 export const buildPackage =
   (settings: PackageSettings) =>
@@ -256,7 +260,7 @@ export const buildPackage =
     const zipFile = reserve(context, 'package');
     const staged: TempResource[] = [];
     try {
-      await writePackage(context, settings, name, zipFile, staged);
+      await writePackage(context, settings, zipFile, staged);
       await store(context, zipFile, name);
     } finally {
       await Promise.all(

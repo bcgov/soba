@@ -3,22 +3,18 @@ import {
   PostSubmissionEmailPackageOptionsSchema,
   type PostSubmissionEmailPackageOptions,
 } from '@soba/lib';
-import { JobPool } from '../../core/config/env';
+import { env, JobPool } from '../../core/config/env';
 import { Features } from '../../core/db/codes';
-import {
-  JobFailedError,
-  type PostSubmissionActionPluginDefinition,
-} from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
+import type { PostSubmissionActionPluginDefinition } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import { buildPackage } from './build';
+import { sendPackageEmail } from './send';
 import { resolvePackageSettings } from './settings';
 
 // Read when the plugin loads. A bad value keeps it from loading, which stops startup wherever
 // POST_SUBMISSION_ACTION_PLUGINS lists it.
 const settings = resolvePackageSettings(process.env);
 
-const notBuilt = (): Promise<void> => Promise.reject(new JobFailedError('Not built yet'));
-
-/** The email-package action's definition; its email step is not built yet. */
+/** Emails staff a link to a package of a submission when it is first submitted. */
 export const postSubmissionActionPluginDefinition: PostSubmissionActionPluginDefinition<PostSubmissionEmailPackageOptions> =
   {
     code: POST_SUBMISSION_EMAIL_PACKAGE_CODE,
@@ -49,7 +45,7 @@ export const postSubmissionActionPluginDefinition: PostSubmissionActionPluginDef
         // About an hour of retries at the default backoff, to ride out a provider outage.
         maxAttempts: 8,
         timeoutMs: 300_000,
-        run: notBuilt,
+        run: sendPackageEmail(() => env.getDesignerAppUrl()),
       },
     ],
   };

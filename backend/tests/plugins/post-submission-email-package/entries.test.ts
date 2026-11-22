@@ -1,18 +1,25 @@
 import {
+  attachmentName,
   documentExtension,
   missingFilesText,
   packageName,
-  uploadNamer,
+  reportName,
 } from '../../../src/plugins/post-submission-email-package/entries';
 
 describe('packageName', () => {
-  it('is the cleaned form name, cut to 100 characters, then the confirmation code', () => {
-    expect(packageName('Permit: Intake/2026', 'ABC123')).toBe('Permit Intake 2026 ABC123');
-    expect(packageName('x'.repeat(150), 'ABC123')).toBe(`${'x'.repeat(100)} ABC123`);
+  it('is the cleaned form name, cut to 100 characters, a hyphen, then the confirmation code', () => {
+    expect(packageName('Permit: Intake/2026', 'ABC123')).toBe('Permit Intake 2026-ABC123');
+    expect(packageName('x'.repeat(150), 'ABC123')).toBe(`${'x'.repeat(100)}-ABC123`);
   });
 
   it('falls back to Submission for a name with nothing usable', () => {
-    expect(packageName('///', 'ABC123')).toBe('Submission ABC123');
+    expect(packageName('///', 'ABC123')).toBe('Submission-ABC123');
+  });
+
+  it('keeps the package name and its extension within 240 bytes', () => {
+    const named = `${packageName('漢'.repeat(100), 'ABC123')}.zip`;
+    expect(Buffer.byteLength(named)).toBeLessThanOrEqual(240);
+    expect(named.endsWith('-ABC123.zip')).toBe(true);
   });
 });
 
@@ -25,62 +32,50 @@ describe('documentExtension', () => {
   });
 });
 
-describe('uploadNamer', () => {
-  it('cleans each name and tells repeats apart before the extension, ignoring case', () => {
-    const name = uploadNamer();
-    expect(['plan.pdf', 'Plan.PDF', 'plan.pdf', 'a/b:c.png'].map(name)).toEqual([
-      'plan.pdf',
-      'Plan (2).PDF',
-      'plan (3).pdf',
-      'a b c.png',
-    ]);
-  });
-
-  it('cuts a name to 100 characters before its extension, then tells the cut names apart', () => {
-    const name = uploadNamer();
-    const long = 'y'.repeat(120);
-    expect(name(`${long}a.txt`)).toBe(`${'y'.repeat(100)}.txt`);
-    expect(name(`${long}b.txt`)).toBe(`${'y'.repeat(100)} (2).txt`);
-  });
-
-  it('names an empty, "." or ".." name file, and keeps a leading dot as part of the name', () => {
-    const name = uploadNamer();
-    expect(['', '.', '..', '.env'].map(name)).toEqual(['file', 'file (2)', 'file (3)', '.env']);
-  });
-
-  it('cuts whole characters, never half of one', () => {
-    const name = uploadNamer();
-    expect(name(`${'a'.repeat(99)}😀b.pdf`)).toBe(`${'a'.repeat(99)}😀.pdf`);
-    expect(name(`${'a'.repeat(99)}😀.pdf`)).toBe(`${'a'.repeat(99)}😀 (2).pdf`);
-  });
-
-  it('keeps a name within 240 bytes, so a long name in any script extracts', () => {
-    const name = uploadNamer();
-    const named = name(`${'漢'.repeat(100)}.pdf`);
-    expect(Buffer.byteLength(named)).toBeLessThanOrEqual(240);
-    expect(named.endsWith('.pdf')).toBe(true);
-    expect(Buffer.byteLength(name(`${'漢'.repeat(100)}.pdf`))).toBeLessThanOrEqual(240);
-  });
-
-  it('drops the trailing dots and spaces Windows would, and guards its device names', () => {
-    const name = uploadNamer();
-    expect(['report. ', 'notes...', 'CON.txt', 'nul', 'Com1.log', 'console.txt'].map(name)).toEqual(
-      ['report', 'notes', '_CON.txt', '_nul', '_Com1.log', 'console.txt'],
+describe('reportName', () => {
+  it("is the template file's name without its extension, a hyphen, then the confirmation code", () => {
+    expect(reportName('permit-report.docx', 'ABC123', 'application/pdf')).toBe(
+      'permit-report-ABC123.pdf',
+    );
+    expect(reportName('Permit: report.docx', 'ABC123', 'text/plain')).toBe(
+      'Permit report-ABC123.txt',
     );
   });
 
-  it('treats a very long extension as part of the name', () => {
-    const name = uploadNamer();
-    const tail = 'x'.repeat(40);
-    expect(name(`plan.${tail}`)).toBe(`plan.${tail}`);
+  it('falls back to Submission for a template name with nothing usable', () => {
+    expect(reportName('///.docx', 'ABC123', 'application/pdf')).toBe('Submission-ABC123.pdf');
   });
 });
 
-describe('packageName in bytes', () => {
-  it('keeps the package name and its extension within 240 bytes', () => {
-    const named = `${packageName('漢'.repeat(100), 'ABC123')}.zip`;
+describe('attachmentName', () => {
+  it('puts the position first, then the cleaned original name', () => {
+    expect(attachmentName(1, 'plan.pdf')).toBe('1-plan.pdf');
+    expect(attachmentName(2, 'plan.pdf')).toBe('2-plan.pdf');
+    expect(attachmentName(12, 'a/b:c.png')).toBe('12-a b c.png');
+  });
+
+  it('cuts a name to 100 characters before its extension, whole characters only', () => {
+    expect(attachmentName(1, `${'y'.repeat(120)}.txt`)).toBe(`1-${'y'.repeat(100)}.txt`);
+    expect(attachmentName(1, `${'a'.repeat(99)}😀b.pdf`)).toBe(`1-${'a'.repeat(99)}😀.pdf`);
+  });
+
+  it('keeps a name within 240 bytes, so a long name in any script extracts', () => {
+    const named = attachmentName(3, `${'漢'.repeat(100)}.pdf`);
     expect(Buffer.byteLength(named)).toBeLessThanOrEqual(240);
-    expect(named.endsWith(' ABC123.zip')).toBe(true);
+    expect(named.startsWith('3-')).toBe(true);
+    expect(named.endsWith('.pdf')).toBe(true);
+  });
+
+  it('drops the trailing dots and spaces Windows would, and names an empty name file', () => {
+    expect(
+      ['report. ', 'notes...', '', '..', 'CON.txt'].map((name) => attachmentName(1, name)),
+    ).toEqual(['1-report', '1-notes', '1-file', '1-file', '1-CON.txt']);
+  });
+
+  it('treats a leading dot, or a very long extension, as part of the name', () => {
+    expect(attachmentName(1, '.env')).toBe('1-.env');
+    const tail = 'x'.repeat(40);
+    expect(attachmentName(1, `plan.${tail}`)).toBe(`1-plan.${tail}`);
   });
 });
 

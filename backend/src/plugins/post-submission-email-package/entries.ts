@@ -1,15 +1,11 @@
 import { cleanFileName } from '../../core/fileNames';
 
-/** The most characters kept before an extension. */
+/** The most characters kept in a name before its extension. */
 const NAME_MAX_CHARACTERS = 100;
 /** The most UTF-8 bytes in a name, within the 255 most file systems take, with room to spare. */
 const NAME_MAX_BYTES = 240;
-/** Room for " (999)" when repeats are told apart. */
-const COPY_SUFFIX_BYTES = 6;
 /** A longer "extension" is part of the name. */
 const EXTENSION_MAX_BYTES = 32;
-/** Names Windows reserves for devices, with or without an extension. */
-const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
 
 /** `name` without the trailing dots and spaces Windows drops when it extracts a file. */
 const trimTrailingDots = (name: string): string => {
@@ -27,19 +23,6 @@ const cut = (text: string, maxBytes: number): string => {
   return characters.join('');
 };
 
-/**
- * `<form name> <confirmation code>`: the name of the package and of the document in it, leaving
- * room for a four-character extension.
- */
-export const packageName = (formName: string, confirmationCode: string): string => {
-  const room = NAME_MAX_BYTES - Buffer.byteLength(` ${confirmationCode}.zip`);
-  return cleanFileName(`${cut(cleanFileName(formName), room) || 'Submission'} ${confirmationCode}`);
-};
-
-/** The rendered document's extension: pdf for a PDF, else txt. */
-export const documentExtension = (contentType: string | undefined): string =>
-  contentType?.toLowerCase().startsWith('application/pdf') ? 'pdf' : 'txt';
-
 /** A name and its extension, dot included; a leading dot, or a very long extension, is the name. */
 const splitExtension = (name: string): [string, string] => {
   const dot = name.lastIndexOf('.');
@@ -47,28 +30,46 @@ const splitExtension = (name: string): [string, string] => {
   return [name.slice(0, dot), name.slice(dot)];
 };
 
+/** `name` cleaned and cut to fit before `suffix`, without trailing dots; `fallback` when empty. */
+const fitted = (name: string, suffix: string, fallback: string): string =>
+  trimTrailingDots(cut(cleanFileName(name), NAME_MAX_BYTES - Buffer.byteLength(suffix))) ||
+  fallback;
+
+/** `<form name>-<confirmation code>`, the package's name before `.zip`. */
+export const packageName = (formName: string, confirmationCode: string): string => {
+  const code = `-${confirmationCode}`;
+  return fitted(formName, `${code}.zip`, 'Submission') + code;
+};
+
+/** The rendered document's extension: pdf for a PDF, else txt. */
+export const documentExtension = (contentType: string | undefined): string =>
+  contentType?.toLowerCase().startsWith('application/pdf') ? 'pdf' : 'txt';
+
 /**
- * Names uploads for the package's `files/` folder, so each extracts as named on Windows, macOS and
- * Linux: cleaned, without trailing dots or spaces, a reserved device name prefixed with "_", cut to
- * 100 characters and 240 bytes before the extension, then told apart with " (2)", " (3)" before the
- * extension when two match, ignoring case as most file systems do. A name left empty becomes "file".
+ * `<template name>-<confirmation code>.<extension>`: the document is named after the template it
+ * was rendered from, so the people who name templates decide how documents sort and group.
  */
-export const uploadNamer = (): ((name: string) => string) => {
-  const used = new Set<string>();
-  return (raw) => {
-    const trimmed = trimTrailingDots(cleanFileName(raw)) || 'file';
-    const usable = WINDOWS_RESERVED.test(trimmed) ? `_${trimmed}` : trimmed;
-    const [base, extension] = splitExtension(usable);
-    const room = NAME_MAX_BYTES - COPY_SUFFIX_BYTES - Buffer.byteLength(extension);
-    const stem = trimTrailingDots(cut(base, room)) || 'file';
-    const nameFor = (copy: number): string => {
-      const candidate = copy === 1 ? `${stem}${extension}` : `${stem} (${copy})${extension}`;
-      return used.has(candidate.toLowerCase()) ? nameFor(copy + 1) : candidate;
-    };
-    const name = nameFor(1);
-    used.add(name.toLowerCase());
-    return name;
-  };
+export const reportName = (
+  templateFilename: string,
+  confirmationCode: string,
+  contentType: string | undefined,
+): string => {
+  const suffix = `-${confirmationCode}.${documentExtension(contentType)}`;
+  const [template] = splitExtension(templateFilename);
+  return `${fitted(template, suffix, 'Submission')}${suffix}`;
+};
+
+/**
+ * `<position>-<original name>` for an upload in the package's `attachments/` folder. The position,
+ * from 1, keeps every name apart and keeps them in the order the form shows them. Cleaned, without
+ * trailing dots or spaces, and cut to 100 characters and 240 bytes before the extension; a name
+ * left empty becomes "file".
+ */
+export const attachmentName = (position: number, originalName: string): string => {
+  const prefix = `${position}-`;
+  const [base, extension] = splitExtension(trimTrailingDots(cleanFileName(originalName)));
+  const stem = fitted(base, `${prefix}${extension}`, 'file');
+  return `${prefix}${stem}${extension}`;
 };
 
 /** Why an upload is not in the package. */

@@ -7,7 +7,7 @@ import {
 } from '../../../src/core/errors';
 import { HttpClientError } from '../../../src/core/http/httpClient';
 import { httpErrorToAppError } from '../../../src/core/http/httpErrorMapper';
-import type { DocumentRenderOutcome } from '../../../src/features/document-generation/service';
+import type { RevisionRenderOutcome } from '../../../src/features/document-generation/service';
 import { toRenderError } from '../../../src/features/document-generation/renderError';
 import {
   ANSWERS_NOT_READ,
@@ -48,18 +48,29 @@ describe('readFromEngine', () => {
 });
 
 const context = { code: 'cdogs-v3', templateId: 'tpl-1' };
-const renderError = (err: unknown): DocumentRenderOutcome => ({
+const renderError = (err: unknown): RevisionRenderOutcome => ({
   status: 'error',
   code: 'cdogs-v3',
   error: toRenderError(err, context),
 });
 
 describe('toRenderOutcome', () => {
-  it('passes on the document and its content type', () => {
+  it("passes on the document, its content type and the template file's name", () => {
     const data = Buffer.from('%PDF-1.7');
     expect(
-      toRenderOutcome({ status: 'ok', code: 'cdogs-v3', data, contentType: 'application/pdf' }),
-    ).toEqual({ status: 'ok', data, contentType: 'application/pdf' });
+      toRenderOutcome({
+        status: 'ok',
+        code: 'cdogs-v3',
+        data,
+        contentType: 'application/pdf',
+        templateFilename: 'permit-report.docx',
+      }),
+    ).toEqual({
+      status: 'ok',
+      data,
+      contentType: 'application/pdf',
+      templateFilename: 'permit-report.docx',
+    });
   });
 
   it.each([

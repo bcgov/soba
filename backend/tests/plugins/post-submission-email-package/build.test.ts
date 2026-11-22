@@ -109,7 +109,12 @@ const harness = (
     documents: {
       render: jest.fn(() =>
         Promise.resolve(
-          setup.render ?? { status: 'ok' as const, data: PDF, contentType: 'application/pdf' },
+          setup.render ?? {
+            status: 'ok' as const,
+            data: PDF,
+            contentType: 'application/pdf',
+            templateFilename: 'permit-report.docx',
+          },
         ),
       ),
     },
@@ -188,12 +193,12 @@ describe('buildPackage', () => {
     const h = harness({
       answers: {
         documents: [ref(1, 'plan.pdf'), ref(2, 'gone.pdf')],
-        grid: [{ photo: [ref(3, 'photo.jpg')] }, { photo: [ref(4, 'other plan.pdf')] }],
+        grid: [{ photo: [ref(3, 'photo.jpg')] }, { photo: [ref(4, 'plan.pdf')] }],
       },
       uploads: {
-        [ID(1)]: { filename: 'plan.pdf', data: Buffer.from('plan bytes') },
-        [ID(3)]: { filename: 'photo.jpg', data: Buffer.from('photo bytes') },
-        [ID(4)]: { filename: 'Plan.pdf', data: Buffer.from('second plan') },
+        [ID(1)]: { filename: 'plan-0199f6a0.pdf', data: Buffer.from('plan bytes') },
+        [ID(3)]: { filename: 'photo-0199f6a1.jpg', data: Buffer.from('photo bytes') },
+        [ID(4)]: { filename: 'plan-0199f6a2.pdf', data: Buffer.from('second plan') },
       },
     });
 
@@ -201,16 +206,17 @@ describe('buildPackage', () => {
 
     expect(h.stored).toEqual([
       expect.objectContaining({
-        filename: 'Permit Intake ABC123.zip',
+        filename: 'Permit Intake-ABC123.zip',
         contentType: 'application/zip',
       }),
     ]);
+    // The document is named after its template; each upload by its original name, numbered.
     const entries = await readZip(h.stored[0].path);
     expect(entries.map(({ name, method }) => [name, method])).toEqual([
-      ['Permit Intake ABC123.pdf', 0],
-      ['files/plan.pdf', 0],
-      ['files/photo.jpg', 0],
-      ['files/Plan (2).pdf', 0],
+      ['permit-report-ABC123.pdf', 0],
+      ['attachments/1-plan.pdf', 0],
+      ['attachments/2-photo.jpg', 0],
+      ['attachments/3-plan.pdf', 0],
       ['missing-files.txt', 0],
     ]);
     expect(entries[0].data).toEqual(PDF);
@@ -219,6 +225,21 @@ describe('buildPackage', () => {
     expect(h.mostOpen()).toBe(1);
     expect(h.context.reportProgress).toHaveBeenLastCalledWith(5, 5);
     await h.expectTempClear();
+  });
+
+  it("names an upload by storage's name only when the answers give it none", async () => {
+    const h = harness({
+      answers: { files: [ref(1, '')] },
+      uploads: { [ID(1)]: { filename: 'scan-0199f6a0.tif', data: Buffer.from('scan bytes') } },
+    });
+
+    await h.run();
+
+    const entries = await readZip(h.stored[0].path);
+    expect(entries.map((entry) => entry.name)).toEqual([
+      'permit-report-ABC123.pdf',
+      'attachments/1-scan-0199f6a0.tif',
+    ]);
   });
 
   it('stages an upload whose size storage does not know, removing the copy once it is in', async () => {
@@ -231,8 +252,8 @@ describe('buildPackage', () => {
 
     const entries = await readZip(h.stored[0].path);
     expect(entries.map((entry) => entry.name)).toEqual([
-      'Permit Intake ABC123.pdf',
-      'files/scan.tif',
+      'permit-report-ABC123.pdf',
+      'attachments/1-scan.tif',
     ]);
     expect(entries[1].data.toString()).toBe('scan bytes');
     const removedCopy = h.services.tempStorage.remove.mock.invocationCallOrder[0];
@@ -255,7 +276,7 @@ describe('buildPackage', () => {
 
     const entries = await readZip(h.stored[0].path);
     expect(entries.map((entry) => entry.name)).toEqual([
-      'Permit Intake ABC123.pdf',
+      'permit-report-ABC123.pdf',
       'missing-files.txt',
     ]);
     expect(entries[1].data.toString()).toContain('video.mp4: larger than 1 MB / plus de 1 Mo');
@@ -389,7 +410,12 @@ describe('buildPackage', () => {
     });
     h.services.documents.render.mockImplementation(() => {
       h.controller.abort('lease_lost');
-      return Promise.resolve({ status: 'ok', data: PDF, contentType: 'application/pdf' });
+      return Promise.resolve({
+        status: 'ok',
+        data: PDF,
+        contentType: 'application/pdf',
+        templateFilename: 'permit-report.docx',
+      });
     });
 
     await expect(h.run()).rejects.toBe('lease_lost');

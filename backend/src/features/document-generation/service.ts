@@ -387,6 +387,11 @@ export interface RevisionRenderInput {
   actorId: string;
 }
 
+/** A job's render: a document comes with the name of the template file it was rendered from. */
+export type RevisionRenderOutcome =
+  | (Extract<DocumentRenderOutcome, { status: 'ok' }> & { templateFilename: string })
+  | Exclude<DocumentRenderOutcome, { status: 'ok' }>;
+
 /** Render from a job. No caller is checked: the job checks the submission before it renders. */
 export const jobDocumentService = {
   /**
@@ -394,14 +399,14 @@ export const jobDocumentService = {
    * revision's print context, audited in `package` mode against the revision. template-notfound
    * when the version has none.
    */
-  async renderRevision(input: RevisionRenderInput): Promise<DocumentRenderOutcome> {
+  async renderRevision(input: RevisionRenderInput): Promise<RevisionRenderOutcome> {
     const [stored] = await listLiveDocumentTemplates(
       input.formVersionId,
       DocumentTemplateType.cdogs,
     );
     if (!stored) return { status: 'template-notfound' };
     const { workspaceId, formId, formVersionId } = input;
-    return renderWith(
+    const outcome = await renderWith(
       { workspaceId, formId, formVersionId },
       stored,
       {
@@ -418,6 +423,9 @@ export const jobDocumentService = {
         templateFileId: stored.file.id,
       },
     );
+    return outcome.status === 'ok'
+      ? { ...outcome, templateFilename: stored.file.filename }
+      : outcome;
   },
 };
 

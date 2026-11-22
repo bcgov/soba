@@ -71,14 +71,15 @@ export interface PostSubmissionActionNotifications {
 export type PostSubmissionActionSubmits = 'every' | 'first';
 
 /**
- * How a render ended: `ok` with the document; `no-template` when the form version has no CDOGS
+ * How a render ended: `ok` with the document and the name of the template file it was rendered
+ * from, such as `permit-report.docx`; `no-template` when the form version has no CDOGS
  * template; `unavailable` when no document generation backend serves the form; `busy` when every
  * render slot is taken; `refused` when the template is not renderable, the backend refused it or
  * the data, or the revision is not one of the submission's submitted revisions; `failed` when the
  * backend or the template's storage failed.
  */
 export type PostSubmissionActionRenderOutcome =
-  | { status: 'ok'; data: Buffer; contentType?: string }
+  | { status: 'ok'; data: Buffer; contentType?: string; templateFilename: string }
   | { status: 'no-template' | 'unavailable' | 'busy' | 'refused' | 'failed' };
 
 /** A render's status when it produced no document. */
