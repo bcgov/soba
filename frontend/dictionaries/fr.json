@@ -915,6 +915,10 @@
       "backToExports": "Retour aux exportations",
       "fileNotFound": "Cette exportation n’est plus disponible. Démarrez-en une nouvelle."
     },
+    "package": {
+      "pageTitle": "Télécharger le paquet de la soumission",
+      "notFound": "Ce paquet n’est plus disponible."
+    },
     "emailReceipt": {
       "button": "Envoyer un reçu de la soumission par courriel",
       "title": "Envoyer un reçu de cette soumission par courriel",
@@ -1146,6 +1150,7 @@
     "fileId": "Identifiant de fichier",
     "submissionId": "Identifiant de soumission",
     "exportId": "Identifiant d'exportation",
+    "packageId": "Identifiant de paquet",
     "type": "Type",
     "size": "Taille",
     "errorCode": "Code d'erreur",

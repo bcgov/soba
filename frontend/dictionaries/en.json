@@ -915,6 +915,10 @@
       "backToExports": "Back to exports",
       "fileNotFound": "This export is no longer available. Start a new one."
     },
+    "package": {
+      "pageTitle": "Download submission package",
+      "notFound": "This package is no longer available."
+    },
     "emailReceipt": {
       "button": "Email receipt of submission",
       "title": "Email a receipt of this submission",
@@ -1146,6 +1150,7 @@
     "fileId": "File ID",
     "submissionId": "Submission ID",
     "exportId": "Export ID",
+    "packageId": "Package ID",
     "type": "Type",
     "size": "Size",
     "errorCode": "Error code",
