@@ -78,26 +78,20 @@ export const POST_SUBMISSION_EMAIL_MAX_ADDRESSES = 100;
 /** One recipient as the email action keeps it: trimmed, lower-cased, then checked. */
 export const PostSubmissionEmailAddressSchema = NormalizedEmailAddressSchema;
 
-/** The email action's options: 1 to 100 addresses, de-duplicated. */
-export const PostSubmissionEmailAddressesOptionsSchema = z.strictObject({
-  to: z
-    .array(PostSubmissionEmailAddressSchema)
-    .min(1)
-    .max(POST_SUBMISSION_EMAIL_MAX_ADDRESSES)
-    .transform((addresses) => [...new Set(addresses)]),
-});
+/** 1 to 100 addresses, each kept once; the limit counts them after duplicates are dropped. */
+const addressList = z
+  .array(PostSubmissionEmailAddressSchema)
+  .transform((addresses) => [...new Set(addresses)])
+  .pipe(z.array(z.string()).min(1).max(POST_SUBMISSION_EMAIL_MAX_ADDRESSES));
+
+/** The email action's options. */
+export const PostSubmissionEmailAddressesOptionsSchema = z.strictObject({ to: addressList });
 export type PostSubmissionEmailAddressesOptions = z.infer<
   typeof PostSubmissionEmailAddressesOptionsSchema
 >;
 
-/** The email-package action's options: 1 to 100 staff addresses, de-duplicated. */
-export const PostSubmissionEmailPackageOptionsSchema = z.strictObject({
-  to: z
-    .array(PostSubmissionEmailAddressSchema)
-    .min(1)
-    .max(POST_SUBMISSION_EMAIL_MAX_ADDRESSES)
-    .transform((addresses) => [...new Set(addresses)]),
-});
+/** The email-package action's options. */
+export const PostSubmissionEmailPackageOptionsSchema = z.strictObject({ to: addressList });
 export type PostSubmissionEmailPackageOptions = z.infer<
   typeof PostSubmissionEmailPackageOptionsSchema
 >;

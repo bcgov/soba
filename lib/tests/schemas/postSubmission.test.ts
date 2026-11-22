@@ -53,22 +53,23 @@ describe('post-submission settings', () => {
   });
 });
 
-describe('the email action options', () => {
+describe.each([
+  ['email', PostSubmissionEmailAddressesOptionsSchema],
+  ['email-package', PostSubmissionEmailPackageOptionsSchema],
+])('the %s action options', (_name, schema) => {
+  const many = Array.from(
+    { length: POST_SUBMISSION_EMAIL_MAX_ADDRESSES + 1 },
+    (_, index) => `a${index}@example.com`,
+  );
+  const parse = (options: unknown) => schema.safeParse(options).success;
+
   it('trims, lower-cases and de-duplicates the addresses', () => {
     expect(
-      PostSubmissionEmailAddressesOptionsSchema.parse({
-        to: [' Team@Example.com ', 'team@example.com', 'b@example.com'],
-      }),
+      schema.parse({ to: [' Team@Example.com ', 'team@example.com', 'b@example.com'] }),
     ).toEqual({ to: ['team@example.com', 'b@example.com'] });
   });
 
   it('takes 1 to 100 valid addresses and nothing else', () => {
-    const many = Array.from(
-      { length: POST_SUBMISSION_EMAIL_MAX_ADDRESSES + 1 },
-      (_, index) => `a${index}@example.com`,
-    );
-    const parse = (options: unknown) =>
-      PostSubmissionEmailAddressesOptionsSchema.safeParse(options).success;
     expect(parse({ to: [] })).toBe(false);
     expect(parse({ to: many })).toBe(false);
     expect(parse({ to: many.slice(1) })).toBe(true);
@@ -76,33 +77,18 @@ describe('the email action options', () => {
     expect(parse({ to: ['a@example.com'], cc: [] })).toBe(false);
   });
 
-  it('checks one address as the field does before it becomes a chip', () => {
-    expect(PostSubmissionEmailAddressSchema.parse('  Jane@Gov.BC.ca ')).toBe('jane@gov.bc.ca');
-    expect(PostSubmissionEmailAddressSchema.safeParse('jane@').success).toBe(false);
+  it('counts the addresses after dropping duplicates', () => {
+    const hundred = many.slice(1);
+    expect(schema.parse({ to: [...hundred, hundred[0].toUpperCase()] }).to).toHaveLength(
+      POST_SUBMISSION_EMAIL_MAX_ADDRESSES,
+    );
   });
 });
 
-describe('the email-package action options', () => {
-  it('trims, lower-cases and de-duplicates the addresses', () => {
-    expect(
-      PostSubmissionEmailPackageOptionsSchema.parse({
-        to: [' Team@Example.com ', 'team@example.com', 'b@example.com'],
-      }),
-    ).toEqual({ to: ['team@example.com', 'b@example.com'] });
-  });
-
-  it('takes 1 to 100 valid addresses and nothing else', () => {
-    const many = Array.from(
-      { length: POST_SUBMISSION_EMAIL_MAX_ADDRESSES + 1 },
-      (_, index) => `a${index}@example.com`,
-    );
-    const parse = (options: unknown) =>
-      PostSubmissionEmailPackageOptionsSchema.safeParse(options).success;
-    expect(parse({ to: [] })).toBe(false);
-    expect(parse({ to: many })).toBe(false);
-    expect(parse({ to: many.slice(1) })).toBe(true);
-    expect(parse({ to: ['not an address'] })).toBe(false);
-    expect(parse({ to: ['a@example.com'], cc: [] })).toBe(false);
+describe('one email action address', () => {
+  it('is checked as the field does before it becomes a chip', () => {
+    expect(PostSubmissionEmailAddressSchema.parse('  Jane@Gov.BC.ca ')).toBe('jane@gov.bc.ca');
+    expect(PostSubmissionEmailAddressSchema.safeParse('jane@').success).toBe(false);
   });
 });
 

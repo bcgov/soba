@@ -38,6 +38,7 @@ import { pool } from './core/db/client';
 import { assertJobShutdownFits, getJobSettings, startJobs, stopJobs } from './core/jobs';
 import { assertAppLinkBases } from './core/appLinks';
 import { getNotificationSettings } from './core/integrations/notification/settings';
+import { assertPostSubmissionActionsInstalled } from './core/integrations/post-submission-action/PostSubmissionActionRegistry';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const app = express();
@@ -47,6 +48,7 @@ const port = Number(process.env.PORT) || 4000;
 const shutdownSettings = env.getShutdownSettings();
 assertJobShutdownFits(getJobSettings(), shutdownSettings.timeoutMs);
 getNotificationSettings();
+assertPostSubmissionActionsInstalled();
 assertAppLinkBases({
   DESIGNER_APP_URL: env.getDesignerAppUrl(),
   FORMS_APP_URL: env.getFormsAppUrl(),

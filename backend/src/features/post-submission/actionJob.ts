@@ -3,15 +3,11 @@ import type {
   PostSubmissionActionJobSettings,
   PostSubmissionActionPluginDefinition,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
-import {
-  actionStepType,
-  getEnabledPostSubmissionActionCodes,
-} from '../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
+import { actionStepType } from '../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
 import { getPostSubmissionActionPluginDefinitions } from '../../core/integrations/plugins/PluginRegistry';
 import type { JobFacts } from '../../core/jobs/facts';
 import type { JobTypeDefinition } from '../../core/jobs/registry';
 import { getJobSettings } from '../../core/jobs/settings';
-import { log } from '../../core/logging';
 import { actionResult } from './actionServices';
 import { runActionStep } from './actionStep';
 import { ActionJobParamsSchema, type ActionJobParams } from './params';
@@ -92,17 +88,6 @@ export const actionJobDefinitions = (
   );
 };
 
-/**
- * The job types for every installed action plugin; the start check cancels those not enabled here.
- * Warns once about enabled codes with no plugin; those never run.
- */
-export const postSubmissionActionJobs = (): JobTypeDefinition[] => {
-  const installed = getPostSubmissionActionPluginDefinitions();
-  const notInstalled = getEnabledPostSubmissionActionCodes().filter(
-    (code) => !installed.some((plugin) => plugin.code === code),
-  );
-  if (notInstalled.length > 0) {
-    log.warn({ codes: notInstalled }, 'POST_SUBMISSION_ACTION_PLUGINS names plugins not installed');
-  }
-  return installed.flatMap(actionJobDefinitions);
-};
+/** The job types for every installed action plugin; the start check cancels those not enabled here. */
+export const postSubmissionActionJobs = (): JobTypeDefinition[] =>
+  getPostSubmissionActionPluginDefinitions().flatMap(actionJobDefinitions);

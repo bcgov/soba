@@ -261,8 +261,9 @@ either key is missing.
 
 Actions that run after a submit are plugins, run as jobs while `backend.features.post-submission`
 is on; the After Submission tab shows on every workspace and form then. The list names the action
-codes this environment runs, comma-separated; with none listed, a submit queues no actions. Set in
-ConfigMap `<fullname>-backend-app` only when non-empty:
+codes this environment runs, comma-separated; with none listed, a submit queues no actions. A listed
+code with no installed plugin, or one whose settings keep it from loading, stops the backend from
+starting. Set in ConfigMap `<fullname>-backend-app` only when non-empty:
 
 | Helm value                                   | Env var                          | Used by                 |
 | -------------------------------------------- | -------------------------------- | ----------------------- |
