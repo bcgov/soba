@@ -59,6 +59,12 @@ export interface PostSubmissionActionNotifications {
     addresses: readonly string[],
     content: PostSubmissionActionEmailContent,
   ): Promise<void>;
+  /**
+   * Throws as `sendToEach` would before its first send: `JobCancelledError` while notifications are
+   * off, and `JobDeferredError` while there is no room today or the provider's pause lasts. Call it
+   * before work whose only use is an email, so that work waits too.
+   */
+  ready(): Promise<void>;
 }
 
 /** Which submits queue an action: every submit, or the submission's first only. */
@@ -74,6 +80,12 @@ export type PostSubmissionActionSubmits = 'every' | 'first';
 export type PostSubmissionActionRenderOutcome =
   | { status: 'ok'; data: Buffer; contentType?: string }
   | { status: 'no-template' | 'unavailable' | 'busy' | 'refused' | 'failed' };
+
+/** A render's status when it produced no document. */
+export type PostSubmissionActionRenderStop = Exclude<
+  PostSubmissionActionRenderOutcome['status'],
+  'ok'
+>;
 
 /** A file uploaded to the job's submission, open for reading. */
 export interface PostSubmissionActionUpload {

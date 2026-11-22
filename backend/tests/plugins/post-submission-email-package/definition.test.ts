@@ -67,7 +67,7 @@ describe('post-submission-email-package', () => {
   it('builds the package as a job typed by its code, in the heavy pool', async () => {
     const plugin = await pluginWith(undefined);
     expect(plugin.code).toBe(POST_SUBMISSION_EMAIL_PACKAGE_CODE);
-    expect(plugin.job).toMatchObject({ pool: 'heavy', maxAttempts: 8, timeoutMs: 900_000 });
+    expect(plugin.job).toMatchObject({ pool: 'heavy', maxAttempts: 8, timeoutMs: 300_000 });
   });
 
   it('keeps the package 7 days by default, or the days its setting names', async () => {

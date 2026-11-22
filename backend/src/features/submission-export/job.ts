@@ -9,6 +9,7 @@ import { Features, JobType, Permissions, SubmissionExportAuditAction } from '../
 import { isFeatureEnabledCached } from '../../core/db/repos/featureRepo';
 import { resolveFormPermissions } from '../../core/db/repos/formAccessRepo';
 import { getLiveForm, insertExportAudit } from '../../core/db/repos/submissionExportRepo';
+import { cleanFileName } from '../../core/fileNames';
 import { getTempStorageAdapter } from '../../core/integrations/plugins/PluginRegistry';
 import { JobCancelledError, JobFailedError } from '../../core/jobs/errors';
 import type { JobContext, JobTypeDefinition } from '../../core/jobs/registry';
@@ -59,11 +60,8 @@ const DATE_IN_BC = new Intl.DateTimeFormat('en-CA', {
 });
 
 /** The form's name and the day the export was started, without characters file systems refuse. */
-export const exportFileName = (formName: string, startedAt: Date, extension: string): string => {
-  // eslint-disable-next-line no-control-regex
-  const name = formName.replace(/[\u0000-\u001f\u007f/\\:*?"<>|]+/g, ' ').replace(/\s+/g, ' ');
-  return `${name.trim().slice(0, 100) || 'Submissions'} ${DATE_IN_BC.format(startedAt)}.${extension}`;
-};
+export const exportFileName = (formName: string, startedAt: Date, extension: string): string =>
+  `${cleanFileName(formName).slice(0, 100) || 'Submissions'} ${DATE_IN_BC.format(startedAt)}.${extension}`;
 
 /** The starter still reads the form's submissions, and the form is live in the job's workspace. */
 const starterStillReads = async (job: JobContext['job']): Promise<string | null> => {

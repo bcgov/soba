@@ -4,6 +4,7 @@ import { AppError } from '../../core/errors';
 import { upstreamStatusOf } from '../../core/http/httpErrorMapper';
 import type {
   PostSubmissionActionRenderOutcome,
+  PostSubmissionActionRenderStop,
   PostSubmissionActionUpload,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import type { DocumentRenderOutcome } from '../document-generation/service';
@@ -31,10 +32,10 @@ export const readFromEngine = async <T>(
   }
 };
 
-type RenderStop = Exclude<PostSubmissionActionRenderOutcome['status'], 'ok'>;
-
 /** Statuses a job's render returns besides `ok` and `error`; any other reads as failed. */
-const RENDER_STOPS: Partial<Record<DocumentRenderOutcome['status'], RenderStop>> = {
+const RENDER_STOPS: Partial<
+  Record<DocumentRenderOutcome['status'], PostSubmissionActionRenderStop>
+> = {
   'template-notfound': 'no-template',
   unavailable: 'unavailable',
   busy: 'busy',

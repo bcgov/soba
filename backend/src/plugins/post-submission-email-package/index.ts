@@ -9,6 +9,7 @@ import {
   JobFailedError,
   type PostSubmissionActionPluginDefinition,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
+import { buildPackage } from './build';
 import { resolvePackageSettings } from './settings';
 
 // Read when the plugin loads. A bad value keeps it from loading, which stops startup wherever
@@ -17,7 +18,7 @@ const settings = resolvePackageSettings(process.env);
 
 const notBuilt = (): Promise<void> => Promise.reject(new JobFailedError('Not built yet'));
 
-/** The email-package action's definition; neither step is built yet. */
+/** The email-package action's definition; its email step is not built yet. */
 export const postSubmissionActionPluginDefinition: PostSubmissionActionPluginDefinition<PostSubmissionEmailPackageOptions> =
   {
     code: POST_SUBMISSION_EMAIL_PACKAGE_CODE,
@@ -34,11 +35,12 @@ export const postSubmissionActionPluginDefinition: PostSubmissionActionPluginDef
     job: {
       pool: JobPool.heavy,
       // About an hour of retries at the default backoff, to ride out a document generation or
-      // storage outage.
+      // storage outage. A package within its limit builds in well under the timeout, so a timeout
+      // is a stall, and the retries keep one from holding the heavy pool for long.
       maxAttempts: 8,
-      timeoutMs: 900_000,
+      timeoutMs: 300_000,
       resultRetentionDays: settings.retentionDays,
-      run: notBuilt,
+      run: buildPackage(settings),
     },
     steps: [
       {
