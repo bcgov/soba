@@ -1106,21 +1106,23 @@
     "status": "État : {status}",
     "on": "Activée",
     "off": "Désactivée",
-    "email": {
-      "label": "Envoyer un avis par courriel",
-      "description": "Envoie un court courriel à chaque adresse de la liste lorsqu'une soumission est reçue.",
-      "enabled": "Envoyer ces courriels",
+    "addressList": {
       "recipients": "Destinataires",
       "recipientsHelp": "Tapez une adresse et appuyez sur Entrée, ou collez-en plusieurs à la fois. Pour retirer une adresse, sélectionnez-la et appuyez sur Suppr ou Retour arrière.",
-      "noticeHelp": "Chaque adresse reçoit son propre courriel avec le nom du formulaire, l’ID de confirmation et un lien vers la soumission, qui exige une connexion. Au-delà de la limite quotidienne d’envoi, les courriels attendent et sont envoyés après sa remise à zéro, à minuit.",
       "count": "Adresses : {count} / {max}",
       "invalid": "Adresse courriel non valide. Corrigez ou supprimez le texte dans le champ.",
       "tooMany": "Une liste peut contenir jusqu'à {max} adresses. Les autres sont toujours dans le champ.",
       "duplicate": "Déjà dans la liste : {addresses}",
-      "required": "Ajoutez au moins une adresse, ou désactivez ces courriels.",
       "added": "Ajout : {addresses}",
       "removed": "Retrait : {address}",
       "none": "Aucune adresse pour l'instant."
+    },
+    "email": {
+      "label": "Envoyer un avis par courriel",
+      "description": "Envoie un court courriel à chaque adresse de la liste lorsqu'une soumission est reçue.",
+      "enabled": "Envoyer ces courriels",
+      "help": "Chaque adresse reçoit son propre courriel avec le nom du formulaire, l’ID de confirmation et un lien vers la soumission, qui exige une connexion. Au-delà de la limite quotidienne d’envoi, les courriels attendent et sont envoyés après sa remise à zéro, à minuit.",
+      "required": "Ajoutez au moins une adresse, ou désactivez ces courriels."
     },
     "log": {
       "label": "Consigner chaque soumission",

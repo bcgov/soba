@@ -4,13 +4,13 @@ import {
   type PostSubmissionActionValues,
 } from '@/src/types/postSubmission';
 
-/** The addresses in the email action's options; none when the options hold no list. */
+/** The addresses in an address-list action's options; none when the options hold no list. */
 export function addressesOf(values: PostSubmissionActionValues): string[] {
   const to = values.options.to;
   return Array.isArray(to) ? to.filter((address) => typeof address === 'string') : [];
 }
 
-/** The email action's values with this list; an empty list keeps no options. */
+/** The action's values with this list; an empty list keeps no options. */
 export function withAddresses(
   values: PostSubmissionActionValues,
   addresses: readonly string[],
@@ -18,7 +18,7 @@ export function withAddresses(
   return { ...values, options: addresses.length > 0 ? { to: [...addresses] } : {} };
 }
 
-/** True when the emails are on with nobody to send them to, which cannot be saved. */
+/** True when the action is on with nobody to send to, which cannot be saved. */
 export const needsAddress = (values: PostSubmissionActionValues): boolean =>
   values.enabled && addressesOf(values).length === 0;
 

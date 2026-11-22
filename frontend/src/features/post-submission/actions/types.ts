@@ -35,10 +35,21 @@ export type ActionViewProps = Readonly<{
   values: PostSubmissionActionValues;
 }>;
 
+/** Where a drawer shows an action: a workspace's values, or one form's. */
+export type ActionScope = 'workspace' | 'form';
+
+/** A note shown with an action's description. */
+export interface ActionNotice {
+  variant: 'info' | 'warning';
+  text: string;
+}
+
 /** How the After Submission tab shows one action: its own words, fields and checks. */
 export interface PostSubmissionActionUi {
   label: (dict: Dictionary) => string;
   description: (dict: Dictionary) => string;
+  /** Notes under the description in every drawer of the scope, read-only and inheriting included. */
+  notices?: (dict: Dictionary, scope: ActionScope) => ActionNotice[];
   /** The fields, for values the person can change. */
   Editor: ComponentType<ActionEditorProps>;
   /** The values read-only, such as a workspace's while a form uses them. */

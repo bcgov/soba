@@ -1106,21 +1106,23 @@
     "status": "Status: {status}",
     "on": "On",
     "off": "Off",
-    "email": {
-      "label": "Email a notice",
-      "description": "Sends a short email to each address on the list when a submission is received.",
-      "enabled": "Send these emails",
+    "addressList": {
       "recipients": "Recipients",
       "recipientsHelp": "Type an address and press Enter, or paste several at once. To remove an address, select it and press Delete or Backspace.",
-      "noticeHelp": "Each address gets its own email with the form name, the confirmation ID and a link to the submission, which needs sign-in. Past the daily email limit, emails wait and are sent after it resets at midnight.",
       "count": "Addresses: {count} / {max}",
       "invalid": "Not a valid email address. Fix or remove the text in the field.",
       "tooMany": "A list can have up to {max} addresses. The rest are still in the field.",
       "duplicate": "Already on the list: {addresses}",
-      "required": "Add at least one address, or turn these emails off.",
       "added": "Added: {addresses}",
       "removed": "Removed: {address}",
       "none": "No addresses yet."
+    },
+    "email": {
+      "label": "Email a notice",
+      "description": "Sends a short email to each address on the list when a submission is received.",
+      "enabled": "Send these emails",
+      "help": "Each address gets its own email with the form name, the confirmation ID and a link to the submission, which needs sign-in. Past the daily email limit, emails wait and are sent after it resets at midnight.",
+      "required": "Add at least one address, or turn these emails off."
     },
     "log": {
       "label": "Log each submission",

@@ -31,6 +31,8 @@ import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import FormActionDrawer from '@/src/features/post-submission/ui/FormActionDrawer';
 import { postSubmissionActionUi } from '@/src/features/post-submission/actions/registry';
+import { addressListAction } from '@/src/features/post-submission/actions/addressList';
+import type { PostSubmissionActionUi } from '@/src/features/post-submission/actions/types';
 
 const dict: Dictionary = en;
 const EMAIL = 'post-submission-email-addresses';
@@ -62,8 +64,7 @@ const inheriting = (workspace: PostSubmissionActionValues): PostSubmissionFormAc
 
 let store: ReturnType<typeof makeStore>;
 
-function renderDrawer(action: Item) {
-  const ui = postSubmissionActionUi(action.code);
+function renderDrawer(action: Item, ui = postSubmissionActionUi(action.code)) {
   if (!ui) throw new Error(`no fields for ${action.code}`);
   return render(
     <Provider store={store}>
@@ -75,6 +76,22 @@ function renderDrawer(action: Item) {
     </Provider>,
   );
 }
+
+// The email action with two notes that name the scope they were asked for.
+const withNotices = (): PostSubmissionActionUi => {
+  const ui = postSubmissionActionUi(EMAIL);
+  if (!ui) throw new Error(`no fields for ${EMAIL}`);
+  return {
+    ...ui,
+    notices: (_dict, scope) => [
+      { variant: 'warning', text: `First note for the ${scope}` },
+      { variant: 'info', text: `Second note for the ${scope}` },
+    ],
+  };
+};
+const notices = () =>
+  [1, 2, 3].map((n) => screen.queryByTestId(`${EMAIL}-notice-${n}`)?.textContent ?? null);
+const FORM_NOTES = ['First note for the form', 'Second note for the form', null];
 
 const inputIn = (testId: string) =>
   screen.getByTestId(testId).querySelector('input') as HTMLInputElement;
@@ -252,5 +269,56 @@ describe('FormActionDrawer', () => {
     expect(await screen.findByTestId(`${EMAIL}-error`)).toHaveTextContent(
       en.postSubmission.settingsLoadError,
     );
+  });
+
+  it("shows the action's notes for a form, in order, both while it uses the workspace's values and when it sets its own", async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(inheriting(TEAM));
+    renderDrawer(item(EMAIL), withNotices());
+    await waitFor(() => expect(inputIn(`${EMAIL}-inherit`)).toBeEnabled());
+    expect(notices()).toEqual(FORM_NOTES);
+    expect(screen.getByTestId(`${EMAIL}-notice-1`)).toHaveClass('warning');
+    expect(screen.getByTestId(`${EMAIL}-notice-2`)).toHaveClass('info');
+
+    await user.click(inputIn(`${EMAIL}-inherit`));
+    expect(inputIn('post-submission-email-input')).toBeInTheDocument();
+    expect(notices()).toEqual(FORM_NOTES);
+  });
+
+  it("shows the action's notes for a form in a read-only drawer", async () => {
+    mockGetSettings.mockResolvedValue(inheriting(TEAM));
+    renderDrawer(item(EMAIL, { scopes: ['workspace'] }), withNotices());
+
+    await screen.findByTestId('post-submission-email-view-list');
+    expect(notices()).toEqual(FORM_NOTES);
+  });
+
+  it('shows another address-list action read-only under its own test ids', async () => {
+    const other = addressListAction({
+      copy: () => ({
+        label: 'Other action',
+        description: 'Sends something else.',
+        enabled: 'Send it',
+        help: 'Each address gets something else.',
+        required: 'Add an address for it.',
+      }),
+      testIdPrefix: 'other',
+    });
+    mockGetSettings.mockResolvedValue(inheriting(TEAM));
+    renderDrawer(item(EMAIL, { scopes: ['workspace'] }), other);
+
+    expect(await screen.findByTestId('other-view-list')).toHaveTextContent('team@example.com');
+    expect(screen.getByTestId('other-view')).toHaveTextContent(
+      en.postSubmission.addressList.recipients,
+    );
+    expect(screen.queryByTestId('post-submission-email-view')).not.toBeInTheDocument();
+  });
+
+  it('shows no notes for an action without any', async () => {
+    mockGetSettings.mockResolvedValue(inheriting(TEAM));
+    renderDrawer(item(EMAIL));
+
+    await screen.findByTestId('post-submission-email-view-list');
+    expect(notices()).toEqual([null, null, null]);
   });
 });

@@ -1,20 +1,38 @@
 'use client';
 
 import { InlineAlert } from '@bcgov/design-system-react-components';
+import type {
+  ActionScope,
+  PostSubmissionActionUi,
+} from '@/src/features/post-submission/actions/types';
 import type { DataError } from '@/src/shared/api/dataContracts';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import type { Dictionary } from '@/src/types/dictionary';
 
-/** What an action does, and why its settings did not load when they did not. */
+/** What an action does, its notes for the scope, and why its settings did not load, if so. */
 export default function ActionDrawerIntro({
   dict,
   id,
-  description,
+  ui,
+  scope,
   error,
-}: Readonly<{ dict: Dictionary; id: string; description: string; error: DataError | null }>) {
+}: Readonly<{
+  dict: Dictionary;
+  id: string;
+  ui: PostSubmissionActionUi;
+  scope: ActionScope;
+  error: DataError | null;
+}>) {
+  const notices = ui.notices?.(dict, scope) ?? [];
   return (
     <>
-      <p data-testid={`${id}-description`}>{description}</p>
+      <p data-testid={`${id}-description`}>{ui.description(dict)}</p>
+      {/* An action's notices are a fixed list, and two may share their text. */}
+      {notices.map((notice, index) => (
+        <InlineAlert key={index} variant={notice.variant} data-testid={`${id}-notice-${index + 1}`}>
+          {notice.text}
+        </InlineAlert>
+      ))}
       {error && (
         <InlineAlert
           variant="warning"

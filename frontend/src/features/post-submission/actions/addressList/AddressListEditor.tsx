@@ -25,26 +25,36 @@ import {
   type AddedAddresses,
 } from './addresses';
 
-type EmailCopy = Dictionary['postSubmission']['email'];
+/** An address-list action's own words for its fields. */
+export interface AddressListCopy {
+  /** The checkbox that turns the action on. */
+  enabled: string;
+  /** What each address gets, under the checkbox. */
+  help: string;
+  /** Why the action cannot be saved on with no addresses. */
+  required: string;
+}
+
+type ListCopy = Dictionary['postSubmission']['addressList'];
 type FieldKeyDown = NonNullable<ComponentProps<typeof TextField>['onKeyDown']>;
 
 /** Keys that turn what is typed into chips instead of typing themselves. */
 const COMMIT_KEYS = new Set(['Enter', ',', ';', ' ']);
 const MAX = String(POST_SUBMISSION_EMAIL_MAX_ADDRESSES);
 
-const fieldErrorOf = (result: AddedAddresses, t: EmailCopy): string | null => {
+const fieldErrorOf = (result: AddedAddresses, t: ListCopy): string | null => {
   if (result.invalid.length > 0) return t.invalid;
   if (result.overflow.length > 0) return t.tooMany.replace('{max}', MAX);
   return null;
 };
 
 /**
- * The email action's fields: whether it sends, and its recipients as chips. What is typed becomes
- * chips on Enter, a comma, a semicolon or a space, and Save adds what is still in the field; a paste
- * adds every address in it. Text that is not a valid address stays in the field with a message, and
- * keeps the drawer from saving until it is fixed or removed.
+ * An address-list action's fields: whether it runs, and its recipients as chips. What is typed
+ * becomes chips on Enter, a comma, a semicolon or a space, and Save adds what is still in the field;
+ * a paste adds every address in it. Text that is not a valid address stays in the field with a
+ * message, and keeps the drawer from saving until it is fixed or removed.
  */
-export default function EmailAddressesEditor({
+export default function AddressListEditor({
   ref,
   dict,
   values,
@@ -52,8 +62,10 @@ export default function EmailAddressesEditor({
   isDisabled,
   onFieldStateChange,
   problem,
-}: ActionEditorProps) {
-  const t = dict.postSubmission.email;
+  copy,
+  testIdPrefix,
+}: ActionEditorProps & Readonly<{ copy: AddressListCopy; testIdPrefix: string }>) {
+  const t = dict.postSubmission.addressList;
   const addresses = addressesOf(values);
   const [text, setText] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -64,10 +76,10 @@ export default function EmailAddressesEditor({
   const announce = (...messages: (string | null)[]) =>
     setAnnouncement(messages.filter(Boolean).join(' '));
 
-  /** Passes changed values up, and says so when they leave the emails on with nobody to send to. */
+  /** Passes changed values up, and says so when they leave the action on with nobody to send to. */
   const change = (next: PostSubmissionActionValues, message: string | null) => {
     onChange(next);
-    announce(message, needsAddress(next) ? t.required : null);
+    announce(message, needsAddress(next) ? copy.required : null);
   };
 
   /** Adds the text's addresses; the values after, or null when some text stays in the field. */
@@ -137,11 +149,11 @@ export default function EmailAddressesEditor({
         isSelected={values.enabled}
         onChange={(enabled) => change({ ...values, enabled }, null)}
         isDisabled={isDisabled}
-        data-testid="post-submission-email-enabled"
+        data-testid={`${testIdPrefix}-enabled`}
       >
-        {t.enabled}
+        {copy.enabled}
       </Checkbox>
-      <p data-testid="post-submission-email-help">{t.noticeHelp}</p>
+      <p data-testid={`${testIdPrefix}-help`}>{copy.help}</p>
       <div ref={fieldRef}>
         <TextField
           label={t.recipients}
@@ -157,30 +169,30 @@ export default function EmailAddressesEditor({
           errorMessage={fieldError ?? undefined}
           // An invalid field must not block the drawer's form natively; Save checks it instead.
           validationBehavior="aria"
-          data-testid="post-submission-email-input"
+          data-testid={`${testIdPrefix}-input`}
         />
       </div>
       <TagGroup
         label={t.count.replace('{count}', String(addresses.length)).replace('{max}', MAX)}
         onRemove={isDisabled ? undefined : remove}
         errorMessage={problem ?? undefined}
-        data-testid="post-submission-email-list"
+        data-testid={`${testIdPrefix}-list`}
       >
         <TagList
           items={addresses.map((address) => ({
             id: address,
             textValue: address,
-            'data-testid': 'post-submission-email-chip',
+            'data-testid': `${testIdPrefix}-chip`,
           }))}
           renderEmptyState={() => t.none}
         />
       </TagGroup>
-      {duplicates && <p data-testid="post-submission-email-duplicates">{duplicates}</p>}
+      {duplicates && <p data-testid={`${testIdPrefix}-duplicates`}>{duplicates}</p>}
       <p
         role="status"
         aria-live="polite"
         className="visually-hidden"
-        data-testid="post-submission-email-status"
+        data-testid={`${testIdPrefix}-status`}
       >
         {announcement}
       </p>
