@@ -90,6 +90,18 @@ export type PostSubmissionEmailAddressesOptions = z.infer<
   typeof PostSubmissionEmailAddressesOptionsSchema
 >;
 
+/** The email-package action's options: 1 to 100 staff addresses, de-duplicated. */
+export const PostSubmissionEmailPackageOptionsSchema = z.strictObject({
+  to: z
+    .array(PostSubmissionEmailAddressSchema)
+    .min(1)
+    .max(POST_SUBMISSION_EMAIL_MAX_ADDRESSES)
+    .transform((addresses) => [...new Set(addresses)]),
+});
+export type PostSubmissionEmailPackageOptions = z.infer<
+  typeof PostSubmissionEmailPackageOptionsSchema
+>;
+
 /** The longest note the log action keeps. */
 export const POST_SUBMISSION_LOG_NOTE_MAX = 200;
 
