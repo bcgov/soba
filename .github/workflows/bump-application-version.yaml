@@ -1,0 +1,141 @@
+name: Bump Application Version
+run-name: Bump ${{ inputs.target_branch }} (${{ inputs.bump_mode }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Branch to bump (develop or release/s<number>-r<number>)
+        required: true
+        type: string
+        default: develop
+      bump_mode:
+        description: How to choose the next version
+        required: true
+        type: choice
+        options: [conventional, stable]
+        default: conventional
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: bump-application-version-${{ inputs.target_branch }}
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      TARGET_BRANCH: ${{ inputs.target_branch }}
+      BUMP_MODE: ${{ inputs.bump_mode }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Validate branch and mode
+        shell: bash
+        run: |
+          if [[ "$TARGET_BRANCH" != develop && ! "$TARGET_BRANCH" =~ ^release/s[0-9]+-r[0-9]+$ ]] ||
+             [[ "$TARGET_BRANCH" == develop && "$BUMP_MODE" == stable ]]; then
+            echo '::error::Use develop with conventional, or a release/s<number>-r<number> branch with either mode.'
+            exit 1
+          fi
+
+      - name: Check out target branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.target_branch }}
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bump version and open PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          current=$(jq -er '.version' package.json)
+          next=''
+          release_it=(pnpm exec release-it --ci --no-git.commit --no-git.tag --no-git.push --no-npm.publish)
+
+          if [[ "$BUMP_MODE" == conventional ]]; then
+            # Start after the last root version change, so repeated runs are no-ops.
+            baseline=$(git log -1 --format=%H -G '"version"[[:space:]]*:' -- package.json)
+            [[ -n "$baseline" ]] || { echo '::error::Version baseline not found.'; exit 1; }
+            if [[ "$baseline" != "$(git rev-parse HEAD)" ]]; then
+              release_it+=("--plugins.@release-it/conventional-changelog.commitsOpts.from=$baseline")
+              next=$("${release_it[@]}" --release-version)
+            fi
+          elif [[ "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]]; then
+            next=${current%-beta.*}
+            release_it+=(--plugins.@release-it/conventional-changelog.ignoreRecommendedBump=true)
+          elif [[ ! "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Stable promotion requires a beta version; found $current."
+            exit 1
+          fi
+
+          if [[ -z "$next" || "$next" == "$current" ]]; then
+            echo "No bump required for $TARGET_BRANCH ($BUMP_MODE)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          [[ "$next" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || {
+            echo "::error::Invalid next version: $next"; exit 1;
+          }
+
+          existing=$(gh pr list --base "$TARGET_BRANCH" --state open --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("version-bump/"))] | length')
+          [[ "$existing" == 0 ]] || { echo '::error::A version-bump PR is already open.'; exit 1; }
+
+          if [[ "$BUMP_MODE" == stable ]]; then
+            "${release_it[@]}" "$next"
+          else
+            "${release_it[@]}"
+          fi
+
+          files=(package.json backend/package.json frontend/package.json lib/package.json \
+            backend/package-lock.json deployments/helm/soba/Chart.yaml)
+          for file in "${files[@]:0:4}"; do
+            jq -e --arg v "$next" '.version == $v' "$file" >/dev/null
+          done
+          jq -e --arg v "$next" '.version == $v and .packages[""].version == $v' \
+            backend/package-lock.json >/dev/null
+          ruby -ryaml -e 'abort "Helm appVersion mismatch" unless YAML.load_file(ARGV[0])["appVersion"] == ARGV[1]' \
+            deployments/helm/soba/Chart.yaml "$next"
+          git diff --check
+          for file in "${files[@]}"; do
+            git diff --quiet -- "$file" && { echo "::error::No change in $file"; exit 1; }
+          done
+          while IFS= read -r file; do
+            case "$file" in
+              package.json|backend/package.json|frontend/package.json|lib/package.json|backend/package-lock.json|deployments/helm/soba/Chart.yaml) ;;
+              *) echo "::error::Unexpected change: $file"; exit 1 ;;
+            esac
+          done < <(git diff --name-only)
+
+          source_sha=$(git rev-parse HEAD)
+          remote_sha=$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)
+          [[ "$source_sha" == "$remote_sha" ]] || {
+            echo "::error::$TARGET_BRANCH moved during this run; retry."; exit 1;
+          }
+
+          branch="version-bump/${TARGET_BRANCH//\//-}-${BUMP_MODE}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git switch -c "$branch"
+          git add "${files[@]}"
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "chore: bump application version to $next"
+          git push origin "HEAD:refs/heads/$branch"
+
+          gh pr create --base "$TARGET_BRANCH" --head "$branch" \
+            --title "chore: bump application version to $next" \
+            --body "Bump the application version from \`$current\` to \`$next\` ($BUMP_MODE)."
