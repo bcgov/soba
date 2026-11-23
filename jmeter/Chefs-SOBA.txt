@@ -1,0 +1,62 @@
+SOBA JMeter submission plan
+
+Configure the Test Plan's user variables, or supply JMeter -J properties:
+
+  api_host       Backend host only, without https:// or a path.
+                 Default: soba-test-api.apps.gold.devops.gov.bc.ca
+                 PR 279: soba-pr-279-api.apps.gold.devops.gov.bc.ca
+  api_protocol   https (default), or http for local development.
+  api_port       Empty by default; use 4000 for a local backend.
+  api_base_path  /chefs/api/v1 (default); no trailing slash.
+  form_id        Required: the UUID of a published SOBA form in that environment.
+  access_token   A valid SOBA bearer access token for protected/member forms.
+                 Leave empty for public forms or when using automatic login.
+  playwright_login  Set to true to sign in through Playwright at startup.
+                    Defaults to false.
+  playwright_base_url  SOBA frontend sign-in page. Falls back to BASE_URL.
+  data_file      Optional absolute path to a UTF-8 JSON object of answers.
+                 Its keys must match the published form's component keys.
+                 Defaults to the repaired answer fields from the original plan.
+  threads        10 by default. Use 1 for an initial check.
+  loops          1 by default.
+  ramp_seconds   10 by default.
+
+This plan sends POST /submit/submissions to open a submission, extracts
+headRevisionId, then sends POST /submit/submissions/{id}/submit with:
+  { "data": { ...answers }, "revisionId": "...UUIDv7...", "baseRevisionId": "..." }
+Submission and revision UUIDv7 values are generated per thread iteration.
+Form version, audit fields and confirmation code are assigned by the server.
+The assertions require a submitted submission with a current revision.
+The thread stops on a failed request/assertion rather than sending later requests.
+
+Playwright login
+
+Install Node.js 22.18 or later, the integration/playwright dependencies, and
+Playwright Chromium. Make sure Node is on PATH for JMeter. Use the same
+KEYCLOAK_USERNAME, KEYCLOAK_PASSWORD and MFA_CODE as the existing Playwright
+tests, either in the environment or in integration/playwright/.env. Set
+playwright_base_url or BASE_URL to the frontend for the API configured by
+api_protocol, api_host, api_port and api_base_path. For the default JMeter test
+API, use https://soba-test.apps.gold.devops.gov.bc.ca/designer/en.
+
+Enable the setup sampler with playwright_login=true in your private JMeter
+properties file, or pass -Jplaywright_login=true. The sampler runs the separate
+jmeter/playwright-login.cjs helper once. It takes the bearer token from the
+browser's successful GET to the configured API's /me endpoint, then shares it
+with both submission requests. A failed login stops the run before submissions.
+This mode takes precedence over access_token. The token
+lasts for the lifetime issued by Keycloak, so keep the load run within that window.
+
+No credentials are stored in this plan. Put token properties in a private local
+properties file and load it with JMeter -q, or set the variables locally in the UI.
+The unconfigured Graphite listener from the original plan is disabled.
+
+Example (Windows, from the repository root with JMeter on PATH):
+  jmeter.bat -n -t jmeter\Chefs.jmx -q C:\private\soba.properties -Jplaywright_login=true -Jthreads=1 -l soba-results.jtl
+
+Example private properties file (replace the placeholders):
+  api_host=soba-pr-279-api.apps.gold.devops.gov.bc.ca
+  playwright_base_url=https://soba-dev.apps.gold.devops.gov.bc.ca/designer-279/en
+  form_id=YOUR_PUBLISHED_FORM_UUID
+  data_file=C:/private/soba-answers.json
+
