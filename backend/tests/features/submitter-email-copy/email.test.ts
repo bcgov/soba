@@ -13,13 +13,16 @@ describe('buildEmailCopy', () => {
   it('writes one email in both languages, the subject ending with the Confirmation ID', () => {
     const { subject, body, bodyType } = buildEmailCopy(facts, FORMS);
     expect(bodyType).toBe('html');
-    expect(subject).toBe(
-      'Your submission to Permit application was submitted / Votre soumission à Permit application a été soumise (K7M2Q9XA)',
-    );
+    expect(subject).toBe('Permit application submitted / Permit application soumis (K7M2Q9XA)');
+    expect(body).toContain('>Permit application submitted</h1>');
+    expect(body).toContain('>Permit application soumis</h1>');
     expect(body).toContain('Confirmation ID: <strong>K7M2Q9XA</strong>');
     expect(body).toContain('ID de confirmation : <strong>K7M2Q9XA</strong>');
     expect(body).toContain(
-      'Thank you for your Permit application submission. You asked for this copy on the confirmation screen.',
+      'Thank you for your Permit application submission. You can view your submission details by visiting the following links:',
+    );
+    expect(body).toContain(
+      'Merci pour votre soumission pour Permit application. Vous pouvez consulter les détails de votre soumission en visitant les liens suivants :',
     );
   });
 

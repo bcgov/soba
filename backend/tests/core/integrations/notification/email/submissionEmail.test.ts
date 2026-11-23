@@ -113,6 +113,18 @@ describe('renderSubmissionEmail', () => {
     expect(renderSubmissionEmail(withSecond, facts(), 'en').body).not.toContain('past submissions');
   });
 
+  it('adds the title as a heading above the Confirmation ID, where the template has one', () => {
+    const titled = defineSubmissionEmail({
+      en: { ...template.en, title: ({ form }) => `${form} submitted` },
+      fr: { ...template.fr, title: ({ form }) => `${form} soumis` },
+    });
+    const { body } = renderSubmissionEmail(titled, facts(), 'en');
+    const title = body.indexOf('>Permit application submitted</h1>');
+    expect(title).toBeGreaterThan(-1);
+    expect(title).toBeLessThan(body.indexOf('Confirmation ID:'));
+    expect(renderSubmissionEmail(template, facts(), 'en').body).not.toContain('<h1');
+  });
+
   it('leaves out a second link the template has no text for', () => {
     const { body } = renderSubmissionEmail(
       template,

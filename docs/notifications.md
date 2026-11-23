@@ -36,7 +36,7 @@ layout frames any email, and a block for each kind of email fills it.
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `html.ts`            | `markup`, a template tag that escapes every value unless it is markup the tag built, and `SafeHtml`, which nothing else can make. A look-alike object or `true` throws                                   |
 | `language.ts`        | `EmailLanguage` (`en`, `fr`), `EmailLanguages` (adds `both`) and `DEFAULT_EMAIL_LANGUAGE`                                                                                                                |
-| `layout.ts`          | `renderEmail(parts, languages)`: the container, the order of `both`, "(Le français suit)", the divider, the footer and a one-line subject. Also `paragraph`, `link`, `languageSection`, `withLineBreaks` |
+| `layout.ts`          | `renderEmail(parts, languages)`: the container, the order of `both`, "(Le français suit)", the divider, the footer and a one-line subject. Also `heading`, `paragraph`, `link`, `languageSection`, `withLineBreaks` |
 | `submissionEmail.ts` | the block for an email about a submission: `defineSubmissionEmail` and `renderSubmissionEmail`                                                                                                           |
 
 The tag is named `markup`, not `html`: Prettier reformats the contents of any template tagged
@@ -95,7 +95,7 @@ const content = renderSubmissionEmail(
 ```
 
 For each language, the submission block renders the Confirmation ID in bold, the sentence and the
-link. An email may also name a second link, with `secondLinkText` in its template and `secondLink`
+link. A template may add a `title`, rendered as a heading above the Confirmation ID. An email may also name a second link, with `secondLinkText` in its template and `secondLink`
 in its facts, such as a signed-in submitter's past submissions; the block renders it after the
 first, and leaves it out when either is missing. After every language's section it adds the
 reviewer's comment, once, under "Comments:", "Commentaires :", or "Comments: / Commentaires :" in an
