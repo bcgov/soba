@@ -54,7 +54,9 @@ block or fake a Confirmation ID.
 
 A template holds words only, in English and French; the type requires both. It never writes markup.
 An email about a submission supplies, for each language, a subject and one sentence, as functions of
-the form name, and link text:
+the form name, and link text. When its words need one more fact, such as the time a link stops
+working, a function takes that fact and returns the template, as
+`backend/src/plugins/post-submission-email-package/email.ts` does:
 
 ```ts
 export const ASSIGNED_EMAIL = defineSubmissionEmail({
@@ -111,7 +113,8 @@ thread every email about one form into a single conversation.
   only on localhost; they refuse credentials, a query or a fragment; they are built from the parsed
   base, so stray whitespace in a setting never reaches a link; and they encode each path segment.
   A link is built when the email renders, once for each language, so each language links
-  under its own path. With no base URL set, the email has no link.
+  under its own path. With no base URL set, the email has no link, except the submission package
+  email, which is not sent without one.
 
 Templates live beside the feature that sends them, such as
 `backend/src/features/submission-review/statusEmailTemplates.ts` and the notice in
@@ -133,7 +136,8 @@ French copy is reviewed by a fluent French speaker before it merges.
 ## Content
 
 - **What an email carries:** the Confirmation ID, the form name, the reviewer's comment when one is
-  attached, and a link. Never submitted answers or other personal data.
+  attached, a link, and the time that link stops working when it does. Never submitted answers or
+  other personal data.
 - **One email per address,** so no recipient sees another's address.
 - **No email to the person who made the change.** Assigning a submission to yourself sends nothing,
   and whoever made the change is left out of the submitters an email goes to, even a reviewer who
@@ -228,8 +232,12 @@ address with no expiry, as `notification_audit` rows keep recipients.
   midnight in `NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset) over every email
   job's sends the provider accepted or refused, by the database clock. Past it, a job sends what
   fits and the rest wait for the next day; the limit drops no email, though a job that no longer
-  applies when it wakes ends cancelled. Each send checks the room first, so jobs sending at the same
-  moment can end a day past the limit by at most one email each.
+  applies when it wakes ends cancelled. Each send reads the day's count from the database first, so
+  every backend pod shares it. The read and the send are separate steps, so sends in flight together
+  can each take the last of the room. Every email job runs in the light pool, so a day that reaches
+  the limit can end past it by up to the backend's pods times `JOB_LIGHT_CONCURRENCY`. The limit
+  stays at least that far under 3225, Notify's 100,000 over 31 days: prod's 3200 allows 6 pods of 4,
+  so 3224 at most.
 - **The provider's limit.** Notify answers 429 at a sending limit, a rate or its monthly quota. A
   429 pauses every email job, and only email jobs, for a minute after it; each further 429 before
   Notify accepts an email doubles the pause, up to an hour. 429s in the same clock minute, as from
@@ -244,10 +252,25 @@ address with no expiry, as `notification_audit` rows keep recipients.
 | email                   | sent to                                                    | link                                                                                                                                          | sent by                                                                                                                                              |
 | ----------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | New submission (notice) | the addresses a form's "Email a notice" action lists       | the submission in the designer                                                                                                                | the action's job, queued by the `submission.submitted` fan-out (`plugins/post-submission-email-addresses`), as the system user                       |
+| Submission package      | the addresses a form's "Submit to Email" action lists      | the package's download page in the designer, until the package expires or its feature is off for the form                                     | the action's `email` step, after its build step stores the package (`plugins/post-submission-email-package`), as the system user                     |
 | Assigned                | the reviewer the submission is assigned to                 | the submission in the designer                                                                                                                | a `submission.status-email` job, queued by the `submission.status-changed` fan-out (`features/submission-review/statusEmailJob.ts`), as the reviewer |
 | Revision requested      | the submission's owner and active collaborators            | the submission's `submit` page in the forms app                                                                                               | a `submission.status-email` job, as the reviewer; none when a submitter sends their own submission back                                              |
 | Review complete         | the submission's owner and active collaborators            | the submission in the forms app                                                                                                               | a `submission.status-email` job, as the reviewer                                                                                                     |
 | Submitter's copy        | the address the submitter typed on the confirmation screen | for a signed-in submitter, the submission in the forms app, and their past submissions on a form that is not public; none for the public user | a `submission.email-copy` job, queued with the request (`features/submitter-email-copy`), as the requester                                           |
+
+The submission package email goes out once per address, on a submission's first submit, after the
+action's build step has stored `<form name>-<confirmation ID>.zip`. It holds the submission's
+document, named `<template name>-<confirmation ID>.pdf` after the name staff gave its template, and
+the files uploaded with it as `attachments/<n>-<original name>`. An upload over the per-file limit,
+or one deleted, is left out and listed in `missing-files.txt`; the email always says that files left
+out are listed in the package.
+The link opens the package page, which needs sign-in and `submission_read` on the form, and the
+email gives the time, in Pacific time, after which the link stops working. Each time the email step
+starts, the package is kept at least `PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_RETENTION_DAYS` (7 by
+default) from then. The build step ends cancelled while notifications are off, and waits while no
+email room is left today or the provider has paused sends; it does not check `DESIGNER_APP_URL`.
+The email step ends dead, sending nothing, when `DESIGNER_APP_URL` is not set or the package is
+gone.
 
 ## Adding an email
 

@@ -61,6 +61,16 @@ export const designerSubmissionFileUrl = (
 ): SafeUrl | null =>
   appLink(base, [language, 'build', formId, 'submissions', submissionId, 'files', fileId]);
 
+/** A package of a submission in the designer; opening it needs sign-in and access to the submission. */
+export const designerSubmissionPackageUrl = (
+  base: string | undefined,
+  language: AppLanguage,
+  formId: string,
+  submissionId: string,
+  jobId: string,
+): SafeUrl | null =>
+  appLink(base, [language, 'build', formId, 'submissions', submissionId, 'packages', jobId]);
+
 /** A forms-app page for the submission: `submit` to change it, `submission` to read it. */
 export type FormsSubmissionPage = 'submit' | 'submission';
 

@@ -1,7 +1,7 @@
 import type { Logger } from 'pino';
-import { validate as isUuid } from 'uuid';
 import { designerSubmissionFileUrl } from '../../core/appLinks';
-import { isRecord } from './formats';
+import { isRecord } from '../../core/records';
+import { isUploadRef } from '../../core/submissionUploads';
 import type { ExportRow } from './source';
 
 /** Each uploaded file's `url` from `fileLink`; a file it gives no link for keeps its stored `url`. */
@@ -14,8 +14,7 @@ export const withStaffFileLinks = (
   const walked = Object.fromEntries(
     Object.entries(value).map(([key, child]) => [key, withStaffFileLinks(child, fileLink)]),
   );
-  // An upload's `id` is always a UUID; answers named `storage` and `id` rarely are.
-  if (value.storage !== 'chefs' || typeof value.id !== 'string' || !isUuid(value.id)) return walked;
+  if (!isUploadRef(value)) return walked;
   const url = fileLink(value.id);
   return url ? { ...walked, url } : walked;
 };

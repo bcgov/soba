@@ -388,3 +388,15 @@ export async function downloadSobaSubmissionExport(
   const response = await sobaFetch(`/design/forms/${formId}/exports/${exportId}/file`, { token });
   return parseDownload(response);
 }
+
+/** A package of a submission, built by the job with this id. */
+export async function downloadSobaSubmissionPackage(
+  token: string,
+  submissionId: string,
+  jobId: string,
+): Promise<DownloadedFile> {
+  const response = await sobaFetch(`/design/submissions/${submissionId}/packages/${jobId}/file`, {
+    token,
+  });
+  return parseDownload(response);
+}

@@ -49,9 +49,23 @@ export interface JobContext {
   queueOnSuccess: (children: readonly ChildJob[]) => void;
 }
 
+/** Where an emailing job type's recipients are known before it runs: the `to` list in its options. */
+export const JOB_EMAIL_RECIPIENTS = ['options'] as const;
+
+/**
+ * What the Jobs pages know of a type's emails before its jobs run. They count every job's sent and
+ * refused addresses from what it sent; a type whose recipients are its options is also counted
+ * against that list, so its total and those still to send show.
+ */
+export interface JobEmails {
+  recipients: (typeof JOB_EMAIL_RECIPIENTS)[number];
+}
+
 export interface JobTypeDefinition {
   type: string;
   pool: JobPoolCode;
+  /** Set on a type that emails the `to` list in its options. */
+  emails?: JobEmails;
   /** Attempts before the job is dead; JOB_MAX_ATTEMPTS when unset. */
   maxAttempts?: number;
   /** Run time before the handler is aborted; the pool's JOB_*_TIMEOUT_MS when unset. */

@@ -1,12 +1,12 @@
 import path from 'node:path';
 import {
+  assertPostSubmissionActionsInstalled,
   findInstalledPostSubmissionAction,
   findPostSubmissionAction,
   getPostSubmissionActions,
 } from '../../../src/core/integrations/post-submission-action/PostSubmissionActionRegistry';
 import { getPostSubmissionActionPluginDefinitions } from '../../../src/core/integrations/plugins/PluginRegistry';
 import { getJobRegistry } from '../../../src/core/jobs/catalog';
-import { log } from '../../../src/core/logging';
 import { listJobTypes } from '../../../src/core/services/jobViewService';
 
 jest.mock('../../../src/core/db/client', () => ({ db: {}, quietDb: {} }));
@@ -77,7 +77,12 @@ describe('post-submission action plugins', () => {
 
   it("keeps a plugin's steps, and skips one with a duplicate, bad or misspelled step", () => {
     expect(findInstalledPostSubmissionAction('post-submission-test-steps')?.steps).toEqual([
-      expect.objectContaining({ name: 'send-email', pool: 'light', maxAttempts: 12 }),
+      expect.objectContaining({
+        name: 'send-email',
+        pool: 'light',
+        maxAttempts: 12,
+        emails: { recipients: 'options' },
+      }),
     ]);
     expect(
       findInstalledPostSubmissionAction('post-submission-test-steps-duplicate'),
@@ -87,6 +92,13 @@ describe('post-submission action plugins', () => {
     ).toBeUndefined();
     expect(
       findInstalledPostSubmissionAction('post-submission-test-steps-misspelled'),
+    ).toBeUndefined();
+  });
+
+  it('skips a plugin whose emails name another source of recipients, or a key it does not know', () => {
+    expect(findInstalledPostSubmissionAction('post-submission-test-bad-emails')).toBeUndefined();
+    expect(
+      findInstalledPostSubmissionAction('post-submission-test-misspelled-emails'),
     ).toBeUndefined();
   });
 
@@ -102,8 +114,21 @@ describe('post-submission action plugins', () => {
     ]);
   });
 
-  it('builds a job type per installed step and warns about enabled codes with no plugin', () => {
-    const warn = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+  it('stops startup when it names a code with no installed plugin, naming the code', () => {
+    expect(() => assertPostSubmissionActionsInstalled()).toThrow(
+      'POST_SUBMISSION_ACTION_PLUGINS names plugins that are not installed or did not load: post-submission-not-installed',
+    );
+    const named = process.env.POST_SUBMISSION_ACTION_PLUGINS;
+    process.env.POST_SUBMISSION_ACTION_PLUGINS =
+      'post-submission-test-echo, post-submission-test-off';
+    try {
+      expect(() => assertPostSubmissionActionsInstalled()).not.toThrow();
+    } finally {
+      process.env.POST_SUBMISSION_ACTION_PLUGINS = named;
+    }
+  });
+
+  it('builds a job type per installed step', () => {
     const registry = getJobRegistry();
     expect(registry.typesIn('light').sort((a, b) => a.localeCompare(b))).toEqual([
       'post-submission-test-echo',
@@ -118,21 +143,33 @@ describe('post-submission action plugins', () => {
       'post-submission-test-steps',
       'submission-export',
     ]);
-    expect(warn).toHaveBeenCalledWith(
-      { codes: ['post-submission-not-installed'] },
-      'POST_SUBMISSION_ACTION_PLUGINS names plugins not installed',
-    );
-    warn.mockRestore();
+  });
+
+  it('gives the job type of a step that emails its options list its emails, and none to others', () => {
+    const registry = getJobRegistry();
+    const types = [
+      'post-submission-test-steps:send-email',
+      'post-submission-test-steps',
+      'post-submission-test-echo',
+      'submission.status-email',
+      'submission.email-copy',
+      'submission-export',
+    ];
+    expect(types.filter((type) => !registry.get(type))).toEqual([]);
+    expect(types.filter((type) => registry.get(type)?.emails)).toEqual([
+      'post-submission-test-steps:send-email',
+    ]);
+    expect(registry.get('post-submission-test-steps:send-email')?.emails).toEqual({
+      recipients: 'options',
+    });
   });
 
   it('names a later step by its action, then the step', () => {
-    const warn = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
     expect(listJobTypes()).toEqual(
       expect.arrayContaining([
         { type: 'post-submission-test-steps', name: 'Test, with steps' },
         { type: 'post-submission-test-steps:send-email', name: 'Test, with steps (send-email)' },
       ]),
     );
-    warn.mockRestore();
   });
 });

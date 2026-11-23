@@ -102,14 +102,16 @@ waits for both answers, and for the actions, before it lays out its drawers, so 
 starts open. The features are fixed, so that is everywhere while one is enabled; if one is made
 scoped, a form's check names its workspace too, since a workspace grant covers its forms.
 
-| file                               | role                                                                                                                                                                |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data/usePostSubmissionActions.ts` | the actions configurable for a form or a workspace, read anew on each mount; a form's list says whether its workspace can set each                                  |
-| `actions/registry.ts`              | the fields for each action, by plugin code; an action not listed shows as a read-only card                                                                          |
-| `actions/<action>/`                | the action's `Editor` and `View`, its save-time `problem` check and `saved` shape                                                                                   |
-| `ui/FormActionDrawer.tsx`          | a form's drawer: inherit or its own values when the workspace can set the action, its own only when not, read-only for an action set for the workspace only         |
-| `ui/WorkspaceActionDrawer.tsx`     | a workspace's drawer                                                                                                                                                |
-| `ui/useActionDrawer.ts`            | one save at a time, with the success, conflict and refusal messages, and the state of text in the fields: waiting text counts as a change, invalid text blocks Save |
+| file                               | role                                                                                                                                                                                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data/usePostSubmissionActions.ts` | the actions configurable for a form or a workspace, read anew on each mount; a form's list says whether its workspace can set each                                                                                                          |
+| `actions/registry.ts`              | the fields for each action, by plugin code; an action not listed shows as a read-only card                                                                                                                                                  |
+| `actions/<action>/`                | the action's `Editor` and `View`, its save-time `problem` check and `saved` shape, any `notices` for a scope, and `stepLabels` naming its later steps on the Jobs pages                                                                     |
+| `actions/addressList/`             | `addressListAction`, the entry for an action whose options are a list of email addresses under the email action's address rule and limit, built once from the action's own words; the list's own text is under `postSubmission.addressList` |
+| `ui/ActionDrawerIntro.tsx`         | the top of each drawer: the action's description, its notices for the workspace or form, and why its settings did not load                                                                                                                  |
+| `ui/FormActionDrawer.tsx`          | a form's drawer: inherit or its own values when the workspace can set the action, its own only when not, read-only for an action set for the workspace only                                                                                 |
+| `ui/WorkspaceActionDrawer.tsx`     | a workspace's drawer                                                                                                                                                                                                                        |
+| `ui/useActionDrawer.ts`            | one save at a time, with the success, conflict and refusal messages, and the state of text in the fields: waiting text counts as a change, invalid text blocks Save                                                                         |
 
 Each action reads and saves under the key `post-submission/<code>` through `useFormSettings` and
 `useWorkspaceSettings`, so a workspace save refreshes its forms' views. Its text lives under

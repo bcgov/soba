@@ -4,9 +4,10 @@ import { AppError } from '../../core/errors';
 import { upstreamStatusOf } from '../../core/http/httpErrorMapper';
 import type {
   PostSubmissionActionRenderOutcome,
+  PostSubmissionActionRenderStop,
   PostSubmissionActionUpload,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
-import type { DocumentRenderOutcome } from '../document-generation/service';
+import type { DocumentRenderOutcome, RevisionRenderOutcome } from '../document-generation/service';
 import type { OpenedFile } from '../files/service';
 
 export const ANSWERS_NOT_READ = "The submission's answers could not be read";
@@ -31,10 +32,10 @@ export const readFromEngine = async <T>(
   }
 };
 
-type RenderStop = Exclude<PostSubmissionActionRenderOutcome['status'], 'ok'>;
-
 /** Statuses a job's render returns besides `ok` and `error`; any other reads as failed. */
-const RENDER_STOPS: Partial<Record<DocumentRenderOutcome['status'], RenderStop>> = {
+const RENDER_STOPS: Partial<
+  Record<DocumentRenderOutcome['status'], PostSubmissionActionRenderStop>
+> = {
   'template-notfound': 'no-template',
   unavailable: 'unavailable',
   busy: 'busy',
@@ -43,10 +44,11 @@ const RENDER_STOPS: Partial<Record<DocumentRenderOutcome['status'], RenderStop>>
 
 /** A render's outcome for an action. An error is `refused` when the render was refused, else `failed`. */
 export const toRenderOutcome = (
-  outcome: DocumentRenderOutcome,
+  outcome: RevisionRenderOutcome,
 ): PostSubmissionActionRenderOutcome => {
   if (outcome.status === 'ok') {
-    return { status: 'ok', data: outcome.data, contentType: outcome.contentType };
+    const { data, contentType, templateName } = outcome;
+    return { status: 'ok', data, contentType, templateName };
   }
   if (outcome.status === 'error') {
     const refused =

@@ -1,30 +1,56 @@
 'use client';
 
 import { InlineAlert } from '@bcgov/design-system-react-components';
+import type {
+  ActionScope,
+  PostSubmissionActionUi,
+} from '@/src/features/post-submission/actions/types';
 import type { DataError } from '@/src/shared/api/dataContracts';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import type { Dictionary } from '@/src/types/dictionary';
+import styles from './ActionDrawerIntro.module.css';
 
-/** What an action does, and why its settings did not load when they did not. */
+/** What an action does, its notes for the scope, and why its settings did not load, if so. */
 export default function ActionDrawerIntro({
   dict,
   id,
-  description,
+  ui,
+  scope,
   error,
-}: Readonly<{ dict: Dictionary; id: string; description: string; error: DataError | null }>) {
+}: Readonly<{
+  dict: Dictionary;
+  id: string;
+  ui: PostSubmissionActionUi;
+  scope: ActionScope;
+  error: DataError | null;
+}>) {
+  const notices = ui.notices?.(dict, scope) ?? [];
   return (
     <>
-      <p data-testid={`${id}-description`}>{description}</p>
-      {error && (
-        <InlineAlert
-          variant="warning"
-          title={messageForDataError(error, {
-            sessionExpired: dict.general.sessionExpired,
-            forbidden: dict.general.noAccess,
-            failed: dict.postSubmission.settingsLoadError,
-          })}
-          data-testid={`${id}-error`}
-        />
+      <p data-testid={`${id}-description`}>{ui.description(dict)}</p>
+      {(notices.length > 0 || error) && (
+        <div className={styles.alerts}>
+          {notices.map((notice) => (
+            <InlineAlert
+              key={notice.key}
+              variant={notice.variant}
+              data-testid={`${id}-notice-${notice.key}`}
+            >
+              {notice.text}
+            </InlineAlert>
+          ))}
+          {error && (
+            <InlineAlert
+              variant="warning"
+              title={messageForDataError(error, {
+                sessionExpired: dict.general.sessionExpired,
+                forbidden: dict.general.noAccess,
+                failed: dict.postSubmission.settingsLoadError,
+              })}
+              data-testid={`${id}-error`}
+            />
+          )}
+        </div>
       )}
     </>
   );

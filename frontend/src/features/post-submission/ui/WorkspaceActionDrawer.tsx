@@ -66,7 +66,7 @@ export default function WorkspaceActionDrawer({
       onCancel={drawer.reset}
       canSave={canSave}
     >
-      <ActionDrawerIntro dict={dict} id={id} description={ui.description(dict)} error={error} />
+      <ActionDrawerIntro dict={dict} id={id} ui={ui} scope="workspace" error={error} />
       {values && (
         <Editor
           key={drawer.editorKey}

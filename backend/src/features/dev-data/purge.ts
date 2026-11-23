@@ -32,6 +32,7 @@ import {
   rolePermissions,
   roles,
   submissionExportAudits,
+  submissionPackageAudits,
   settingsAudit,
   sobaAdmins,
   submissionFiles,
@@ -279,6 +280,7 @@ export const WORKSPACE_SCOPED_TABLES: readonly string[] = [
   'notification_audit',
   'submitter_email_copy_request',
   'submission_export_audit',
+  'submission_package_audit',
   'submission_revision',
   'submission_status',
   'submission_note',
@@ -366,6 +368,11 @@ async function purgeWorkspaceScoped(
   await record(
     'submission_export_audit',
     tx.delete(submissionExportAudits).where(inArray(submissionExportAudits.workspaceId, ids)),
+  );
+  // Package audit rows reference submissions.
+  await record(
+    'submission_package_audit',
+    tx.delete(submissionPackageAudits).where(inArray(submissionPackageAudits.workspaceId, ids)),
   );
   // submission.head_revision_id and status_id reference the revisions and statuses, so the pointers
   // are cleared first.
