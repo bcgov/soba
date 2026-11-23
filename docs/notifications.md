@@ -256,9 +256,10 @@ address with no expiry, as `notification_audit` rows keep recipients.
 
 The submission package email goes out once per address, on a submission's first submit, after the
 action's build step has stored `<form name>-<confirmation ID>.zip`. It holds the submission's
-document, named `<template name>-<confirmation ID>.pdf` after the template it was rendered from, and
+document, named `<template name>-<confirmation ID>.pdf` after the name staff gave its template, and
 the files uploaded with it as `attachments/<n>-<original name>`. An upload over the per-file limit,
-or one deleted, is left out and listed in `missing-files.txt`, which the email mentions every time.
+or one deleted, is left out and listed in `missing-files.txt`; the email always says that files left
+out are listed in the package.
 The link opens the package page, which needs sign-in and `submission_read` on the form, and the
 email gives the time, in Pacific time, after which the link stops working. Each time the email step
 starts, the package is kept at least `PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_RETENTION_DAYS` (7 by

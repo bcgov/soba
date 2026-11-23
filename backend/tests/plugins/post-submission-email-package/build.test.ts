@@ -113,7 +113,7 @@ const harness = (
             status: 'ok' as const,
             data: PDF,
             contentType: 'application/pdf',
-            templateFilename: 'permit-report.docx',
+            templateName: 'Permit report',
           },
         ),
       ),
@@ -213,7 +213,7 @@ describe('buildPackage', () => {
     // The document is named after its template; each upload by its original name, numbered.
     const entries = await readZip(h.stored[0].path);
     expect(entries.map(({ name, method }) => [name, method])).toEqual([
-      ['permit-report-ABC123.pdf', 0],
+      ['Permit report-ABC123.pdf', 0],
       ['attachments/1-plan.pdf', 0],
       ['attachments/2-photo.jpg', 0],
       ['attachments/3-plan.pdf', 0],
@@ -237,7 +237,7 @@ describe('buildPackage', () => {
 
     const entries = await readZip(h.stored[0].path);
     expect(entries.map((entry) => entry.name)).toEqual([
-      'permit-report-ABC123.pdf',
+      'Permit report-ABC123.pdf',
       'attachments/1-scan-0199f6a0.tif',
     ]);
   });
@@ -252,7 +252,7 @@ describe('buildPackage', () => {
 
     const entries = await readZip(h.stored[0].path);
     expect(entries.map((entry) => entry.name)).toEqual([
-      'permit-report-ABC123.pdf',
+      'Permit report-ABC123.pdf',
       'attachments/1-scan.tif',
     ]);
     expect(entries[1].data.toString()).toBe('scan bytes');
@@ -276,7 +276,7 @@ describe('buildPackage', () => {
 
     const entries = await readZip(h.stored[0].path);
     expect(entries.map((entry) => entry.name)).toEqual([
-      'permit-report-ABC123.pdf',
+      'Permit report-ABC123.pdf',
       'missing-files.txt',
     ]);
     expect(entries[1].data.toString()).toContain('video.mp4: larger than 1 MB / plus de 1 Mo');
@@ -414,7 +414,7 @@ describe('buildPackage', () => {
         status: 'ok',
         data: PDF,
         contentType: 'application/pdf',
-        templateFilename: 'permit-report.docx',
+        templateName: 'Permit report',
       });
     });
 

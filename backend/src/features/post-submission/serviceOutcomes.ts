@@ -47,8 +47,8 @@ export const toRenderOutcome = (
   outcome: RevisionRenderOutcome,
 ): PostSubmissionActionRenderOutcome => {
   if (outcome.status === 'ok') {
-    const { data, contentType, templateFilename } = outcome;
-    return { status: 'ok', data, contentType, templateFilename };
+    const { data, contentType, templateName } = outcome;
+    return { status: 'ok', data, contentType, templateName };
   }
   if (outcome.status === 'error') {
     const refused =

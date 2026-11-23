@@ -211,7 +211,7 @@ const writePackage = async (
   try {
     packing.zip.addBuffer(
       document.data,
-      reportName(document.templateFilename, confirmationCode, document.contentType),
+      reportName(document.templateName, confirmationCode, document.contentType),
     );
     context.reportProgress(1, uploads.length + 1);
     await addUploads(context, packing, uploads);

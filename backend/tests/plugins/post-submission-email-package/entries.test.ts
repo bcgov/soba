@@ -33,17 +33,22 @@ describe('documentExtension', () => {
 });
 
 describe('reportName', () => {
-  it("is the template file's name without its extension, a hyphen, then the confirmation code", () => {
-    expect(reportName('permit-report.docx', 'ABC123', 'application/pdf')).toBe(
-      'permit-report-ABC123.pdf',
+  it("is the template's name as staff set it, cleaned, a hyphen, then the confirmation code", () => {
+    expect(reportName('Permit report', 'ABC123', 'application/pdf')).toBe(
+      'Permit report-ABC123.pdf',
     );
-    expect(reportName('Permit: report.docx', 'ABC123', 'text/plain')).toBe(
-      'Permit report-ABC123.txt',
+    expect(reportName('Permit: report', 'ABC123', 'text/plain')).toBe('Permit report-ABC123.txt');
+  });
+
+  // A template's name is not a file name, so a dot in it is kept.
+  it('keeps the whole name, a dot and what follows it included', () => {
+    expect(reportName('Permit report v1.2', 'ABC123', 'application/pdf')).toBe(
+      'Permit report v1.2-ABC123.pdf',
     );
   });
 
   it('falls back to Submission for a template name with nothing usable', () => {
-    expect(reportName('///.docx', 'ABC123', 'application/pdf')).toBe('Submission-ABC123.pdf');
+    expect(reportName('///', 'ABC123', 'application/pdf')).toBe('Submission-ABC123.pdf');
   });
 });
 

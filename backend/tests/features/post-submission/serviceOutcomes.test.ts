@@ -55,7 +55,7 @@ const renderError = (err: unknown): RevisionRenderOutcome => ({
 });
 
 describe('toRenderOutcome', () => {
-  it("passes on the document, its content type and the template file's name", () => {
+  it("passes on the document, its content type and the template's name", () => {
     const data = Buffer.from('%PDF-1.7');
     expect(
       toRenderOutcome({
@@ -63,13 +63,13 @@ describe('toRenderOutcome', () => {
         code: 'cdogs-v3',
         data,
         contentType: 'application/pdf',
-        templateFilename: 'permit-report.docx',
+        templateName: 'Permit report',
       }),
     ).toEqual({
       status: 'ok',
       data,
       contentType: 'application/pdf',
-      templateFilename: 'permit-report.docx',
+      templateName: 'Permit report',
     });
   });
 

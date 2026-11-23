@@ -387,9 +387,9 @@ export interface RevisionRenderInput {
   actorId: string;
 }
 
-/** A job's render: a document comes with the name of the template file it was rendered from. */
+/** A job's render: a document comes with the name staff gave the template it was rendered from. */
 export type RevisionRenderOutcome =
-  | (Extract<DocumentRenderOutcome, { status: 'ok' }> & { templateFilename: string })
+  | (Extract<DocumentRenderOutcome, { status: 'ok' }> & { templateName: string })
   | Exclude<DocumentRenderOutcome, { status: 'ok' }>;
 
 /** Render from a job. No caller is checked: the job checks the submission before it renders. */
@@ -423,9 +423,7 @@ export const jobDocumentService = {
         templateFileId: stored.file.id,
       },
     );
-    return outcome.status === 'ok'
-      ? { ...outcome, templateFilename: stored.file.filename }
-      : outcome;
+    return outcome.status === 'ok' ? { ...outcome, templateName: stored.template.name } : outcome;
   },
 };
 

@@ -79,7 +79,7 @@ export type PostSubmissionActionSubmits = 'every' | 'first';
  * backend or the template's storage failed.
  */
 export type PostSubmissionActionRenderOutcome =
-  | { status: 'ok'; data: Buffer; contentType?: string; templateFilename: string }
+  | { status: 'ok'; data: Buffer; contentType?: string; templateName: string }
   | { status: 'no-template' | 'unavailable' | 'busy' | 'refused' | 'failed' };
 
 /** A render's status when it produced no document. */

@@ -46,17 +46,16 @@ export const documentExtension = (contentType: string | undefined): string =>
   contentType?.toLowerCase().startsWith('application/pdf') ? 'pdf' : 'txt';
 
 /**
- * `<template name>-<confirmation code>.<extension>`: the document is named after the template it
- * was rendered from, so the people who name templates decide how documents sort and group.
+ * `<template name>-<confirmation code>.<extension>`: the document is named after the name staff
+ * gave the template it was rendered from, so they decide how documents sort and group.
  */
 export const reportName = (
-  templateFilename: string,
+  templateName: string,
   confirmationCode: string,
   contentType: string | undefined,
 ): string => {
   const suffix = `-${confirmationCode}.${documentExtension(contentType)}`;
-  const [template] = splitExtension(templateFilename);
-  return `${fitted(template, suffix, 'Submission')}${suffix}`;
+  return `${fitted(templateName, suffix, 'Submission')}${suffix}`;
 };
 
 /**
