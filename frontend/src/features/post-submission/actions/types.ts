@@ -40,6 +40,8 @@ export type ActionScope = 'workspace' | 'form';
 
 /** A note shown with an action's description. */
 export interface ActionNotice {
+  /** Names the notice within its action; its test id ends with it. */
+  key: string;
   variant: 'info' | 'warning';
   text: string;
 }

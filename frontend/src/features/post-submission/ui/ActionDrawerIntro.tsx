@@ -30,12 +30,11 @@ export default function ActionDrawerIntro({
       <p data-testid={`${id}-description`}>{ui.description(dict)}</p>
       {(notices.length > 0 || error) && (
         <div className={styles.alerts}>
-          {/* An action's notices are a fixed list, and two may share their text. */}
-          {notices.map((notice, index) => (
+          {notices.map((notice) => (
             <InlineAlert
-              key={index}
+              key={notice.key}
               variant={notice.variant}
-              data-testid={`${id}-notice-${index + 1}`}
+              data-testid={`${id}-notice-${notice.key}`}
             >
               {notice.text}
             </InlineAlert>

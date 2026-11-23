@@ -10,8 +10,9 @@ export const emailPackageAction: PostSubmissionActionUi = {
     notices: (dict, scope) => {
       const t = dict.postSubmission.emailPackage;
       return [
-        { variant: 'warning', text: t.privacyNotice },
+        { key: 'privacy', variant: 'warning', text: t.privacyNotice },
         {
+          key: 'template',
           variant: 'info',
           text: scope === 'workspace' ? t.templateNoticeWorkspace : t.templateNoticeForm,
         },

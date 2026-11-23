@@ -86,14 +86,15 @@ const withNotices = (): PostSubmissionActionUi => {
   return {
     ...ui,
     notices: (_dict, scope) => [
-      { variant: 'warning', text: `First note for the ${scope}` },
-      { variant: 'info', text: `Second note for the ${scope}` },
+      { key: 'first', variant: 'warning', text: `First note for the ${scope}` },
+      { key: 'second', variant: 'info', text: `Second note for the ${scope}` },
     ],
   };
 };
+// The notes in the drawer, in the order it shows them.
 const notices = () =>
-  [1, 2, 3].map((n) => screen.queryByTestId(`${EMAIL}-notice-${n}`)?.textContent ?? null);
-const FORM_NOTES = ['First note for the form', 'Second note for the form', null];
+  screen.queryAllByTestId(new RegExp(`^${EMAIL}-notice-`)).map((notice) => notice.textContent);
+const FORM_NOTES = ['First note for the form', 'Second note for the form'];
 
 const inputIn = (testId: string) =>
   screen.getByTestId(testId).querySelector('input') as HTMLInputElement;
@@ -279,8 +280,8 @@ describe('FormActionDrawer', () => {
     renderDrawer(item(EMAIL), withNotices());
     await waitFor(() => expect(inputIn(`${EMAIL}-inherit`)).toBeEnabled());
     expect(notices()).toEqual(FORM_NOTES);
-    expect(screen.getByTestId(`${EMAIL}-notice-1`)).toHaveClass('warning');
-    expect(screen.getByTestId(`${EMAIL}-notice-2`)).toHaveClass('info');
+    expect(screen.getByTestId(`${EMAIL}-notice-first`)).toHaveClass('warning');
+    expect(screen.getByTestId(`${EMAIL}-notice-second`)).toHaveClass('info');
 
     await user.click(inputIn(`${EMAIL}-inherit`));
     expect(inputIn('post-submission-email-input')).toBeInTheDocument();
@@ -325,14 +326,18 @@ describe('FormActionDrawer', () => {
     expect(mockGetSettings).toHaveBeenCalledWith('token', 'f1', `post-submission/${PACKAGE}`);
     expect(screen.getByTestId(`accordion-${PACKAGE}`)).toHaveTextContent(pkg.label);
     expect(screen.getByTestId(`${PACKAGE}-description`)).toHaveTextContent(pkg.description);
-    expect(screen.getByTestId(`${PACKAGE}-notice-1`)).toHaveTextContent(pkg.privacyNotice);
-    expect(screen.getByTestId(`${PACKAGE}-notice-1`)).toHaveClass('warning');
-    expect(screen.getByTestId(`${PACKAGE}-notice-2`)).toHaveTextContent(pkg.templateNoticeForm);
-    expect(screen.getByTestId(`${PACKAGE}-notice-2`)).toHaveClass('info');
+    expect(screen.getByTestId(`${PACKAGE}-notice-privacy`)).toHaveTextContent(pkg.privacyNotice);
+    expect(screen.getByTestId(`${PACKAGE}-notice-privacy`)).toHaveClass('warning');
+    expect(screen.getByTestId(`${PACKAGE}-notice-template`)).toHaveTextContent(
+      pkg.templateNoticeForm,
+    );
+    expect(screen.getByTestId(`${PACKAGE}-notice-template`)).toHaveClass('info');
     expect(screen.getByTestId(`${PACKAGE}-view-list`)).toHaveTextContent('team@example.com');
 
     await user.click(inputIn(`${PACKAGE}-inherit`));
-    expect(screen.getByTestId(`${PACKAGE}-notice-2`)).toHaveTextContent(pkg.templateNoticeForm);
+    expect(screen.getByTestId(`${PACKAGE}-notice-template`)).toHaveTextContent(
+      pkg.templateNoticeForm,
+    );
     expect(screen.getByTestId(`${PACKAGE}-help`)).toHaveTextContent(pkg.help);
     expect(screen.getByTestId(`${PACKAGE}-enabled`)).toHaveTextContent(pkg.enabled);
     await user.type(inputIn(`${PACKAGE}-input`), 'form@example.com{Enter}');
@@ -355,7 +360,9 @@ describe('FormActionDrawer', () => {
     expect(screen.getByTestId(`${PACKAGE}-form-only`)).toHaveTextContent(
       en.postSubmission.formOnlyNote,
     );
-    expect(screen.getByTestId(`${PACKAGE}-notice-2`)).toHaveTextContent(pkg.templateNoticeForm);
+    expect(screen.getByTestId(`${PACKAGE}-notice-template`)).toHaveTextContent(
+      pkg.templateNoticeForm,
+    );
     await user.click(inputIn(`${PACKAGE}-enabled`));
     expect(screen.getByTestId(`${PACKAGE}-list`)).toHaveTextContent(pkg.required);
     expect(saveButton(PACKAGE)).toBeDisabled();
@@ -366,6 +373,6 @@ describe('FormActionDrawer', () => {
     renderDrawer(item(EMAIL));
 
     await screen.findByTestId('post-submission-email-view-list');
-    expect(notices()).toEqual([null, null, null]);
+    expect(notices()).toEqual([]);
   });
 });

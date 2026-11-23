@@ -318,7 +318,9 @@ describe('WorkspaceActionDrawer with another address-list action', () => {
       required: 'Add an address for it.',
     }),
     testIdPrefix: 'other',
-    notices: (_dict, scope) => [{ variant: 'warning', text: `A note for the ${scope}` }],
+    notices: (_dict, scope) => [
+      { key: 'note', variant: 'warning', text: `A note for the ${scope}` },
+    ],
   });
 
   it("uses the action's own words, test ids and notes for the workspace", async () => {
@@ -330,8 +332,8 @@ describe('WorkspaceActionDrawer with another address-list action', () => {
 
     expect(screen.getByTestId(`accordion-${CODE}`)).toHaveTextContent('Other action');
     expect(screen.getByTestId(`${CODE}-description`)).toHaveTextContent('Sends something else.');
-    expect(screen.getByTestId(`${CODE}-notice-1`)).toHaveTextContent('A note for the workspace');
-    expect(screen.getByTestId(`${CODE}-notice-1`)).toHaveClass('warning');
+    expect(screen.getByTestId(`${CODE}-notice-note`)).toHaveTextContent('A note for the workspace');
+    expect(screen.getByTestId(`${CODE}-notice-note`)).toHaveClass('warning');
     expect(screen.getByTestId('other-help')).toHaveTextContent('Each address gets something else.');
     expect(screen.getByTestId('other-enabled')).toHaveTextContent('Send it');
     expect(screen.queryByTestId('post-submission-email-input')).not.toBeInTheDocument();
@@ -372,11 +374,11 @@ describe('WorkspaceActionDrawer with Submit to Email', () => {
 
     expect(mockGetSettings).toHaveBeenCalledWith('token', 'ws1', `post-submission/${PACKAGE}`);
     expect(screen.getByTestId(`accordion-${PACKAGE}`)).toHaveTextContent(pkg.label);
-    expect(screen.getByTestId(`${PACKAGE}-notice-1`)).toHaveTextContent(pkg.privacyNotice);
-    expect(screen.getByTestId(`${PACKAGE}-notice-2`)).toHaveTextContent(
+    expect(screen.getByTestId(`${PACKAGE}-notice-privacy`)).toHaveTextContent(pkg.privacyNotice);
+    expect(screen.getByTestId(`${PACKAGE}-notice-template`)).toHaveTextContent(
       pkg.templateNoticeWorkspace,
     );
-    expect(screen.queryByTestId(`${PACKAGE}-notice-3`)).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId(new RegExp(`^${PACKAGE}-notice-`))).toHaveLength(2);
     // The workspace drawer shows the form drawer's help, so it names no form in particular.
     expect(screen.getByTestId(`${PACKAGE}-help`)).toHaveTextContent(pkg.help);
     expect(pkg.help).not.toMatch(/this form/i);
