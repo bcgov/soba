@@ -42,6 +42,7 @@ The request is checked against `SendEmailSchema`. Optional `cc` and `bcc` arrays
 are supported. `bodyType` is `text` or `html`. The receipt's `id` is Notify's
 `notifyId` and `status` is Notify's status; acceptance does not mean delivery.
 Sends are never retried automatically. Upstream failures throw
-`ServiceUnavailableError` with the upstream status; its message carries no
-recipient or credential details. Notify's error text, such as a safelist
-refusal, goes to the audit row only.
+`ServiceUnavailableError` with the upstream status (its subclass
+`NotificationLimitError` for a 429); the message carries no recipient
+or credential details. Notify's error text, such as a safelist refusal, goes to
+the audit row only.

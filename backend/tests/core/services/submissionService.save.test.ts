@@ -4,8 +4,8 @@ import * as versionRepo from '../../../src/core/db/repos/formVersionRepo';
 import * as formRepo from '../../../src/core/db/repos/formRepo';
 import * as registry from '../../../src/core/integrations/form-engine/FormEngineRegistry';
 import * as featureAvailability from '../../../src/core/services/featureAvailabilityService';
-import * as jobs from '../../../src/core/jobs';
 import * as enqueue from '../../../src/core/jobs/enqueue';
+import * as jobNudge from '../../../src/core/jobs/nudge';
 import * as resolve from '../../../src/features/post-submission/resolve';
 import { ConflictError, NotFoundError, ValidationError } from '../../../src/core/errors';
 
@@ -37,7 +37,7 @@ jest.mock('../../../src/core/services/featureAvailabilityService', () => ({
   isFeatureAvailable: jest.fn(),
 }));
 
-jest.mock('../../../src/core/jobs', () => ({ nudgeJobs: jest.fn() }));
+jest.mock('../../../src/core/jobs/nudge', () => ({ nudgeJobs: jest.fn() }));
 
 jest.mock('../../../src/core/jobs/enqueue', () => ({
   ...jest.requireActual('../../../src/core/jobs/enqueue'),
@@ -61,7 +61,7 @@ const getVersion = versionRepo.getFormVersionById as unknown as jest.Mock;
 const getEngineCode = formRepo.getFormEngineCodeForForm as unknown as jest.Mock;
 const createAdapter = registry.createFormEngineAdapter as unknown as jest.Mock;
 const isAvailable = featureAvailability.isFeatureAvailable as unknown as jest.Mock;
-const nudge = jobs.nudgeJobs as unknown as jest.Mock;
+const nudge = jobNudge.nudgeJobs as unknown as jest.Mock;
 const enqueueJob = enqueue.enqueueSubmittedJob as unknown as jest.Mock;
 const availableActions = resolve.availableActions as unknown as jest.Mock;
 const ACTIONS = [
@@ -468,8 +468,10 @@ describe('SubmissionService save (versioned engine write)', () => {
       appendRevision.mock.invocationCallOrder[0],
     );
     const onAppended = appendRevision.mock.calls[0][1];
-    await onAppended('tx', { id: 's1' });
-    expect(enqueueJob).toHaveBeenCalledWith('tx', { id: 's1' }, 'rev-new', 'actor-1', ACTIONS);
+    await onAppended('tx', { id: 's1' }, { firstSubmit: false });
+    expect(enqueueJob).toHaveBeenCalledWith('tx', { id: 's1' }, 'rev-new', 'actor-1', ACTIONS, {
+      firstSubmit: false,
+    });
     expect(nudge).toHaveBeenCalledWith('submission.submitted');
   });
 
@@ -510,7 +512,7 @@ describe('SubmissionService save (versioned engine write)', () => {
     postSubmissionOn();
     enqueueJob.mockRejectedValue(new Error('job insert failed'));
     appendRevision.mockImplementation(async (_append, onAppended) => {
-      await onAppended('tx', { id: 's1' });
+      await onAppended('tx', { id: 's1' }, { firstSubmit: true });
     });
 
     await expect(svc.submit(input)).rejects.toThrow('job insert failed');

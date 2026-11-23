@@ -263,9 +263,9 @@ describe('JobDetailPanel', () => {
     expect(screen.getByTestId('job-status-line')).toHaveFocus();
   });
 
-  it('offers no Run again for a submission-received job that queued its actions', async () => {
+  it('offers no Run again for a job that queued jobs', async () => {
     current = jobDetail({
-      type: 'submission.submitted',
+      type: 'post-submission-email-addresses',
       status: 'dead',
       parentJobId: null,
       parent: undefined,
@@ -275,8 +275,8 @@ describe('JobDetailPanel', () => {
     stubJobsServer(readJob);
     await renderPanel();
 
-    expect(await screen.findByTestId('job-actions-queued')).toHaveTextContent(
-      dictDetail.actionsQueued,
+    expect(await screen.findByTestId('job-children-queued')).toHaveTextContent(
+      dictDetail.childrenQueued,
     );
     expect(screen.queryByTestId('job-rerun')).not.toBeInTheDocument();
   });

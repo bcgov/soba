@@ -226,6 +226,8 @@ export type FeatureScopeStatusCode = (typeof FeatureScopeStatus)[keyof typeof Fe
  */
 export const DocumentGenerationMode = {
   print: 'print',
+  /** A post-submission action job's render of a revision. */
+  package: 'package',
 } as const;
 export type DocumentGenerationModeCode =
   (typeof DocumentGenerationMode)[keyof typeof DocumentGenerationMode];
@@ -246,6 +248,8 @@ export const NotificationOutcome = {
   not_sent: 'not_sent',
   /** The notifications feature is off, so no plugin was called. */
   disabled: 'disabled',
+  /** The provider refused it at a sending limit; it is sent again after the pause that starts. */
+  limited: 'limited',
   error: 'error',
 } as const;
 export type NotificationOutcomeCode =

@@ -3,6 +3,7 @@ import { NotifyV1Adapter } from '../../../src/plugins/notify-v1/notifyV1Adapter'
 import { createPluginConfigReaderFrom } from '../../../src/core/config/pluginConfig';
 import { createEnvReader } from '../../../src/core/config/env';
 import {
+  NotificationLimitError,
   SendEmailSchema,
   providerDetailOf,
   type SendEmail,
@@ -21,12 +22,13 @@ const accepted = {
   createdAt: '2026-10-05T12:00:00.000Z',
   message: 'Notification accepted for delivery',
 };
-const makeAdapter = () =>
+const makeAdapter = (extra: Record<string, string> = {}) =>
   new NotifyV1Adapter(
     createPluginConfigReaderFrom(
       createEnvReader({
         PLUGIN_NOTIFY_V1_ENDPOINT: 'https://notify.example/api/v1',
         PLUGIN_NOTIFY_V1_API_KEY: 'configured-key',
+        ...extra,
       }),
       'notify-v1',
     ),
@@ -55,6 +57,27 @@ test('keeps Notify error text out of the message but on the error for the audit'
     "Request validation failed: Recipient(s) not on this tenant's safelist: recipient@example.com. This environment only sends to safelisted recipients.",
   );
   expect(Object.keys(err as object)).not.toContain('providerDetail');
+});
+
+describe('the sending limit', () => {
+  const failWith = async (status: number, body = '{}') => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(new Response(body, { status }));
+    return makeAdapter()
+      .sendEmail(email)
+      .catch((e: unknown) => e);
+  };
+
+  it('reports a 429 as a sending limit, with its status and text for the audit', async () => {
+    const err = await failWith(429, JSON.stringify({ message: 'Too many requests' }));
+    expect(err).toBeInstanceOf(NotificationLimitError);
+    expect(err).toEqual(new Error('Notify email send failed (upstream HTTP 429)'));
+    expect(upstreamStatusOf(err)).toBe(429);
+    expect(providerDetailOf(err)).toBe('Too many requests');
+  });
+
+  it.each([400, 422, 502])('reports a %s as a failure, not a limit', async (status) => {
+    expect(await failWith(status)).not.toBeInstanceOf(NotificationLimitError);
+  });
 });
 
 test('keeps a non-JSON error body as the provider detail', async () => {

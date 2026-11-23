@@ -176,11 +176,13 @@ address with no expiry, as `notification_audit` rows keep recipients.
   decided inside it, and the event's `params.actions` records them, so later settings changes don't
   alter them. The Jobs tabs show them as "Actions recorded". A new reaction to an existing event is
   a new entry in that event's list; the code that records the event does not change.
-- **The fan-out queues the reactions.** In one transaction it marks the event's children queued and
-  inserts one job per recorded reaction, with dedupe key `<reaction type>:<event id>`, the event as
-  parent and the event's creator as its own. Once the children are queued, the event can't be run
-  again; their jobs can. When the submission, its form or its workspace is already gone, the event
-  ends cancelled with that reason and queues nothing.
+- **The fan-out queues the reactions.** The transaction that records the event's job as succeeded
+  marks its children queued and inserts one job per recorded reaction, with dedupe key
+  `<reaction type>:<event id>`, the event as parent and the event's creator as its own. Once the
+  children are queued, the event can't be run again; their jobs can. A stop asked for before then
+  ends the event cancelled with nothing queued, and a reaction the database refuses ends it dead.
+  When the submission, its form or its workspace is already gone, the event ends cancelled with that
+  reason and queues nothing.
 - **Params hold ids and choices, never content.** A status-changed event's params are
   `{ statusChangeId, actions }`, and its status email's are
   `{ statusChangeId, options: { attachComment } }`: a reaction's job keeps its recorded options
@@ -196,6 +198,8 @@ address with no expiry, as `notification_audit` rows keep recipients.
   | the job                       | when                                                                                                                                                                 |
   | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
   | throws, so it retries         | the provider fails without refusing the address, or times out; an audit row could not be written                                                                     |
+  | waits for the daily reset     | the day's sends reached `NOTIFICATION_DAILY_LIMIT`; the job is deferred to the next midnight, without using an attempt                                               |
+  | waits for a pause             | the provider answered 429, or a pause after one is in force (see the provider's limit below); without using an attempt                                               |
   | ends cancelled, with a reason | notifications are off; the event no longer applies; no one is left to send to; a recipient cannot be resolved, such as an assignee who can no longer review the form |
 
   Cancel reasons show in the Jobs tabs, so they name no address, comment or form name.
@@ -204,25 +208,36 @@ address with no expiry, as `notification_audit` rows keep recipients.
   1. Puts each address in lower case and drops duplicates.
   2. Counts an address no provider would take as refused, without sending to it.
   3. Skips the addresses this job already handled. With none left it stops, unless none was ever
-     sent (step 7).
+     sent (step 6).
   4. Checks that notifications are on.
-  5. Runs the policy's `checkBudgets`, if any, until the run has handled an address.
-  6. Sends to one address at a time. A refused address (400 or 422) is recorded and skipped; any
-     other failure throws.
-  7. Ends cancelled when no email on the list has been sent, on this attempt or an earlier one:
+  5. Sends to one address at a time, checking before each send that the environment may still
+     send today and that no pause after the provider's limit is in force; otherwise the job waits
+     for the daily reset or the end of the pause, and goes on from that address. A refused address
+     (400 or 422) is recorded and skipped. A send refused at the provider's limit (429) is recorded
+     as `limited`, which starts or lengthens the pause, and the job waits for it to end. Any other
+     failure throws.
+  6. Ends cancelled when no email on the list has been sent, on this attempt or an earlier one:
      every address was refused.
 - **Attribution.** `jobNotifications(job, actorId)` binds the service to the job; `actorId` is a
   function that gives the user each send is attributed to. A send is attributed to the person whose
   action caused it. Running an email's job again attributes its sends to whoever ran it; running an
   event again does not, since the jobs it queues keep the event's creator. An action a form is
   configured with, such as the notice, sends as the system user.
-- **Hourly limits** apply where people choose the recipients. The notice, whose list staff set,
-  checks its form, workspace and environment limits before its run sends anything. A submitter's
-  copy, sent to an address they type, is checked when they ask: per submission, address, form,
-  workspace and environment, counted from its own requests, and refused with 429
-  `email_copy_limit_reached` (`SUBMITTER_EMAIL_COPY_*_HOURLY_LIMIT`). A sent copy is also an
-  accepted send in `notification_audit`, so it counts toward the notice's limits. Status emails go
-  out one per person's action and have none.
+- **The daily limit.** The environment sends up to `NOTIFICATION_DAILY_LIMIT` emails a day (3000
+  when unset, under Notify's 100,000 a month over 31 days; 100 in PR environments), counted from
+  midnight in `NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset) over every email
+  job's sends the provider accepted or refused, by the database clock. Past it, a job sends what
+  fits and the rest wait for the next day; the limit drops no email, though a job that no longer
+  applies when it wakes ends cancelled. Each send checks the room first, so jobs sending at the same
+  moment can end a day past the limit by at most one email each.
+- **The provider's limit.** Notify answers 429 at a sending limit, a rate or its monthly quota. A
+  429 pauses every email job, and only email jobs, for a minute after it; each further 429 before
+  Notify accepts an email doubles the pause, up to an hour. 429s in the same clock minute, as from
+  sends in flight together, count once, and sends count in the order they started. The daily limit
+  keeps the environment under the monthly quota.
+- **Copy request limits.** A submitter's copy, sent to an address they type, is also checked when
+  they ask: per submission, address, form, workspace and environment, counted from its own
+  requests, and refused with 429 `email_copy_limit_reached` (`SUBMITTER_EMAIL_COPY_*_HOURLY_LIMIT`).
 
 ## Emails today
 
@@ -259,11 +274,9 @@ address with no expiry, as `notification_audit` rows keep recipients.
    - an enqueue function in `backend/src/core/jobs/enqueue.ts`, run in the transaction that saves
      the event, which records the reactions
    - `nudgeJobs` after the commit
-   - a fan-out registered in the catalog
+   - a fan-out registered in the catalog, which queues the reactions with `queueOnSuccess`, so
+     neither the server nor the page offers to run the event again once it has
    - its names in the Jobs tabs
-   - its type in both `FAN_OUT_TYPES` sets, in `jobViewService.ts` and
-     `frontend/src/features/jobs/jobs.ts`, so neither the server nor the page offers to run it again
-     once it has queued its reactions
 8. Test it: the full English body, a French subject and body, the reaction's rule, the handler's
    recipients, cancel reasons and attribution, and that the event records the reaction once. Unit
    tests use no real database.

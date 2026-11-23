@@ -2,23 +2,29 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import rTracer from 'cls-rtracer';
 import type { Logger } from 'pino';
 import type { JobPoolCode, JobSettings } from '../config/env';
+import { isPgDataError } from '../db/pgError';
 import {
   claimJobs,
   finishJob,
   heartbeatJob,
   releaseJob,
+  STOPPED_BEFORE_CHILDREN,
+  succeedJobQueuingChildren,
   writeJobProgress,
+  type ChildJob,
   type ClaimedJob,
   type JobProgress,
 } from '../db/repos/jobRepo';
+import { JobCancelledError } from './errors';
+import { jobFacts } from './facts';
 import type { JobRegistry } from './registry';
-import { createProgressReporter, storeJobResult } from './results';
+import { createProgressReporter, resolveResultOptions, storeJobResult } from './results';
 import { OUTCOME_WRITE_RETRIES, OUTCOME_WRITE_RETRY_MS } from './settings';
 import {
   decideOutcome,
   errorText,
-  JobCancelledError,
-  JobFailedError,
+  handlerEnding,
+  type HandlerEnding,
   type JobOutcome,
   type JobStopReason,
 } from './settlement';
@@ -28,8 +34,10 @@ interface RunningJob {
   job: ClaimedJob;
   controller: AbortController;
   stopReason?: JobStopReason;
-  /** The handler threw `JobFailedError`: no further attempts. */
-  permanent: boolean;
+  /** How the handler asked to end when it threw: no further attempts, or a deferral. */
+  ending: HandlerEnding;
+  /** Children the handler asked to queue with its success. */
+  onSuccess: ChildJob[];
   /** The handler has returned; only the outcome write is left. */
   returned: boolean;
   stopHeartbeat: () => void;
@@ -62,14 +70,58 @@ const settlesWithin = async (promise: Promise<unknown>, ms: number): Promise<boo
   }
 };
 
-const recordOutcome = (
+const writeOutcome = (
   job: ClaimedJob,
   outcome: JobOutcome,
   progress: JobProgress | undefined,
-): Promise<boolean> =>
-  outcome.kind === 'release'
-    ? releaseJob(job.id, job.claimToken)
-    : finishJob(job.id, job.claimToken, outcome, progress);
+): Promise<boolean> => {
+  if (outcome.kind === 'release') return releaseJob(job.id, job.claimToken);
+  if (outcome.kind === 'defer') return releaseJob(job.id, job.claimToken, outcome);
+  return finishJob(job.id, job.claimToken, outcome, progress);
+};
+
+// Begins the error a job ends dead with when the database refuses its children.
+const CHILDREN_NOT_QUEUED = 'Could not queue the jobs that follow it';
+
+/**
+ * Write the outcome, queuing the children asked for on success in the same transaction, and log
+ * the children queued. The outcome recorded: cancelled for a success with children to queue whose
+ * stop was asked for first, and dead when the database refuses the transaction, which another try
+ * would not change; null when the job was no longer held.
+ */
+const recordOutcome = async (
+  job: ClaimedJob,
+  outcome: JobOutcome,
+  progress: JobProgress | undefined,
+  onSuccess: readonly ChildJob[],
+  log: Logger,
+): Promise<JobOutcome | null> => {
+  if (outcome.kind !== 'succeeded' || onSuccess.length === 0) {
+    return (await writeOutcome(job, outcome, progress)) ? outcome : null;
+  }
+  let queued: Awaited<ReturnType<typeof succeedJobQueuingChildren>>;
+  try {
+    queued = await succeedJobQueuingChildren(job, onSuccess, progress);
+  } catch (err) {
+    // Any data or constraint error in the transaction; its own update writes only clamped values.
+    if (!isPgDataError(err)) throw err;
+    const dead: JobOutcome = { kind: 'dead', error: `${CHILDREN_NOT_QUEUED}: ${errorText(err)}` };
+    return (await finishJob(job.id, job.claimToken, dead, progress)) ? dead : null;
+  }
+  if (queued?.ended === 'cancelled') return { kind: 'cancelled', error: STOPPED_BEFORE_CHILDREN };
+  if (!queued) return null;
+  log.info(
+    {
+      // A null job id: a job with that dedupe key was queued already.
+      children: onSuccess.map((child, index) => ({
+        type: child.type,
+        jobId: queued.jobIds[index],
+      })),
+    },
+    'Job queued the jobs that follow it',
+  );
+  return outcome;
+};
 
 const OUTCOME_MESSAGES: Record<JobOutcome['kind'], string> = {
   succeeded: 'Job succeeded',
@@ -77,7 +129,14 @@ const OUTCOME_MESSAGES: Record<JobOutcome['kind'], string> = {
   dead: 'Job dead',
   cancelled: 'Job cancelled',
   release: 'Job released for another pod',
+  defer: 'Job deferred',
 };
+
+const EXPECTED_OUTCOMES: ReadonlySet<JobOutcome['kind']> = new Set([
+  'succeeded',
+  'release',
+  'defer',
+]);
 
 /**
  * Runs queued jobs for the pools this pod is configured for. Each pool polls on its own interval and
@@ -126,11 +185,17 @@ export class JobRunner {
     this.schedule(state, 0);
   }
 
+  /** `nudge` the pool that runs jobs of `type`; nothing for a type this process does not know. */
+  nudgeType(type: string): void {
+    const definition = this.registry.get(type);
+    if (definition) this.nudge(definition.pool);
+  }
+
   /**
    * Stop claiming and wait up to the drain deadline for running jobs. Jobs still running then are
-   * aborted; each is released once its handler returns. Jobs whose handler has returned get the
-   * outcome write's retries. A handler that does not return within the grace keeps its job until the
-   * lease expires and the sweeper takes it.
+   * aborted; once its handler returns, each is released, or waits as asked when it deferred. Jobs
+   * whose handler has returned get the outcome write's retries. A handler that does not return
+   * within the grace keeps its job until the lease expires and the sweeper takes it.
    */
   async stop(): Promise<void> {
     this.stopping = true;
@@ -185,7 +250,8 @@ export class JobRunner {
     const entry: RunningJob = {
       job,
       controller: new AbortController(),
-      permanent: false,
+      ending: {},
+      onSuccess: [],
       returned: false,
       stopHeartbeat: () => undefined,
       done: Promise.resolve(),
@@ -216,20 +282,20 @@ export class JobRunner {
       const error = await this.runHandler(state, entry, log, progress.report);
       entry.returned = true;
       clearTimeout(entry.abandonTimer);
-      const outcome = decideOutcome(error, entry.stopReason, job, this.settings, entry.permanent);
+      const outcome = decideOutcome(error, entry.stopReason, job, this.settings, entry.ending);
       if (!outcome) {
         log.warn({ reason: entry.stopReason, error }, 'Job stopped before finishing');
         return;
       }
       // The heartbeat keeps the lease while the outcome is written.
       const recorded = await withRetries(
-        () => recordOutcome(job, outcome, progress.latest()),
+        () => recordOutcome(job, outcome, progress.latest(), entry.onSuccess, log),
         OUTCOME_WRITE_RETRIES,
         OUTCOME_WRITE_RETRY_MS,
       );
       if (recorded) {
-        const expected = outcome.kind === 'succeeded' || outcome.kind === 'release';
-        log[expected ? 'info' : 'warn']({ outcome }, OUTCOME_MESSAGES[outcome.kind]);
+        const expected = EXPECTED_OUTCOMES.has(recorded.kind);
+        log[expected ? 'info' : 'warn']({ outcome: recorded }, OUTCOME_MESSAGES[recorded.kind]);
       } else {
         log.warn({ outcome: outcome.kind }, 'Job was no longer held; outcome not recorded');
       }
@@ -254,17 +320,27 @@ export class JobRunner {
       timeoutMs = definition.timeoutMs ?? timeoutMs;
       timer = setTimeout(() => this.abort(entry, 'timeout'), timeoutMs);
       await definition.run({
-        job,
+        job: jobFacts(job),
         signal: controller.signal,
         log,
         reportProgress,
         resultMaxBytes: this.settings.resultMaxBytes,
-        storeResult: (staged, meta) =>
-          storeJobResult(job, staged, meta, this.settings, controller.signal),
+        storeResult: (staged, meta, options) =>
+          storeJobResult(
+            job,
+            staged,
+            meta,
+            this.settings,
+            controller.signal,
+            resolveResultOptions(definition, job, this.settings, options),
+          ),
+        queueOnSuccess: (children) => {
+          entry.onSuccess.push(...children);
+        },
       });
       return undefined;
     } catch (err) {
-      if (err instanceof JobFailedError) entry.permanent = true;
+      entry.ending = handlerEnding(err);
       if (err instanceof JobCancelledError && !entry.stopReason) entry.stopReason = 'cancel';
       return entry.stopReason === 'timeout' ? `Timed out after ${timeoutMs} ms` : errorText(err);
     } finally {

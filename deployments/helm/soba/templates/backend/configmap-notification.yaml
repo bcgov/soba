@@ -6,6 +6,12 @@ metadata:
     {{- include "soba.labels" (dict "root" . "component" "backend") | nindent 4 }}
 data:
   NOTIFICATION_DEFAULT_CODE: {{ .Values.backend.config.notificationDefaultCode | quote }}
+  {{- with include "soba.wholeNumberSetting" (dict "key" "backend.notification.dailyLimit" "value" .Values.backend.notification.dailyLimit "max" 100000) }}
+  NOTIFICATION_DAILY_LIMIT: {{ . }}
+  {{- end }}
+  {{- with .Values.backend.notification.dailyResetTimeZone }}
+  NOTIFICATION_DAILY_RESET_TIME_ZONE: {{ . | quote }}
+  {{- end }}
   {{- with .Values.backend.notification.notifyV1.endpoint }}
   PLUGIN_NOTIFY_V1_ENDPOINT: {{ . | quote }}
   {{- end }}

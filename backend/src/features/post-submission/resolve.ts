@@ -1,5 +1,6 @@
 import type { DbOrTx } from '../../core/db/client';
 import { Features } from '../../core/db/codes';
+import type { RevisionAppendedFacts } from '../../core/db/repos/submissionRepo';
 import type {
   PostSubmissionActionPluginDefinition,
   PostSubmissionActionScope,
@@ -77,12 +78,14 @@ export const availableActions = async (
   return actions.filter((action) => action !== null);
 };
 
-/** The actions to record with a submission: each available action whose settings turn it on. */
+/** The actions a submit records: each available one its settings turn on and its `submits` allows. */
 export const chooseSubmittedActions = (
   rows: readonly ActionSettingRow[],
   actions: readonly ScopedAction[],
+  facts: RevisionAppendedFacts,
 ): SubmittedAction[] =>
   actions.flatMap(({ plugin, scopes }) => {
+    if (plugin.submits === 'first' && !facts.firstSubmit) return [];
     const { workspaceRow, formRow } = rowsFor(rows, plugin.code);
     const { values, source } = effectiveAction(workspaceRow, formRow, scopes);
     return values.enabled && source ? [{ code: plugin.code, options: values.options, source }] : [];
@@ -94,8 +97,9 @@ export const resolveSubmittedActions = async (
   workspaceId: string,
   formId: string,
   actions: readonly ScopedAction[],
+  facts: RevisionAppendedFacts,
 ): Promise<SubmittedAction[]> => {
   if (actions.length === 0) return [];
   const rows = await findActionSettingRows(executor, workspaceId, formId);
-  return chooseSubmittedActions(rows, actions);
+  return chooseSubmittedActions(rows, actions, facts);
 };

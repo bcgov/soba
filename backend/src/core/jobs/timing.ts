@@ -8,6 +8,20 @@ export const backoffDelayMs = (
   { backoffBaseMs, backoffMaxMs }: { backoffBaseMs: number; backoffMaxMs: number },
 ): number => Math.min(backoffBaseMs * 2 ** Math.max(attempt - 1, 0), backoffMaxMs);
 
+export const MIN_DEFER_MS = 1000;
+export const MAX_DEFER_MS = 86_400_000;
+
+/**
+ * A deferral's delay in whole milliseconds, from a second to a day. A value that is not a number,
+ * from code without types, waits the least.
+ */
+export const deferDelayMs = (ms: unknown): number => {
+  const value = Number(ms);
+  return Number.isNaN(value)
+    ? MIN_DEFER_MS
+    : Math.min(Math.max(Math.round(value), MIN_DEFER_MS), MAX_DEFER_MS);
+};
+
 /**
  * `ms` moved by up to a fifth either way, so pods started together do not poll together. Never past
  * the largest timer delay.

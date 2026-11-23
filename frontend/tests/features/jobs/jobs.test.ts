@@ -1,24 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import en from '@/dictionaries/en.json';
 import fr from '@/dictionaries/fr.json';
-import { jobTypeLabel, queuedItsActions, submissionJobTypes } from '@/src/features/jobs/jobs';
+import { jobTypeLabel, queuedItsChildren, submissionJobTypes } from '@/src/features/jobs/jobs';
 import type { Dictionary } from '@/src/types/dictionary';
 
-describe('queuedItsActions', () => {
-  const job = (type: string, childrenQueuedAt: string | null, children: unknown[] = []) =>
-    ({ type, childrenQueuedAt, children }) as Parameters<typeof queuedItsActions>[0];
+describe('queuedItsChildren', () => {
+  const job = (childrenQueuedAt: string | null, children: unknown[] = []) =>
+    ({ childrenQueuedAt, children }) as Parameters<typeof queuedItsChildren>[0];
 
-  it.each(['submission.submitted', 'submission.status-changed'])(
-    'marks a %s job that queued its jobs, even once retention deleted them',
-    (type) => {
-      expect(queuedItsActions(job(type, null, [{ id: 'child-1' }]))).toBe(true);
-      expect(queuedItsActions(job(type, '2026-11-08T00:00:00Z'))).toBe(true);
-      expect(queuedItsActions(job(type, null))).toBe(false);
-    },
-  );
+  it('marks a job that queued jobs, even once retention deleted them', () => {
+    expect(queuedItsChildren(job(null, [{ id: 'child-1' }]))).toBe(true);
+    expect(queuedItsChildren(job('2026-11-08T00:00:00Z'))).toBe(true);
+  });
 
-  it('never marks a job that queues no jobs of its own', () => {
-    expect(queuedItsActions(job('submission.status-email', '2026-11-08T00:00:00Z'))).toBe(false);
+  it('never marks a job that queued none', () => {
+    expect(queuedItsChildren(job(null))).toBe(false);
   });
 });
 
