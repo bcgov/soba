@@ -11,6 +11,7 @@ import {
 } from '../../core/db/repos/notificationAuditRepo';
 import { upstreamStatusOf } from '../../core/http/httpErrorMapper';
 import {
+  NotificationLimitError,
   providerDetailOf,
   type NotificationAdapter,
   type SendEmail,
@@ -37,7 +38,7 @@ export interface NotificationContext {
 export interface NotificationSendResult {
   outcome: NotificationOutcomeCode;
   providerMessageId: string | null;
-  /** The provider's HTTP status on error; null otherwise or when no response came back. */
+  /** The provider's HTTP status on an error or a limit; null otherwise or when none came back. */
   httpStatus: number | null;
   /** Whether the audit row was written. */
   audited: boolean;
@@ -82,7 +83,10 @@ async function attempt(deps: NotificationServiceDeps, email: SendEmail): Promise
     };
   } catch (err) {
     return {
-      outcome: NotificationOutcome.error,
+      outcome:
+        err instanceof NotificationLimitError
+          ? NotificationOutcome.limited
+          : NotificationOutcome.error,
       httpStatus: upstreamStatusOf(err) ?? null,
       errorDetail: errorDetail(err),
     };
@@ -101,17 +105,17 @@ export const createNotificationService = (deps: NotificationServiceDeps) => ({
     const startedAt = Date.now();
     const result = await attempt(deps, email);
     const pluginCode = deps.pluginCode();
+    // The audit row holds the provider's text; the log keeps to fields without recipients.
+    const failure = {
+      pluginCode,
+      httpStatus: result.httpStatus,
+      workspaceId: context.workspaceId,
+      submissionId: context.submissionId,
+    };
     if (result.outcome === NotificationOutcome.error) {
-      // The audit row holds the provider's text; the log keeps to fields without recipients.
-      log.error(
-        {
-          pluginCode,
-          httpStatus: result.httpStatus,
-          workspaceId: context.workspaceId,
-          submissionId: context.submissionId,
-        },
-        'Notification send failed',
-      );
+      log.error(failure, 'Notification send failed');
+    } else if (result.outcome === NotificationOutcome.limited) {
+      log.warn(failure, 'Notification send refused at a sending limit');
     }
     let audited = false;
     try {

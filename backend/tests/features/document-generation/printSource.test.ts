@@ -1,6 +1,7 @@
 import {
   printContextOf,
   printSourceOf,
+  submittedRevisionContext,
 } from '../../../src/features/document-generation/printSource';
 
 const saved = { data: { name: 'Ann', tags: [1, 2] } };
@@ -87,6 +88,18 @@ describe('printContextOf', () => {
     expect(printContextOf(submission('revising'), 'unsaved', now)).toMatchObject({
       confirmationCode: null,
       revisionNo: null,
+    });
+  });
+});
+
+describe('submittedRevisionContext', () => {
+  it("gives a job's render of a submitted revision that revision's number and the code", () => {
+    const now = new Date('2026-11-19T20:00:00Z');
+    expect(submittedRevisionContext({ confirmationCode: 'K7M2Q9XA', revisionNo: 2 }, now)).toEqual({
+      status: 'submitted',
+      printedAt: '2026-11-19T20:00:00.000Z',
+      confirmationCode: 'K7M2Q9XA',
+      revisionNo: 2,
     });
   });
 });

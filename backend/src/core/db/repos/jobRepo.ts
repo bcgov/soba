@@ -1,8 +1,23 @@
-import { and, eq, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from 'drizzle-orm';
-import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
+import {
+  and,
+  eq,
+  exists,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  ne,
+  notExists,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
+import { alias, type PgUpdateSetSource } from 'drizzle-orm/pg-core';
+import { mapInOrder } from '../../inOrder';
 import { quietDb, type DbOrTx, type Tx } from '../client';
 import { JobStatus } from '../codes';
-import { files, jobs } from '../schema';
+import { files, jobs, submissions } from '../schema';
 import type { FileRecord } from './fileRepo';
 
 export type JobRecord = typeof jobs.$inferSelect;
@@ -22,6 +37,11 @@ export interface NewJob {
   dedupeKey?: string | null;
   maxAttempts: number;
 }
+
+/** A job queued by another, which gives it its workspace and becomes its parent. */
+export type ChildJob = Omit<NewJob, 'workspaceId' | 'parentJobId' | 'dedupeKey'> & {
+  dedupeKey: string;
+};
 
 /**
  * How a claimed job ends. A retry goes back to queued after the delay. A retry or dead job whose
@@ -51,6 +71,22 @@ export const LEASE_EXPIRED = 'Lease expired';
 
 const afterMs = (ms: number): SQL => sql`now() + ${ms}::int * interval '1 millisecond'`;
 const daysAgo = (days: number): SQL => sql`now() - ${days}::int * interval '1 day'`;
+
+const childJobs = alias(jobs, 'child_job');
+
+/**
+ * True when every child of the job has succeeded, or it has none. A later action step reads the step
+ * before it on every run, including one run again after it ended dead or cancelled, so the step
+ * before keeps its row and its result until the later step succeeds, unless the submission is
+ * deleted.
+ */
+const everyChildSucceeded = (): SQL =>
+  notExists(
+    quietDb
+      .select({ id: childJobs.id })
+      .from(childJobs)
+      .where(and(eq(childJobs.parentJobId, jobs.id), ne(childJobs.status, JobStatus.succeeded))),
+  );
 
 const held = (id: string, claimToken: string) =>
   and(eq(jobs.id, id), eq(jobs.claimToken, claimToken), eq(jobs.status, JobStatus.running));
@@ -82,22 +118,15 @@ export const insertJob = async (dbOrTx: DbOrTx, input: NewJob): Promise<string |
   return row?.id ?? null;
 };
 
-/**
- * Record, in the caller's transaction, that a held job queued its children. False when the job is no
- * longer this worker's, and the caller then rolls the children back.
- */
-export const markChildrenQueued = async (
-  dbOrTx: DbOrTx,
-  id: string,
-  claimToken: string,
-): Promise<boolean> => {
-  const rows = await dbOrTx
-    .update(jobs)
-    .set({ childrenQueuedAt: sql`now()` })
-    .where(held(id, claimToken))
-    .returning({ id: jobs.id });
-  return rows.length > 0;
-};
+/** A child job as inserted: in its parent's workspace, under its parent. */
+export const childRow = (
+  parent: Pick<ClaimedJob, 'id' | 'workspaceId'>,
+  child: ChildJob,
+): NewJob => ({
+  ...child,
+  workspaceId: parent.workspaceId,
+  parentJobId: parent.id,
+});
 
 /**
  * Claim up to `limit` due jobs of the given types, oldest first. Rows another worker has locked are
@@ -158,7 +187,7 @@ export const writeJobProgress = async (
 };
 
 export type AttachResultOutcome =
-  | { attached: true; previous: FileRecord | null }
+  | { attached: true; previous: FileRecord | null; expiresAt: Date }
   | { attached: false; reason: 'not_held' | 'cancel_requested' };
 
 /**
@@ -180,16 +209,34 @@ export const attachJobResult = async (
     .for('update');
   if (!row) return { attached: false, reason: 'not_held' };
   if (row.cancelRequestedAt) return { attached: false, reason: 'cancel_requested' };
-  await tx
+  const [updated] = await tx
     .update(jobs)
     .set({
       resultFileId: fileId,
       resultExpiresAt: sql`now() + ${retentionDays}::int * interval '1 day'`,
     })
-    .where(eq(jobs.id, id));
-  if (!row.resultFileId) return { attached: true, previous: null };
+    .where(eq(jobs.id, id))
+    .returning({ expiresAt: jobs.resultExpiresAt });
+  if (!updated?.expiresAt) throw new Error(`Job ${id} result attach returned no expiry`);
+  const expiresAt = updated.expiresAt;
+  if (!row.resultFileId) return { attached: true, previous: null, expiresAt };
   const [previous] = await tx.delete(files).where(eq(files.id, row.resultFileId)).returning();
-  return { attached: true, previous: previous ?? null };
+  return { attached: true, previous: previous ?? null, expiresAt };
+};
+
+/**
+ * Keep a succeeded job's result file at least `days` from now, never shortening its expiry. Nothing
+ * when the job has no result file.
+ */
+export const extendJobResult = async (id: string, days: number): Promise<void> => {
+  await quietDb
+    .update(jobs)
+    .set({
+      resultExpiresAt: sql`greatest(${jobs.resultExpiresAt}, now() + ${days}::int * interval '1 day')`,
+    })
+    .where(
+      and(eq(jobs.id, id), eq(jobs.status, JobStatus.succeeded), isNotNull(jobs.resultFileId)),
+    );
 };
 
 /** Extend the lease. `held` is false once the job is no longer this worker's. */
@@ -237,6 +284,9 @@ const finishValues = (finish: JobFinish): PgUpdateSetSource<typeof jobs> => {
   }
 };
 
+const progressValues = (progress?: JobProgress): PgUpdateSetSource<typeof jobs> =>
+  progress ? { progressDone: progress.done, progressTotal: progress.total } : {};
+
 /**
  * Record how a claimed job ended, with the progress it last reported. False when the job was no
  * longer this worker's.
@@ -249,20 +299,68 @@ export const finishJob = async (
 ): Promise<boolean> => {
   const rows = await quietDb
     .update(jobs)
-    .set({
-      ...finishValues(finish),
-      ...(progress ? { progressDone: progress.done, progressTotal: progress.total } : {}),
-    })
+    .set({ ...finishValues(finish), ...progressValues(progress) })
     .where(held(id, claimToken))
     .returning({ id: jobs.id });
   return rows.length > 0;
 };
 
+/** The error a job ends cancelled with when its stop was asked for before its children were queued. */
+export const STOPPED_BEFORE_CHILDREN = 'Stopped before it queued the jobs that follow it';
+
 /**
- * Hand a claimed job back for another worker without counting the attempt. A job whose cancel was
- * requested ends cancelled instead.
+ * Record a held job as succeeded and queue its children, in order, in the same transaction, marking
+ * that it queued them. A job whose stop was asked for ends cancelled instead and queues none, so it
+ * can run again. How it ended, with each child's id or null where its dedupe key was taken; null
+ * when it was no longer this worker's.
  */
-export const releaseJob = async (id: string, claimToken: string): Promise<boolean> => {
+export const succeedJobQueuingChildren = (
+  job: Pick<ClaimedJob, 'id' | 'claimToken' | 'workspaceId'>,
+  children: readonly ChildJob[],
+  progress?: JobProgress,
+): Promise<{ ended: 'succeeded'; jobIds: (string | null)[] } | { ended: 'cancelled' } | null> =>
+  quietDb.transaction(async (tx) => {
+    const succeeded = await tx
+      .update(jobs)
+      .set({
+        ...finishValues({ kind: 'succeeded' }),
+        ...progressValues(progress),
+        childrenQueuedAt: sql`now()`,
+      })
+      .where(and(held(job.id, job.claimToken), isNull(jobs.cancelRequestedAt)))
+      .returning({ id: jobs.id });
+    if (succeeded.length > 0) {
+      const jobIds = await mapInOrder(children, (child) => insertJob(tx, childRow(job, child)));
+      return { ended: 'succeeded', jobIds };
+    }
+    const cancelled = await tx
+      .update(jobs)
+      .set({
+        ...finishValues({ kind: 'cancelled', error: STOPPED_BEFORE_CHILDREN }),
+        ...progressValues(progress),
+      })
+      .where(held(job.id, job.claimToken))
+      .returning({ id: jobs.id });
+    return cancelled.length > 0 ? { ended: 'cancelled' } : null;
+  });
+
+/** A wait a job asked for, and why. */
+export interface JobDeferral {
+  /** Whole milliseconds, at most a day, as `deferDelayMs` bounds it. */
+  delayMs: number;
+  /** Recorded as the job's last error. */
+  reason: string;
+}
+
+/**
+ * Hand a claimed job back without counting the attempt, to run again now or, with a deferral, after
+ * its delay; it stays the same run. A job whose cancel was requested ends cancelled instead.
+ */
+export const releaseJob = async (
+  id: string,
+  claimToken: string,
+  deferral?: JobDeferral,
+): Promise<boolean> => {
   const rows = await quietDb
     .update(jobs)
     .set({
@@ -270,7 +368,8 @@ export const releaseJob = async (id: string, claimToken: string): Promise<boolea
       status: unlessCancelRequested(JobStatus.queued),
       finishedAt: finishedIfCancelRequested(),
       attempts: sql`greatest(${jobs.attempts} - 1, 0)`,
-      runAfter: sql`now()`,
+      runAfter: deferral ? afterMs(deferral.delayMs) : sql`now()`,
+      ...(deferral ? { lastError: deferral.reason } : {}),
     })
     .where(held(id, claimToken))
     .returning({ id: jobs.id });
@@ -313,7 +412,8 @@ export const cancelJob = async (
  * Requeue running jobs whose lease expired (their worker died), or end them as cancelled or dead, then
  * delete up to `retentionBatch` finished jobs past retention. Succeeded jobs use
  * `succeededRetentionDays`; dead and cancelled jobs use `deadRetentionDays`. A job that still points
- * at a result file is kept until the result sweep has removed it.
+ * at a result file is kept until the result sweep has removed it, and one is kept while a child it
+ * queued has not succeeded.
  */
 export const sweepJobs = async (retention: {
   retentionBatch: number;
@@ -334,6 +434,7 @@ export const sweepJobs = async (retention: {
     .returning({ status: jobs.status });
   const isPastRetention = and(
     isNull(jobs.resultFileId),
+    everyChildSucceeded(),
     or(
       and(
         eq(jobs.status, JobStatus.succeeded),
@@ -363,13 +464,24 @@ export const sweepJobs = async (retention: {
   };
 };
 
-const ENDED_UNSUCCESSFULLY = [JobStatus.dead, JobStatus.cancelled];
+const endedUnsuccessfully = inArray(jobs.status, [JobStatus.dead, JobStatus.cancelled]);
+
+/** A job about a submission that has been deleted. */
+const submissionDeleted = (): SQL =>
+  exists(
+    quietDb
+      .select({ id: submissions.id })
+      .from(submissions)
+      .where(and(eq(submissions.id, jobs.submissionId), isNotNull(submissions.deletedAt))),
+  );
 
 /**
  * Remove up to `batch` result files: those past their expiry, and those of jobs that ended dead or
- * cancelled. One transaction locks the jobs (skipping any being written), points them away from their
- * files and deletes the file rows; the caller then deletes the returned files' bytes. A dead or
- * cancelled job's expiry goes too, so it never reads as expired.
+ * cancelled, except while a child of the job has not succeeded; and those of jobs whose submission
+ * was deleted, whatever their children. One transaction locks the jobs (skipping any being
+ * written), points them away from their files and deletes the file rows; the caller then deletes
+ * the returned files' bytes. Those dead or cancelled jobs lose their expiry too, so they never read
+ * as expired.
  */
 export const sweepJobResults = (batch: number): Promise<FileRecord[]> =>
   quietDb.transaction(async (tx) => {
@@ -379,7 +491,13 @@ export const sweepJobResults = (batch: number): Promise<FileRecord[]> =>
       .where(
         and(
           isNotNull(jobs.resultFileId),
-          or(lte(jobs.resultExpiresAt, sql`now()`), inArray(jobs.status, ENDED_UNSUCCESSFULLY)),
+          or(
+            and(
+              or(lte(jobs.resultExpiresAt, sql`now()`), endedUnsuccessfully),
+              everyChildSucceeded(),
+            ),
+            submissionDeleted(),
+          ),
         ),
       )
       .limit(batch)
@@ -390,7 +508,8 @@ export const sweepJobResults = (batch: number): Promise<FileRecord[]> =>
       .update(jobs)
       .set({
         resultFileId: null,
-        resultExpiresAt: sql`case when ${inArray(jobs.status, ENDED_UNSUCCESSFULLY)} then null else ${jobs.resultExpiresAt} end`,
+        // A succeeded job released for a deleted submission reads as expired from now.
+        resultExpiresAt: sql`case when ${endedUnsuccessfully} then null when ${submissionDeleted()} then least(${jobs.resultExpiresAt}, now()) else ${jobs.resultExpiresAt} end`,
       })
       .where(
         inArray(

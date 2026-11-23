@@ -23,8 +23,8 @@ import { getPublicUser } from '../../services/publicUser';
 import { canReviewForm } from '../../../features/submission-review/assignee';
 import { availableStatusReactions } from '../../../features/submission-review/statusReactions';
 import { JobType } from '../../db/codes';
-import { nudgeJobs } from '../../jobs';
 import { enqueueStatusChangedJob } from '../../jobs/enqueue';
+import { nudgeJobs } from '../../jobs/nudge';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../errors';
 import type { SubmissionsContextInput } from './serviceFactory';
 

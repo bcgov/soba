@@ -1,6 +1,9 @@
 import type { Logger } from 'pino';
-import type { ClaimedJob } from '../../../src/core/db/repos/jobRepo';
-import type { PostSubmissionActionServices } from '../../../src/core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
+import type {
+  PostSubmissionActionJob,
+  PostSubmissionActionResult,
+  PostSubmissionActionServices,
+} from '../../../src/core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import { findPostSubmissionAction } from '../../../src/core/integrations/post-submission-action/PostSubmissionActionRegistry';
 import { postSubmissionActionPluginDefinition as plugin } from '../../../src/plugins/post-submission-log';
 
@@ -31,19 +34,23 @@ describe('post-submission-log', () => {
     const info = jest.fn();
     const source = { scope: 'form' as const, settingId: 'setting-1', version: 2 };
     await plugin.job.run({
-      job: { id: 'job-1', submissionId: 's1', revisionId: 'r1' } as ClaimedJob,
+      job: { id: 'job-1', submissionId: 's1', revisionId: 'r1' } as PostSubmissionActionJob,
+      previous: null,
       options: { note: 'private words' },
       source,
       submission: {
         id: 's1',
         formId: 'f1',
+        formVersionId: 'v1',
         formName: 'Form',
         workspaceId: 'w1',
         workspaceName: 'Workspace',
         confirmationCode: 'ABCDEFGH',
       },
-      // The log plugin uses no services.
+      // The log plugin uses no services and stores no result.
       services: {} as PostSubmissionActionServices,
+      result: {} as PostSubmissionActionResult,
+      reportProgress: jest.fn(),
       signal: new AbortController().signal,
       log: { info } as unknown as Logger,
     });

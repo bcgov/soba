@@ -6,8 +6,8 @@ import { fileStore } from '../services/fileStore';
 import { jitteredMs } from './timing';
 
 /**
- * Periodically requeues jobs whose worker died, removes result files that expired or belong to jobs
- * that did not succeed, and deletes finished jobs past retention.
+ * Periodically requeues jobs whose worker died and deletes finished jobs past retention
+ * (`sweepJobs`), and removes the result files no longer kept (`sweepJobResults`).
  */
 export class JobSweeper {
   private timer?: NodeJS.Timeout;

@@ -1,4 +1,11 @@
-import { backoffDelayMs, jitteredMs, withRetries } from '../../../src/core/jobs/timing';
+import {
+  backoffDelayMs,
+  deferDelayMs,
+  jitteredMs,
+  MAX_DEFER_MS,
+  MIN_DEFER_MS,
+  withRetries,
+} from '../../../src/core/jobs/timing';
 
 const backoff = { backoffBaseMs: 30_000, backoffMaxMs: 1_800_000 };
 
@@ -12,6 +19,28 @@ describe('backoffDelayMs', () => {
   it('stops at the cap', () => {
     expect(backoffDelayMs(7, backoff)).toBe(1_800_000);
     expect(backoffDelayMs(2000, backoff)).toBe(1_800_000);
+  });
+});
+
+describe('deferDelayMs', () => {
+  it('keeps a delay from a second to a day, in whole milliseconds', () => {
+    expect(deferDelayMs(1500.4)).toBe(1500);
+    expect(deferDelayMs(MIN_DEFER_MS)).toBe(MIN_DEFER_MS);
+    expect(deferDelayMs(MAX_DEFER_MS)).toBe(MAX_DEFER_MS);
+  });
+
+  it.each([
+    [0, MIN_DEFER_MS],
+    [-5, MIN_DEFER_MS],
+    [999, MIN_DEFER_MS],
+    [Number.NEGATIVE_INFINITY, MIN_DEFER_MS],
+    [Number.NaN, MIN_DEFER_MS],
+    ['soon', MIN_DEFER_MS],
+    [undefined, MIN_DEFER_MS],
+    [2 * MAX_DEFER_MS, MAX_DEFER_MS],
+    [Number.POSITIVE_INFINITY, MAX_DEFER_MS],
+  ])('bounds a delay of %s to %s ms', (ms, expected) => {
+    expect(deferDelayMs(ms)).toBe(expected);
   });
 });
 

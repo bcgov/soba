@@ -1,5 +1,5 @@
 import { Transform } from 'node:stream';
-import { JobFailedError } from '../../core/jobs/settlement';
+import { JobFailedError } from '../../core/jobs/errors';
 
 /** Recorded as the job's error; the export routes read it as the size limit. */
 export const EXPORT_TOO_LARGE = 'Result over the size limit';
