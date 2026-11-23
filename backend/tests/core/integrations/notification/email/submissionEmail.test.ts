@@ -116,13 +116,29 @@ describe('renderSubmissionEmail', () => {
   it('adds the title as a heading above the Confirmation ID, where the template has one', () => {
     const titled = defineSubmissionEmail({
       en: { ...template.en, title: ({ form }) => `${form} submitted` },
-      fr: { ...template.fr, title: ({ form }) => `${form} soumis` },
+      fr: { ...template.fr, title: ({ form }) => `Formulaire soumis : ${form}` },
     });
-    const { body } = renderSubmissionEmail(titled, facts(), 'en');
-    const title = body.indexOf('>Permit application submitted</h1>');
+    const { body } = renderSubmissionEmail(titled, facts({ formName: '<b>Fees</b>' }), 'en');
+    const title = body.indexOf(
+      '<h1 style="margin:0 0 16px 0;font-size:20px;line-height:28px;font-weight:bold;">&lt;b&gt;Fees&lt;/b&gt; submitted</h1>',
+    );
     expect(title).toBeGreaterThan(-1);
     expect(title).toBeLessThan(body.indexOf('Confirmation ID:'));
     expect(renderSubmissionEmail(template, facts(), 'en').body).not.toContain('<h1');
+  });
+
+  it('adds the links intro before the links, only when the email has a link', () => {
+    const withIntro = defineSubmissionEmail({
+      en: { ...template.en, linksIntro: 'See the links:' },
+      fr: { ...template.fr, linksIntro: 'Voir les liens :' },
+    });
+    const { body } = renderSubmissionEmail(withIntro, facts(), 'en');
+    const intro = body.indexOf('<p style="margin:0 0 16px 0;">See the links:</p>');
+    expect(intro).toBeGreaterThan(body.indexOf('There is a new'));
+    expect(intro).toBeLessThan(body.indexOf('<a '));
+    expect(renderSubmissionEmail(withIntro, facts({ link: () => null }), 'en').body).not.toContain(
+      'See the links:',
+    );
   });
 
   it('leaves out a second link the template has no text for', () => {

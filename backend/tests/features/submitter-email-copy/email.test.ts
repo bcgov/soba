@@ -13,16 +13,20 @@ describe('buildEmailCopy', () => {
   it('writes one email in both languages, the subject ending with the Confirmation ID', () => {
     const { subject, body, bodyType } = buildEmailCopy(facts, FORMS);
     expect(bodyType).toBe('html');
-    expect(subject).toBe('Permit application submitted / Permit application soumis (K7M2Q9XA)');
+    expect(subject).toBe(
+      'Permit application submitted / Formulaire soumis : Permit application (K7M2Q9XA)',
+    );
     expect(body).toContain('>Permit application submitted</h1>');
-    expect(body).toContain('>Permit application soumis</h1>');
+    expect(body).toContain('>Formulaire soumis : Permit application</h1>');
     expect(body).toContain('Confirmation ID: <strong>K7M2Q9XA</strong>');
     expect(body).toContain('ID de confirmation : <strong>K7M2Q9XA</strong>');
+    expect(body).toContain('>Thank you for your Permit application submission.</p>');
     expect(body).toContain(
-      'Thank you for your Permit application submission. You can view your submission details by visiting the following links:',
+      '>You can view your submission details by visiting the following links:</p>',
     );
+    expect(body).toContain('>Merci pour votre soumission pour Permit application.</p>');
     expect(body).toContain(
-      'Merci pour votre soumission pour Permit application. Vous pouvez consulter les détails de votre soumission en visitant les liens suivants :',
+      '>Vous pouvez consulter les détails de votre soumission en visitant les liens suivants :</p>',
     );
   });
 
@@ -42,6 +46,9 @@ describe('buildEmailCopy', () => {
   it('has no links for a submitter who was not signed in', () => {
     const { body } = buildEmailCopy({ ...facts, signedIn: false, publicForm: true }, FORMS);
     expect(body).toContain('Confirmation ID: <strong>K7M2Q9XA</strong>');
+    expect(body).toContain('>Thank you for your Permit application submission.</p>');
+    expect(body).not.toContain('following links');
+    expect(body).not.toContain('liens suivants');
     expect(body).not.toContain('<a ');
   });
 

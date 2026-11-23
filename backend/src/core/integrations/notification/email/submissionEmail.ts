@@ -25,6 +25,8 @@ export interface SubmissionEmailCopy {
   title?: (vars: SubmissionEmailVars) => string;
   /** The one sentence that says what happened. */
   sentence: (vars: SubmissionEmailVars) => string;
+  /** A line before the links, shown only when the email has a link. */
+  linksIntro?: string;
   linkText: string;
   /** Text for a second link, for an email that has one. */
   secondLinkText?: string;
@@ -86,6 +88,7 @@ export const renderSubmissionEmail = (
               markup`${COPY[language].confirmationId} <strong>${facts.confirmationCode}</strong>`,
             ),
             paragraph(copy.sentence(vars)),
+            url && copy.linksIntro && paragraph(copy.linksIntro),
             url && paragraph(link(url, copy.linkText)),
             secondUrl && copy.secondLinkText && paragraph(link(secondUrl, copy.secondLinkText)),
           ]),
