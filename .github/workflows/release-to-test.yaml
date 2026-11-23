@@ -177,7 +177,7 @@ jobs:
       contents: read
     environment:
       name: test
-      url: https://${{ env.ACRONYM }}-test.${{ vars.OC_DOMAIN }}/designer
+      url: https://submit-test.${{ vars.OC_DOMAIN }}/designer
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:

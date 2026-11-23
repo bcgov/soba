@@ -118,7 +118,7 @@ jobs:
       contents: read
     environment:
       name: dev
-      url: https://soba-dev.${{ vars.OC_DOMAIN }}/designer
+      url: https://submit-dev.${{ vars.OC_DOMAIN }}/designer
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
@@ -275,7 +275,7 @@ jobs:
     with:
       DEP_ENV: dev
       pr_branch: develop
-      BASE_URL: https://soba-dev.${{ vars.OC_DOMAIN }}/designer/en
+      BASE_URL: https://submit-dev.${{ vars.OC_DOMAIN }}/designer/en
     secrets:
       keycloakUsername: ${{ secrets.keycloakUsername }}
       keycloakPassword: ${{ secrets.keycloakPassword }}

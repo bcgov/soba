@@ -39,12 +39,10 @@ backend:
     # Virus scan inherits virusscan-clamav from values.yaml: PRs deploy into the dev
     # namespace, so the <release>-clamav alias resolves to the shared dev clamav
     # (same namespace — no externalName override, no cross-namespace NSP needed).
-    # Same for the cache, message bus and event stream: PRs share the dev-namespace Valkey via the
-    # <release>-valkey alias; the per-release key/channel/stream prefixes keep each PR's cached rows,
-    # bus events and streams separate.
-    cacheDefaultCode: cache-redis
-    messagebusDefaultCode: messagebus-redis
-    eventStreamDefaultCode: eventstream-redis
+    # Same for the cache, message bus and event stream (cache-redis, messagebus-redis and
+    # eventstream-redis from values.yaml): PRs share the dev-namespace Valkey via the
+    # <release>-valkey alias; the per-PR valkey.prefix keeps each PR's cached rows, bus events and
+    # streams separate.
   credentialIssuer:
     apsCredentialIssuerV3:
       apiBaseUrl: https://api.gov.bc.ca/ds/api/v3

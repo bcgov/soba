@@ -84,11 +84,28 @@ If mongodb is internal, point at the in-cluster service; otherwise use mongodb.e
 {{- end }}
 
 {{/*
+First label of every public hostname: global.hostBase when set, otherwise the fullname with its
+leading chart name swapped for global.hostPrefix (soba-test -> submit-test, soba-pr-42 ->
+submit-pr-42). Object names keep the fullname.
+*/}}
+{{- define "soba.hostBase" -}}
+{{- $full := include "soba.fullname" . -}}
+{{- $name := include "soba.name" . -}}
+{{- if .Values.global.hostBase -}}
+{{- .Values.global.hostBase -}}
+{{- else if and .Values.global.hostPrefix (hasPrefix $name $full) -}}
+{{- printf "%s%s" .Values.global.hostPrefix (trimPrefix $name $full) -}}
+{{- else -}}
+{{- $full -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Public host shared by every frontend app (Route / Ingress); apps are told apart by routePath.
 Usage: {{ include "soba.frontendHost" $root }}
 */}}
 {{- define "soba.frontendHost" -}}
-{{- .Values.frontend.host | default (printf "%s.%s" (include "soba.fullname" .) .Values.global.domain) -}}
+{{- .Values.frontend.host | default (printf "%s.%s" (include "soba.hostBase" .) .Values.global.domain) -}}
 {{- end }}
 
 {{/*
@@ -120,7 +137,7 @@ The https:// origin every frontend app shares. Feeds the backend CORS allowlist.
 Backend public URL host (browser and NEXT_PUBLIC_SOBA_API_BASE_URL).
 */}}
 {{- define "soba.backendHost" -}}
-{{- printf "%s-api.%s" (include "soba.fullname" .) .Values.global.domain }}
+{{- printf "%s-api.%s" (include "soba.hostBase" .) .Values.global.domain }}
 {{- end }}
 
 {{/*
@@ -308,6 +325,19 @@ valkey alias Service, which they share — so it exists whenever any is on redis
 */}}
 {{- define "soba.usesValkey" -}}
 {{- if or (eq .Values.backend.config.cacheDefaultCode "cache-redis") (eq .Values.backend.config.messagebusDefaultCode "messagebus-redis") (eq .Values.backend.config.eventStreamDefaultCode "eventstream-redis") -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Fails the render when the cache, message bus or event stream is unset or on a per-pod *-memory
+plugin. Every deployment runs them on the namespace's Valkey.
+*/}}
+{{- define "soba.validateValkeyPlugins" -}}
+{{- range $key := list "cacheDefaultCode" "messagebusDefaultCode" "eventStreamDefaultCode" -}}
+{{- $code := index $.Values.backend.config $key | default "" -}}
+{{- if or (not $code) (hasSuffix "-memory" $code) -}}
+{{- fail (printf "backend.config.%s is '%s'; deployments run it on the namespace's Valkey (the *-redis plugin), not in pod memory" $key $code) -}}
+{{- end -}}
+{{- end -}}
 {{- end }}
 
 {{/*

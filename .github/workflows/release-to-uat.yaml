@@ -194,7 +194,7 @@ jobs:
       contents: read
     environment:
       name: uat
-      url: https://${{ env.ACRONYM }}-uat.${{ vars.OC_DOMAIN }}/designer
+      url: https://submit-uat.${{ vars.OC_DOMAIN }}/designer
     env:
       NAMESPACE: ${{ vars.OC_NAMESPACE }}
       OC_SERVER: ${{ vars.OC_SERVER }}
