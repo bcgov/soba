@@ -232,8 +232,12 @@ address with no expiry, as `notification_audit` rows keep recipients.
   midnight in `NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset) over every email
   job's sends the provider accepted or refused, by the database clock. Past it, a job sends what
   fits and the rest wait for the next day; the limit drops no email, though a job that no longer
-  applies when it wakes ends cancelled. Each send checks the room first, so jobs sending at the same
-  moment can end a day past the limit by at most one email each.
+  applies when it wakes ends cancelled. Each send reads the day's count from the database first, so
+  every backend pod shares it. The read and the send are separate steps, so sends in flight together
+  can each take the last of the room. Every email job runs in the light pool, so a day that reaches
+  the limit can end past it by up to the backend's pods times `JOB_LIGHT_CONCURRENCY`. The limit
+  stays at least that far under 3225, Notify's 100,000 over 31 days: prod's 3200 allows 6 pods of 4,
+  so 3224 at most.
 - **The provider's limit.** Notify answers 429 at a sending limit, a rate or its monthly quota. A
   429 pauses every email job, and only email jobs, for a minute after it; each further 429 before
   Notify accepts an email doubles the pause, up to an hour. 429s in the same clock minute, as from

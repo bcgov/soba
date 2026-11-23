@@ -36,6 +36,9 @@ backend:
     # PLUGIN_NOTIFY_V1_API_KEY in the Vault secret.
     postSubmissionActionPlugins: post-submission-email-addresses,post-submission-email-package
   notification:
+    # Sends in flight can pass the limit by pods times light workers: 6 x 4 = 24, so 3224 a day at
+    # most, 99,944 over 31 days. Lower it when autoscaling.maxReplicas or jobs.lightConcurrency grows.
+    dailyLimit: "3200"
     notifyV1:
       # Keeps one slow send well inside an email job's lease and timeout.
       timeoutMs: "10000"

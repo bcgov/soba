@@ -223,8 +223,12 @@ Notify's 100,000 a month over 31 days; 100 in PR environments), counting from mi
 `NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset). An email job past it waits
 until the next midnight. When Notify answers 429, every email job waits a minute, doubling with
 each 429 in a row, up to an hour. Each environment counts only its own sends, so environments that
-share a Notify key share its quota, and their limits together should stay under it. A
-`dailyLimit` outside 1 to 100000 fails the render; an invalid zone stops startup.
+share a Notify key share its quota, and their limits together should stay under it. Every backend
+pod reads the same count, but sends in flight together can pass the limit by up to the backend's
+pods times `JOB_LIGHT_CONCURRENCY` on a day that reaches it, so keep `dailyLimit` that far under
+3225 (100,000 / 31). Prod sets 3200: 6 pods at most, 4 light workers each, so at most 3224 a day.
+Lower it when either grows. A `dailyLimit` outside 1 to 100000 fails the render; an invalid zone
+stops startup.
 
 ### Secret values (Vault template in backend Deployment)
 

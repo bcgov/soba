@@ -329,7 +329,8 @@ backend:
 
   # -- configmap-notification: PLUGIN_NOTIFY_V1_*, default notification code, daily email limit + reset time zone
   notification:
-    # -- emails the environment sends in a day, 1 to 100000; empty uses 3000 (under 100,000 a month)
+    # -- emails the environment sends in a day, 1 to 100000; empty uses 3000 (under 100,000 a month).
+    # Sends in flight can pass it by backend pods times JOB_LIGHT_CONCURRENCY; keep it that far under 3225.
     dailyLimit: ""
     # -- IANA time zone whose midnight resets the daily email limit; empty uses America/Vancouver
     dailyResetTimeZone: ""
