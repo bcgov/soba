@@ -9,7 +9,7 @@ env:
 on:
   push:
     branches:
-      - "release/sprint-*"
+      - "release/s*-r*"
     paths:
       - "backend/**"
       - "frontend/**"
@@ -27,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       release_branch:
-        description: "Release branch to deploy, for example release/sprint-30"
+        description: "Release branch to deploy, for example release/s12-r1"
         required: true
         type: string
 
@@ -42,13 +42,12 @@ jobs:
     name: Set release variables
     # The create event is emitted for every new branch and tag; only release
     # branches should start this deployment workflow.
-    if: ${{ github.event_name != 'create' || (github.event.ref_type == 'branch' && startsWith(github.event.ref, 'release/sprint-')) }}
+    if: ${{ github.event_name != 'create' || (github.event.ref_type == 'branch' && startsWith(github.event.ref, 'release/s')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       ref: ${{ steps.vars.outputs.ref }}
       branch: ${{ steps.vars.outputs.branch }}
-      image_version: ${{ steps.vars.outputs.image_version }}
     steps:
       - name: Validate release branch
         id: vars
@@ -61,27 +60,108 @@ jobs:
             BRANCH="${{ github.ref_name }}"
           fi
 
-          if ! echo "$BRANCH" | grep -Eq '^release/sprint-[0-9]+$'; then
-            echo "Branch '$BRANCH' does not match release/sprint-xxx."
+          if ! echo "$BRANCH" | grep -Eq '^release/s[0-9]+-r[0-9]+$'; then
+            echo "Branch '$BRANCH' must match release/s<number>-r<number>."
             exit 1
           fi
 
-          # Keep release images distinct from ordinary branch images.
-          # release/sprint-34 becomes soba-release-sprint-34.
-          IMAGE_VERSION="soba-$(echo "$BRANCH" | tr '/' '-')"
-
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           echo "ref=refs/heads/$BRANCH" >> "$GITHUB_OUTPUT"
-          echo "image_version=$IMAGE_VERSION" >> "$GITHUB_OUTPUT"
+
+  version:
+    name: Prepare application version
+    needs: [set-vars]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      ready: ${{ steps.prepare.outputs.ready }}
+      source_sha: ${{ steps.prepare.outputs.source_sha }}
+      image_version: ${{ steps.prepare.outputs.image_version }}
+    steps:
+      - name: Checkout release branch and history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.set-vars.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+
+      - name: Install existing release tools
+        run: pnpm install --frozen-lockfile
+
+      - name: Calculate version or wait for its PR
+        id: prepare
+        env:
+          BRANCH: ${{ needs.set-vars.outputs.branch }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA=$(git rev-parse HEAD)
+          CURRENT=$(jq -r .version package.json)
+          ACCEPTED=$(git show origin/main:package.json | jq -r .version)
+          FROM=""
+          RELEASE_ARGS=(--ci --git.commit '--git.commitMessage=chore(release): version ${version}')
+          if [ "$CURRENT" = '2.0.0-beta.0' ] && [ "$ACCEPTED" = "$CURRENT" ]; then
+            RELEASE_ARGS=(2.0.0 "${RELEASE_ARGS[@]}")
+          elif [ "$CURRENT" = "$ACCEPTED" ] || [ "$CURRENT" = '2.0.0-beta.0' ]; then
+            git merge-base --is-ancestor "v$ACCEPTED" origin/main || { echo "::error::main has no accepted v$ACCEPTED tag."; exit 1; }
+            RELEASE_ARGS+=(--npm.ignoreVersion --git.getLatestTagFromAllRefs)
+          else
+            if git merge-base --is-ancestor "v$CURRENT" origin/main 2>/dev/null; then
+              echo "::error::Version $CURRENT is already accepted on main."
+              exit 1
+            fi
+            FROM=$(git log --first-parent -1 -G '^[[:space:]]*"version"[[:space:]]*:' --format=%H -- package.json)
+            RELEASE_ARGS+=("--plugins.@release-it/conventional-changelog.commitsOpts.from=$FROM")
+          fi
+
+          VERSION_BRANCH="version/${BRANCH#release/}-$(git rev-parse --short "$SOURCE_SHA")"
+          git switch -c "$VERSION_BRANCH"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          pnpm exec release-it "${RELEASE_ARGS[@]}"
+
+          if [ "$(git rev-parse HEAD)" = "$SOURCE_SHA" ]; then
+            if [ "$FROM" = "$SOURCE_SHA" ]; then
+              echo "ready=true" >> "$GITHUB_OUTPUT"
+              echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+              echo "image_version=release-v${CURRENT}-${BRANCH#release/}" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+
+          NEXT=$(jq -r .version package.json)
+          if gh pr list --base "$BRANCH" --state open --limit 100 --json headRefName --jq '.[].headRefName' |
+             grep -E "^version/${BRANCH#release/}-" >/dev/null; then
+            echo '::notice::An existing version-update PR must be merged or closed before another is opened.'
+            exit 0
+          fi
+          git push origin "HEAD:refs/heads/$VERSION_BRANCH"
+          gh pr create --base "$BRANCH" --head "$VERSION_BRANCH" \
+            --title "chore(release): version $NEXT" \
+            --body "Merge this version update before the Test image build."
+          echo "::notice::Merge the version-update PR to start the Test image build."
 
   build:
     name: Build & Push
     uses: ./.github/workflows/build-images.yaml
-    needs: [set-vars]
+    needs: [set-vars, version]
+    if: needs.version.outputs.ready == 'true'
     with:
-      ref: ${{ needs.set-vars.outputs.ref }}
+      ref: ${{ needs.version.outputs.source_sha }}
       platforms: amd64
-      image_version: ${{ needs.set-vars.outputs.image_version }}
+      image_version: ${{ needs.version.outputs.image_version }}
       publish_latest: false
     secrets: inherit
     permissions:
@@ -90,7 +170,8 @@ jobs:
 
   deploy-crunchy:
     name: Deploy Crunchy Postgres
-    needs: [set-vars]
+    needs: [set-vars, version]
+    if: needs.version.outputs.ready == 'true'
     environment:
       name: test
     runs-on: ubuntu-24.04
@@ -101,7 +182,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.set-vars.outputs.ref }}
+          ref: ${{ needs.version.outputs.source_sha }}
 
       - name: Deploy Crunchy
         id: crunchy
@@ -115,7 +196,8 @@ jobs:
 
   deploy-mongodb:
     name: Deploy MongoDB
-    needs: [set-vars]
+    needs: [set-vars, version]
+    if: needs.version.outputs.ready == 'true'
     permissions:
       contents: read
     environment:
@@ -126,7 +208,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.set-vars.outputs.ref }}
+          ref: ${{ needs.version.outputs.source_sha }}
 
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
@@ -172,7 +254,7 @@ jobs:
 
   deploy:
     name: Deploy SOBA to Test
-    needs: [set-vars, build, deploy-crunchy, deploy-mongodb]
+    needs: [set-vars, version, build, deploy-crunchy, deploy-mongodb]
     permissions:
       contents: read
     environment:
@@ -184,7 +266,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.set-vars.outputs.ref }}
+          ref: ${{ needs.version.outputs.source_sha }}
 
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
@@ -247,12 +329,11 @@ jobs:
           : "${VAULT_SERVICE_ACCOUNT_NAME:?Set the VAULT_SERVICE_ACCOUNT_NAME variable.}"
           REPO_LC=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
 
-          # Version /meta reports, e.g. 2.0.0-beta.0+test.a1b2c3d. Empty if unreadable: the
-          # chart then omits APP_VERSION and the backend falls back to package.json.
+          # Runtime version matches the committed application version.
           BASE_VERSION=$(jq -r '.version // empty' backend/package.json 2>/dev/null || echo "")
           APP_VERSION=""
           if [[ "$BASE_VERSION" =~ ^[0-9A-Za-z.-]+$ ]]; then
-            APP_VERSION="${BASE_VERSION}+test.${SHORT_SHA}"
+            APP_VERSION="$BASE_VERSION"
           fi
 
           cat > /tmp/values-override.yaml <<OVERRIDE

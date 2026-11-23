@@ -32,6 +32,7 @@ jobs:
       short_sha: ${{ steps.tags.outputs.short_sha }}
       uat_tag: ${{ steps.tags.outputs.uat_tag }}
       prod_tag: ${{ steps.tags.outputs.prod_tag }}
+      app_version: ${{ steps.tags.outputs.app_version }}
     steps:
       - name: Require main and a full source SHA
         shell: bash
@@ -60,10 +61,17 @@ jobs:
           set -euo pipefail
           SOURCE_SHA=$(git rev-parse HEAD)
           SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION=$(jq -r .version backend/package.json)
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+             [ "$VERSION" != "$(jq -r .version package.json)" ]; then
+            echo '::error::Approved UAT source has no synchronized stable application version.'
+            exit 1
+          fi
           printf 'source_sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
           printf 'short_sha=%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          printf 'uat_tag=soba-uat-%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          printf 'prod_tag=soba-prod-%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          printf 'app_version=%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
+          printf 'uat_tag=uat-v%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
+          printf 'prod_tag=prod-v%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
 
   deploy:
     name: Deploy promoted images to Prod
@@ -175,6 +183,10 @@ jobs:
               echo "::error::Missing or unreadable UAT source: $source"
               exit 1
             }
+            if [ "$(digest "$IMAGE_ROOT/$image:sha-${{ needs.set-vars.outputs.short_sha }}$suffix")" != "$source_digest" ]; then
+              echo "::error::The approved source SHA does not match the UAT image: $source"
+              exit 1
+            fi
             printf '%s|%s|%s\n' "$image" "$suffix" "$source_digest" >> "$RUNNER_TEMP/prod-images"
           done
 
@@ -233,7 +245,7 @@ jobs:
             -f deployments/helm/soba/values-prod.yaml \
             --set-string "backend.image.repository=ghcr.io/$REPOSITORY_LOWER/backend" \
             --set-string "backend.image.tag=$PROD_TAG" \
-            --set-string "backend.config.appVersion=$PROD_TAG" \
+            --set-string "backend.config.appVersion=${{ needs.set-vars.outputs.app_version }}" \
             --set-string "backend.config.gitSha=$SOURCE_SHA" \
             --set-string "backend.config.gitTag=$PROD_TAG" \
             --set-string "backend.config.imageTag=$PROD_TAG" \
