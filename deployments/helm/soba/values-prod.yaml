@@ -6,16 +6,21 @@ global:
 backend:
   # Development data generator: stated explicitly rather than left to the default.
   features:
-    confirmation-email-copy: "disabled"
-    confirmation-id-visibility: "disabled"
-    confirmation-screen: "disabled"
+    api-keys: "disabled"
+    confirmation-email-copy: "enabled"
+    confirmation-id-visibility: "enabled"
+    confirmation-screen: "enabled"
     dev-data: "disabled"
-    notifications: "disabled"
+    notifications: "enabled"
     post-submission: "enabled"
     post-submission-email: "enabled"
-    submission-export: "disabled"
-    user-search: "disabled"
+    submission-export: "enabled"
+    user-search: "enabled"
   replicas: 3
+  sso:
+    jwksUri: https://loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/certs
+    jwtIssuer: https://loginproxy.gov.bc.ca/auth/realms/standard
+    jwtAudience: connected-services-submit-6349
   resources:
     requests:
       cpu: 250m
@@ -36,14 +41,22 @@ backend:
     tenantEngineDefaultCode: cstar-v1
     # Switch to aps-credential-issuer-v3 after adding the Vault keys.
     credentialIssuerDefaultCode: credential-issuer-noop
-    # Email jobs end cancelled while notifications are disabled. Sending needs the notifications
-    # feature enabled, notificationDefaultCode notify-v1, notification.notifyV1.endpoint, and
-    # PLUGIN_NOTIFY_V1_API_KEY in the Vault secret.
+    cacheDefaultCode: cache-redis
+    messagebusDefaultCode: messagebus-redis
+    eventStreamDefaultCode: eventstream-redis
+    notificationDefaultCode: notify-v1
+    userSearchPlugins: css-v1,user-search-soba
     postSubmissionActionPlugins: post-submission-email-addresses
   notification:
     notifyV1:
+      endpoint: https://gw-fe8c5-notify.api.gov.bc.ca/api/v1
       # Keeps one slow send well inside an email job's lease and timeout.
       timeoutMs: "10000"
+  userSearch:
+    cssV1:
+      apiBaseUrl: https://api.loginproxy.gov.bc.ca/api/v1
+      environment: prod
+      tokenUrl: https://loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
   credentialIssuer:
     apsCredentialIssuerV3:
       apiBaseUrl: https://api.gov.bc.ca/ds/api/v3
