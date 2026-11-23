@@ -26,7 +26,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.merged == true &&
-      startsWith(github.event.pull_request.head.ref, 'release/sprint-') &&
+      startsWith(github.event.pull_request.head.ref, 'release/s') &&
       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -64,10 +64,10 @@ jobs:
             # This recovers its existing Test image tag without accepting a branch input.
             PRS=$(gh api "repos/$GITHUB_REPOSITORY/commits/$EVENT_SHA/pulls?per_page=100")
             MATCHES=$(jq --arg repo "$GITHUB_REPOSITORY" --arg sha "$EVENT_SHA" \
-              '[.[] | select(.merged_at != null and .base.ref == "main" and .head.repo.full_name == $repo and .merge_commit_sha == $sha and (.head.ref | test("^release/sprint-[0-9]+$")))]' \
+              '[.[] | select(.merged_at != null and .base.ref == "main" and .head.repo.full_name == $repo and .merge_commit_sha == $sha and (.head.ref | test("^release/s[0-9]+-r[0-9]+$")))]' \
               <<< "$PRS")
             if [ "$(jq 'length' <<< "$MATCHES")" -ne 1 ]; then
-              echo "::error::The current main commit must belong to exactly one merged release/sprint-* PR. No UAT image was promoted."
+              echo "::error::The current main commit must belong to exactly one merged release/s<number>-r<number> PR. No UAT image was promoted."
               exit 1
             fi
             BRANCH=$(jq -r '.[0].head.ref' <<< "$MATCHES")
@@ -79,8 +79,8 @@ jobs:
             CHART_REF="$MERGE_SHA"
           fi
 
-          if ! [[ "$BRANCH" =~ ^release/sprint-[0-9]+$ ]]; then
-            echo "The release branch must match release/sprint-<number>." >&2
+          if ! [[ "$BRANCH" =~ ^release/s[0-9]+-r[0-9]+$ ]]; then
+            echo "The release branch must match release/s<number>-r<number>." >&2
             exit 1
           fi
 
@@ -101,8 +101,9 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA=$(git rev-parse --short HEAD)
+          BRANCH="${{ steps.release.outputs.branch }}"
           printf 'short_sha=%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          printf 'uat_tag=soba-uat-%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          printf 'uat_tag=soba-uat-%s\n' "${BRANCH#release/}" >> "$GITHUB_OUTPUT"
 
   approve-uat:
     name: Approve UAT promotion
@@ -193,7 +194,7 @@ jobs:
       contents: read
     environment:
       name: uat
-      url: https://${{ env.ACRONYM }}-uat.${{ vars.OC_DOMAIN }}/designer
+      url: https://submit-uat.${{ vars.OC_DOMAIN }}/designer
     env:
       NAMESPACE: ${{ vars.OC_NAMESPACE }}
       OC_SERVER: ${{ vars.OC_SERVER }}

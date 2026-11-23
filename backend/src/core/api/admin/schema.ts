@@ -439,7 +439,7 @@ const registerJobPaths = (registry: OpenAPIRegistry) => {
       404: { description: JOB_NOT_FOUND },
       409: {
         description:
-          'Not dead or cancelled; a type this environment does not run; a submission-received job whose actions were queued; or a last run that may still be finishing',
+          'Not dead or cancelled; a submission export; a type this environment does not run; a job that queued jobs already; a last run that may still be finishing; or a job that changed meanwhile',
       },
     },
   });

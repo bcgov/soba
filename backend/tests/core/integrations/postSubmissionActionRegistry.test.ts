@@ -7,6 +7,7 @@ import {
 import { getPostSubmissionActionPluginDefinitions } from '../../../src/core/integrations/plugins/PluginRegistry';
 import { getJobRegistry } from '../../../src/core/jobs/catalog';
 import { log } from '../../../src/core/logging';
+import { listJobTypes } from '../../../src/core/services/jobViewService';
 
 jest.mock('../../../src/core/db/client', () => ({ db: {}, quietDb: {} }));
 
@@ -55,28 +56,82 @@ describe('post-submission action plugins', () => {
     expect(findInstalledPostSubmissionAction('post-submission-test-no-schema')).toBeUndefined();
   });
 
+  it("keeps a plugin's submits, and skips one with a bad submits or an unknown key", () => {
+    expect(findInstalledPostSubmissionAction('post-submission-test-off')?.submits).toBe('first');
+    expect(findInstalledPostSubmissionAction('post-submission-test-bad-submits')).toBeUndefined();
+    expect(findInstalledPostSubmissionAction('post-submission-test-misspelled')).toBeUndefined();
+    expect(
+      findInstalledPostSubmissionAction('post-submission-test-misspelled-job'),
+    ).toBeUndefined();
+  });
+
+  it("keeps a plugin's result retention, and skips one with a bad value", () => {
+    expect(findInstalledPostSubmissionAction('post-submission-test-off')?.job).toEqual(
+      expect.objectContaining({ resultRetentionDays: 2 }),
+    );
+    expect(findInstalledPostSubmissionAction('post-submission-test-bad-retention')).toBeUndefined();
+    expect(
+      findInstalledPostSubmissionAction('post-submission-test-long-retention'),
+    ).toBeUndefined();
+  });
+
+  it("keeps a plugin's steps, and skips one with a duplicate, bad or misspelled step", () => {
+    expect(findInstalledPostSubmissionAction('post-submission-test-steps')?.steps).toEqual([
+      expect.objectContaining({ name: 'send-email', pool: 'light', maxAttempts: 12 }),
+    ]);
+    expect(
+      findInstalledPostSubmissionAction('post-submission-test-steps-duplicate'),
+    ).toBeUndefined();
+    expect(
+      findInstalledPostSubmissionAction('post-submission-test-steps-bad-name'),
+    ).toBeUndefined();
+    expect(
+      findInstalledPostSubmissionAction('post-submission-test-steps-misspelled'),
+    ).toBeUndefined();
+  });
+
   it('installs one plugin per code when two folders share one', () => {
     expect(
       getPostSubmissionActionPluginDefinitions()
         .map((plugin) => plugin.code)
         .sort((a, b) => a.localeCompare(b)),
-    ).toEqual(['post-submission-test-echo', 'post-submission-test-off']);
+    ).toEqual([
+      'post-submission-test-echo',
+      'post-submission-test-off',
+      'post-submission-test-steps',
+    ]);
   });
 
-  it('builds a job type per installed code and warns about enabled codes with no plugin', () => {
+  it('builds a job type per installed step and warns about enabled codes with no plugin', () => {
     const warn = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
     const registry = getJobRegistry();
     expect(registry.typesIn('light').sort((a, b) => a.localeCompare(b))).toEqual([
       'post-submission-test-echo',
+      'post-submission-test-steps:send-email',
       'submission.email-copy',
       'submission.status-changed',
       'submission.status-email',
       'submission.submitted',
     ]);
-    expect(registry.typesIn('heavy')).toEqual(['submission-export', 'post-submission-test-off']);
+    expect(registry.typesIn('heavy').sort((a, b) => a.localeCompare(b))).toEqual([
+      'post-submission-test-off',
+      'post-submission-test-steps',
+      'submission-export',
+    ]);
     expect(warn).toHaveBeenCalledWith(
       { codes: ['post-submission-not-installed'] },
       'POST_SUBMISSION_ACTION_PLUGINS names plugins not installed',
+    );
+    warn.mockRestore();
+  });
+
+  it('names a later step by its action, then the step', () => {
+    const warn = jest.spyOn(log, 'warn').mockImplementation(() => undefined);
+    expect(listJobTypes()).toEqual(
+      expect.arrayContaining([
+        { type: 'post-submission-test-steps', name: 'Test, with steps' },
+        { type: 'post-submission-test-steps:send-email', name: 'Test, with steps (send-email)' },
+      ]),
     );
     warn.mockRestore();
   });

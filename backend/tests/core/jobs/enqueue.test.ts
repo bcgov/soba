@@ -1,5 +1,5 @@
 import { SubmissionReviewStatuses } from '@soba/lib';
-import type { ClaimedJob } from '../../../src/core/db/repos/jobRepo';
+import type { JobFacts } from '../../../src/core/jobs/facts';
 import {
   queuesSubmittedJob,
   statusChangedJob,
@@ -59,12 +59,8 @@ describe('statusChangedJob', () => {
     expect(actions).toEqual([
       { code: 'submission.status-email', options: { attachComment: true } },
     ]);
-    const child = reactionJob(
-      { id: 'event-1', ...event } as ClaimedJob,
-      statusChangeId,
-      actions[0],
-      8,
-    );
+    const parent = { id: 'event-1', formId: 'f1', submissionId: 's1', createdBy: 'rev-1' };
+    const child = reactionJob(parent as JobFacts, statusChangeId, actions[0], 8);
     expect(StatusEmailJobParamsSchema.parse(child.params)).toEqual({
       statusChangeId: CHANGE_ID,
       options: { attachComment: true },

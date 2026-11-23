@@ -37,6 +37,7 @@ import { Features } from './core/db/codes';
 import { pool } from './core/db/client';
 import { assertJobShutdownFits, getJobSettings, startJobs, stopJobs } from './core/jobs';
 import { assertAppLinkBases } from './core/appLinks';
+import { getNotificationSettings } from './core/integrations/notification/settings';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const app = express();
@@ -45,6 +46,7 @@ const port = Number(process.env.PORT) || 4000;
 // Read before listening, so an invalid value stops startup before the port opens.
 const shutdownSettings = env.getShutdownSettings();
 assertJobShutdownFits(getJobSettings(), shutdownSettings.timeoutMs);
+getNotificationSettings();
 assertAppLinkBases({
   DESIGNER_APP_URL: env.getDesignerAppUrl(),
   FORMS_APP_URL: env.getFormsAppUrl(),

@@ -36,9 +36,7 @@ import { WorkspaceJobsTab } from '@/src/features/jobs/ui/ScopedJobsTabs';
 import { useAfterSubmissionAvailable } from '@/src/features/post-submission/data/useAfterSubmissionAvailable';
 import type { UpdateWorkspaceBody, WorkspaceItem } from '@/src/types/workspaces';
 import styles from './WorkspaceForm.module.css';
-import WorkspaceRoleTab from './WorkspaceRoleTab';
-import WorkspaceGroupTab from './WorkspaceGroupTab';
-import WorkspaceAccessTab from './WorkspaceAccessTab';
+import WorkspacePermissionsTab from './WorkspacePermissionsTab';
 
 // How long to wait after the last keystroke, and how short a name can be, before checking it.
 const NAME_CHECK_DEBOUNCE_MS = 400;
@@ -326,9 +324,7 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
       'settings',
       'form-settings',
       ...(postSubmissionAvailable ? ['post-submission'] : []),
-      'roles',
-      'groups',
-      'access',
+      'permissions',
       ...(canSeeJobs ? ['jobs'] : []),
     ],
     [postSubmissionAvailable, canSeeJobs],
@@ -457,30 +453,12 @@ function WorkspaceForm({ workspaceId, first = false }: Readonly<WorkspaceFormPro
         </Tab>
       )}
       <Tab
-        eventKey="roles"
-        title={dictWorkspaces.rolesTab}
-        tabAttrs={{ 'data-testid': 'workspace-roles-tab' }}
+        eventKey="permissions"
+        title={dictWorkspaces.permissionsTab}
+        tabAttrs={{ 'data-testid': 'workspace-permissions-tab' }}
       >
         <div className={styles.tabContent}>
-          <WorkspaceRoleTab dict={dict} workspaceId={workspace.id} />
-        </div>
-      </Tab>
-      <Tab
-        eventKey="groups"
-        title={dictWorkspaces.groupsTab}
-        tabAttrs={{ 'data-testid': 'workspace-groups-tab' }}
-      >
-        <div className={styles.tabContent}>
-          <WorkspaceGroupTab dict={dict} workspaceId={workspace.id} />
-        </div>
-      </Tab>
-      <Tab
-        eventKey="access"
-        title={dictWorkspaces.accessTab}
-        tabAttrs={{ 'data-testid': 'workspace-access-tab' }}
-      >
-        <div className={styles.tabContent}>
-          <WorkspaceAccessTab dict={dict} workspaceId={workspace.id} />
+          <WorkspacePermissionsTab dict={dict} workspaceId={workspace.id} />
         </div>
       </Tab>
       {canSeeJobs && (

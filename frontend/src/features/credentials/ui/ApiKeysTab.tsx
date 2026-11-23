@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Button, InlineAlert } from '@bcgov/design-system-react-components';
+import { Button, ButtonGroup, InlineAlert } from '@bcgov/design-system-react-components';
 import { ListPageToolbar } from '@/src/components/ListPageLayout';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { RowActionButton } from '@/src/components/RowActionButton';
@@ -126,10 +126,10 @@ export function ApiKeysTab({ dict, owner }: Readonly<ApiKeysTabProps>) {
       {
         key: 'actions',
         label: t.columns.actions,
-        align: 'end',
+        align: 'start',
         render: (row) =>
           ownedBy(owner.kind, row) && (
-            <div>
+            <ButtonGroup ariaLabel={t.columns.actions}>
               <RowActionButton
                 isDisabled={formHeld}
                 onPress={() => setFormView({ credentialId: row.id })}
@@ -148,7 +148,7 @@ export function ApiKeysTab({ dict, owner }: Readonly<ApiKeysTabProps>) {
                   {t.delete}
                 </RowActionButton>
               )}
-            </div>
+            </ButtonGroup>
           ),
       },
     ];

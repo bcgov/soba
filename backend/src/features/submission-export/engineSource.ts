@@ -9,7 +9,7 @@ import type {
   ReadSubmissionsResult,
 } from '../../core/integrations/form-engine/FormEngineAdapter';
 import { createFormEngineAdapter } from '../../core/integrations/form-engine/FormEngineRegistry';
-import { JobFailedError } from '../../core/jobs/settlement';
+import { JobFailedError } from '../../core/jobs/errors';
 import { log } from '../../core/logging';
 import { readEngineSchema } from '../../core/services/engineSchema';
 import type {

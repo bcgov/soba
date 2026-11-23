@@ -52,7 +52,12 @@ import { listAllowsNothing, permittedFormsWhere, type FormAccessGrant } from './
 import { liveSubmission } from './liveRows';
 import { isActiveOwner } from './submissionParticipantRepo';
 import { recordSubmittedStatus } from './submissionReviewRepo';
-import { demoteHead, nextRevisionNo, resolveRevisionStanding } from './submissionRevisionChain';
+import {
+  demoteHead,
+  isFirstSubmit,
+  nextRevisionNo,
+  resolveRevisionStanding,
+} from './submissionRevisionChain';
 import { listSubmitterForms, type SubmitterFormListRow } from './submitterFormRepo';
 
 export type SubmissionRecord = typeof submissions.$inferSelect;
@@ -150,8 +155,17 @@ export type AppendSubmissionRevisionResult =
       reason: RevisionReasonCode;
     };
 
+/** What the append read from the submission under the lock, before it moved the head. */
+export interface RevisionAppendedFacts {
+  firstSubmit: boolean;
+}
+
 /** Runs in the append transaction when the write lands as the new head; a throw rolls it back. */
-export type OnRevisionAppended = (tx: Tx, record: SubmissionRecord) => Promise<void>;
+export type OnRevisionAppended = (
+  tx: Tx,
+  record: SubmissionRecord,
+  facts: RevisionAppendedFacts,
+) => Promise<void>;
 
 export type SubmissionListSortField = (typeof SUBMISSION_SORT_FIELDS)[number];
 
@@ -348,6 +362,61 @@ export const getSubmissionRevisionById = async (
     .where(eq(submissionRevisions.id, revisionId))
     .limit(1);
   return rows[0] ?? null;
+};
+
+/** The revision, when it is the submission's and not pending. */
+const savedRevisionOf = (workspaceId: string, submissionId: string, revisionId: string) =>
+  and(
+    eq(submissionRevisions.id, revisionId),
+    eq(submissionRevisions.workspaceId, workspaceId),
+    eq(submissionRevisions.submissionId, submissionId),
+    ne(submissionRevisions.status, RevisionStatus.pending),
+  );
+
+/**
+ * The engine ref of the answers a revision left, when the revision is the submission's and not
+ * pending; null otherwise, or when it left none.
+ */
+export const findSubmissionRevisionContent = async (
+  workspaceId: string,
+  submissionId: string,
+  revisionId: string,
+): Promise<string | null> => {
+  const [row] = await db
+    .select({ engineSubmissionRef: submissionRevisions.afterEngineSubmissionRef })
+    .from(submissionRevisions)
+    .where(savedRevisionOf(workspaceId, submissionId, revisionId))
+    .limit(1);
+  return row?.engineSubmissionRef ?? null;
+};
+
+// The events that leave submitted answers: a submit, a staff edit, and a restore of the last submit.
+const SUBMITTED_ANSWER_EVENTS = [
+  SubmissionEventType.submitted,
+  SubmissionEventType.edited,
+  SubmissionEventType.restored,
+];
+
+/**
+ * A revision's number, when the revision is the submission's, not pending, and left submitted
+ * answers; null otherwise.
+ */
+export const findSubmittedRevisionNo = async (
+  workspaceId: string,
+  submissionId: string,
+  revisionId: string,
+): Promise<number | null> => {
+  const [row] = await db
+    .select({ revisionNo: submissionRevisions.revisionNo })
+    .from(submissionRevisions)
+    .where(
+      and(
+        savedRevisionOf(workspaceId, submissionId, revisionId),
+        inArray(submissionRevisions.eventType, SUBMITTED_ANSWER_EVENTS),
+      ),
+    )
+    .limit(1);
+  return row?.revisionNo ?? null;
 };
 
 /** Fetch the raw (non-deleted) submission row — used by the engine write path. */
@@ -879,9 +948,8 @@ export const appendSubmissionRevision = (
 
     // submittedBy is stamped at open; record the submit timestamp when the first submit lands. A
     // resubmit after a revision keeps the original time.
-    if (input.eventType === SubmissionEventType.submitted && !submission.submittedAt) {
-      updates.submittedAt = new Date();
-    }
+    const firstSubmit = isFirstSubmit(input.eventType, submission);
+    if (firstSubmit) updates.submittedAt = new Date();
 
     const [updated] = await tx
       .update(submissions)
@@ -901,7 +969,7 @@ export const appendSubmissionRevision = (
         actorDisplayLabel: input.actorDisplayLabel,
       });
     }
-    await onAppended?.(tx, updated);
+    await onAppended?.(tx, updated, { firstSubmit });
     return toAppendResult('appended', updated, input.revisionId, nextRevision, status, reason);
   });
 };

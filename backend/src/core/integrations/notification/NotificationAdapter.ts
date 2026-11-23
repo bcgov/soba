@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { EmailAddressSchema } from '@soba/lib';
 import type { PluginConfigReader } from '../../config/pluginConfig';
+import { ServiceUnavailableError } from '../../errors';
 
 const addresses = z.array(EmailAddressSchema).max(100);
 
@@ -39,6 +40,9 @@ export const providerDetailOf = (err: unknown): string | undefined => {
   const detail = (err as { providerDetail?: unknown } | null)?.providerDetail;
   return typeof detail === 'string' ? detail : undefined;
 };
+
+/** The provider refused a send at a sending limit; it can go after the pause that starts. */
+export class NotificationLimitError extends ServiceUnavailableError {}
 
 /** Result of a notification readiness check; no config or credentials are exposed. */
 export interface NotificationReadinessResult {

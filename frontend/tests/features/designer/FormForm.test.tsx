@@ -175,9 +175,18 @@ type PreviewHook = (
 const preview = vi.hoisted(() => ({
   cancel: vi.fn(),
   beforeSubmit: null as PreviewHook | null,
+  // The schema the preview was last drawn with.
+  form: null as unknown,
 }));
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => ({
-  DynamicForm: ({ options }: { options: { hooks: { beforeSubmit: PreviewHook } } }) => {
+  DynamicForm: ({
+    form,
+    options,
+  }: {
+    form: unknown;
+    options: { hooks: { beforeSubmit: PreviewHook } };
+  }) => {
+    preview.form = form;
     preview.beforeSubmit = options.hooks.beforeSubmit;
     // Stands in for a form with no validation errors.
     const validForm = { validate: () => [], triggerChange: () => {} };
@@ -381,6 +390,37 @@ describe('FormForm', () => {
     api.saveFormVersionSchema.mockResolvedValue({});
     api.publishSobaFormVersion.mockResolvedValue({});
     builder.onUpdateModel = null;
+    preview.form = null;
+  });
+
+  // A preview has no submission, so an upload there would be refused and left in the browser.
+  it('previews file components as read-only', async () => {
+    mockWorkspaceState.versions = [{ id: 'v1', versionNo: 1, state: 'draft' }];
+    mockWorkspaceState.schemas = {
+      v1: {
+        components: [
+          { key: 'name', type: 'textfield' },
+          { key: 'panel', type: 'panel', components: [{ key: 'doc', type: 'bcgov-file' }] },
+        ],
+      },
+    };
+    await act(async () => {
+      await renderForm({ formId: 'f1' });
+    });
+
+    await userEvent.click(await screen.findByTestId('preview-form-button'));
+
+    await screen.findByTestId('dynamic-form');
+    expect(preview.form).toEqual({
+      components: [
+        { key: 'name', type: 'textfield' },
+        {
+          key: 'panel',
+          type: 'panel',
+          components: [{ key: 'doc', type: 'bcgov-file', disabled: true }],
+        },
+      ],
+    });
   });
 
   it('renders designer tab content when authenticated and not initializing', async () => {

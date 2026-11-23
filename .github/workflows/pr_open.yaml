@@ -8,7 +8,8 @@ env:
   ACRONYM: soba
   # PR deployments share the dev host and are told apart by path, so the Keycloak redirect URIs
   # stay a finite set (one wildcard per environment) without a pool of slot hostnames.
-  DEV_HOST_PREFIX: soba-dev
+  # Matches the soba chart's dev frontend host (global.hostPrefix + release soba-dev).
+  DEV_HOST_PREFIX: submit-dev
 
 on:
   pull_request:

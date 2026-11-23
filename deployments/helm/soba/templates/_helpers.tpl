@@ -84,11 +84,28 @@ If mongodb is internal, point at the in-cluster service; otherwise use mongodb.e
 {{- end }}
 
 {{/*
+First label of every public hostname: global.hostBase when set, otherwise the fullname with its
+leading chart name swapped for global.hostPrefix (soba-test -> submit-test, soba-pr-42 ->
+submit-pr-42). Object names keep the fullname.
+*/}}
+{{- define "soba.hostBase" -}}
+{{- $full := include "soba.fullname" . -}}
+{{- $name := include "soba.name" . -}}
+{{- if .Values.global.hostBase -}}
+{{- .Values.global.hostBase -}}
+{{- else if and .Values.global.hostPrefix (hasPrefix $name $full) -}}
+{{- printf "%s%s" .Values.global.hostPrefix (trimPrefix $name $full) -}}
+{{- else -}}
+{{- $full -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Public host shared by every frontend app (Route / Ingress); apps are told apart by routePath.
 Usage: {{ include "soba.frontendHost" $root }}
 */}}
 {{- define "soba.frontendHost" -}}
-{{- .Values.frontend.host | default (printf "%s.%s" (include "soba.fullname" .) .Values.global.domain) -}}
+{{- .Values.frontend.host | default (printf "%s.%s" (include "soba.hostBase" .) .Values.global.domain) -}}
 {{- end }}
 
 {{/*
@@ -120,7 +137,7 @@ The https:// origin every frontend app shares. Feeds the backend CORS allowlist.
 Backend public URL host (browser and NEXT_PUBLIC_SOBA_API_BASE_URL).
 */}}
 {{- define "soba.backendHost" -}}
-{{- printf "%s-api.%s" (include "soba.fullname" .) .Values.global.domain }}
+{{- printf "%s-api.%s" (include "soba.hostBase" .) .Values.global.domain }}
 {{- end }}
 
 {{/*
@@ -311,6 +328,19 @@ valkey alias Service, which they share — so it exists whenever any is on redis
 {{- end }}
 
 {{/*
+Fails the render when the cache, message bus or event stream is unset or on a per-pod *-memory
+plugin. Every deployment runs them on the namespace's Valkey.
+*/}}
+{{- define "soba.validateValkeyPlugins" -}}
+{{- range $key := list "cacheDefaultCode" "messagebusDefaultCode" "eventStreamDefaultCode" -}}
+{{- $code := index $.Values.backend.config $key | default "" -}}
+{{- if or (not $code) (hasSuffix "-memory" $code) -}}
+{{- fail (printf "backend.config.%s is '%s'; deployments run it on the namespace's Valkey (the *-redis plugin), not in pod memory" $key $code) -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Feature status env vars for the backend, consumed by the seed step.
 
 Must stay inline: the only consumer is a pre-install/pre-upgrade hook Job, and Helm creates hook
@@ -346,20 +376,19 @@ unquoted numbers in values files as floats, so whole numbers are printed without
 {{- end }}
 
 {{/*
-An hourly email limit, from (dict "name" <values key> "value" <value> "min" <lowest>): nothing when
-"" or unset, else a whole number from min (100 when not given) to 1000000 as a quoted string.
-Anything else fails the render, a fraction included, so a bad value cannot quietly keep the plugin
-or the backend from starting. The fraction check runs first: soba.optionalSetting rounds numbers.
+A whole-number setting, from (dict "key" <values key> "value" <value> "max" <largest>): nothing
+when "" or unset, else a whole number from 1 to max as a quoted string. Anything else fails the
+render, a fraction included, so a bad value cannot quietly keep the backend from starting. The
+fraction check runs first: soba.optionalSetting rounds numbers.
 */}}
-{{- define "soba.hourlyEmailLimit" -}}
-{{- $min := int (default 100 .min) -}}
+{{- define "soba.wholeNumberSetting" -}}
 {{- if and (kindIs "float64" .value) (ne (floor .value) .value) -}}
-{{- fail (printf "backend.config.%s must be a whole number from %d to 1000000, got %v" .name $min .value) -}}
+{{- fail (printf "%s must be a whole number from 1 to %d, got %v" .key (int .max) .value) -}}
 {{- end -}}
 {{- $raw := include "soba.optionalSetting" .value | trimAll "\"" -}}
 {{- if $raw -}}
-{{- if or (not (regexMatch "^[0-9]+$" $raw)) (lt (atoi $raw) $min) (gt (atoi $raw) 1000000) -}}
-{{- fail (printf "backend.config.%s must be a whole number from %d to 1000000, got %q" .name $min $raw) -}}
+{{- if or (not (regexMatch "^[0-9]+$" $raw)) (lt (atoi $raw) 1) (gt (atoi $raw) (int .max)) -}}
+{{- fail (printf "%s must be a whole number from 1 to %d, got %q" .key (int .max) $raw) -}}
 {{- end -}}
 {{ $raw | quote }}
 {{- end -}}

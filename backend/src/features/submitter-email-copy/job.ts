@@ -2,8 +2,8 @@ import { canEmailSubmissionCopy, isIdentifiedCaller } from '@soba/lib';
 import { env } from '../../core/config/env';
 import { findSubmitterSubmission } from '../../core/db/repos/submitterSubmissionRepo';
 import { sendEachAddress } from '../../core/integrations/notification/sendEachAddress';
+import { JobCancelledError } from '../../core/jobs/errors';
 import type { JobContext } from '../../core/jobs/registry';
-import { JobCancelledError } from '../../core/jobs/settlement';
 import { EmailCopyJobParamsSchema } from '../../core/jobs/submitterEmailCopy';
 import { isConfirmationSettingAvailable } from '../form-settings/confirmation/availability';
 import { jobNotifications } from '../notifications/jobNotifications';
@@ -48,9 +48,8 @@ export const runEmailCopy = async ({ job, signal, log }: JobContext): Promise<vo
     },
     env.getFormsAppUrl(),
   );
-  const actorId = job.lastRequeuedBy ?? job.createdBy;
   await sendEachAddress(
-    { notifications: jobNotifications(job, () => Promise.resolve(actorId)), signal, log },
+    { notifications: jobNotifications(job, () => Promise.resolve(job.run.queuedBy)), signal, log },
     [request.address],
     content,
   );

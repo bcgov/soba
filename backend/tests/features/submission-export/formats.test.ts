@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { SubmissionExportLayout } from '@soba/lib';
 import { createDiskTempStorageAdapter } from '../../../src/core/integrations/temp-storage/diskTempStorage';
-import { JobFailedError } from '../../../src/core/jobs/settlement';
+import { JobFailedError } from '../../../src/core/jobs/errors';
 import {
   csvFormat,
   jsonFormat,

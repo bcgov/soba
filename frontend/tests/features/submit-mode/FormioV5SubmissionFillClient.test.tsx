@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig, useSWRConfig } from 'swr';
@@ -23,6 +23,8 @@ const h = vi.hoisted(() => ({
   onSubmit: undefined as
     | undefined
     | ((submission: { data: Record<string, unknown> }) => Promise<void>),
+  onChange: undefined as undefined | ((value: unknown, flags: unknown, modified: boolean) => void),
+  printSources: [] as Array<{ opened: boolean; answers?: () => unknown }>,
   options: undefined as undefined | { readOnly?: boolean; bcgovFile?: unknown },
   submission: undefined as unknown,
   mounts: 0,
@@ -39,7 +41,27 @@ vi.mock('@/app/[lang]/Providers', () => ({
       version: 'Version',
     },
     submission: { notFound: 'Submission not found.', loadError: 'Could not load this submission.' },
-    form: { loading: 'Loading...' },
+    form: {
+      loading: 'Loading...',
+      templates: {
+        print: {
+          button: 'Print',
+          modalTitle: 'Print Submission',
+          methodLabel: 'Print with',
+          browserOption: 'Browser print',
+          print: 'Print',
+          printing: 'Printing…',
+          uploadOption: 'Upload CDOGS template',
+          storedOption: 'Use default CDOGS template',
+          fileNameColumn: 'File Name',
+          uploadDateColumn: 'Upload Date',
+          failed: 'Failed to generate the document.',
+          printedAt: 'Printed {time}',
+          unsavedMark: 'Not saved',
+          draftMark: 'Draft',
+        },
+      },
+    },
     apiErrors: {
       drafts_disabled: 'Drafts are off for this form.',
       submission_not_found: 'This submission is gone.',
@@ -91,15 +113,24 @@ vi.mock('@/src/shared/api/useAccessCaller', () => ({
   useAccessCaller: () => h.access,
 }));
 
+vi.mock('@/src/features/templates/data/useSubmissionPrint', () => ({
+  useSubmitterPrint: (_submissionId: string, source: (typeof h.printSources)[number]) => {
+    h.printSources.push(source);
+    return { choice: null, printTemplate: vi.fn(), staff: null };
+  },
+}));
+
 vi.mock('@/src/features/formio-v5/ui/DynamicForm', () => {
   // Like @formio/react: onFormReady once, when the webform is built.
   function MockDynamicForm(props: {
     onSubmit: typeof h.onSubmit;
+    onChange?: typeof h.onChange;
     options: typeof h.options;
     submission: unknown;
     onFormReady?: (instance: unknown) => void;
   }) {
     h.onSubmit = props.onSubmit;
+    h.onChange = props.onChange;
     h.options = props.options;
     h.submission = props.submission;
     const { onFormReady } = props;
@@ -156,6 +187,7 @@ describe('FormioV5SubmissionFillClient', () => {
     vi.clearAllMocks();
     store = makeStore();
     h.formData = {};
+    h.printSources = [];
     h.mounts = 0;
     h.access = { caller: { idpCode: 'idir' }, pending: false };
     h.files = { option: {}, ready: true };
@@ -207,6 +239,62 @@ describe('FormioV5SubmissionFillClient', () => {
     expect(screen.queryByTestId('submission-fill-readonly')).not.toBeInTheDocument();
   });
 
+  describe('print', () => {
+    const draft = (form = facts.form) => ({
+      workflowState: 'draft',
+      formVersionId: 'ver-1',
+      headRevisionId: 'rev-1',
+      schema: { components: [] },
+      content: { data: { name: 'Ada' } },
+      ...facts,
+      form,
+    });
+    const watermark = () => screen.getByTestId('print-watermark');
+    const answers = () => h.printSources.at(-1)?.answers?.();
+    const renderForm = async () => {
+      await renderSignedOut();
+      await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    };
+
+    it('prints a loaded draft as a draft, and as not saved once the user edits it', async () => {
+      h.getSubmitFillBundle.mockResolvedValue(draft());
+      await renderForm();
+      expect(h.printSources.at(-1)?.opened).toBe(true);
+      expect(watermark()).toHaveTextContent('Draft');
+      expect(answers()).toBeUndefined();
+      h.formData = { name: 'Ada Lovelace' };
+      act(() => h.onChange!({ data: h.formData }, {}, true));
+      expect(watermark()).toHaveTextContent('Not saved');
+      expect(answers()).toEqual({ name: 'Ada Lovelace' });
+    });
+
+    it('prints a submission with nothing saved as not saved, sending its answers', async () => {
+      h.formData = { name: 'Typed' };
+      await renderForm();
+      expect(watermark()).toHaveTextContent('Not saved');
+      expect(answers()).toEqual({ name: 'Typed' });
+    });
+
+    it('sends no answers for a caller who may only read, though nothing is saved', async () => {
+      h.formData = { name: 'Typed' };
+      h.getSubmitFillBundle.mockResolvedValue({
+        ...draft({ ...facts.form, permissions: [] }),
+        content: null,
+      });
+      await renderForm();
+      expect(answers()).toBeUndefined();
+    });
+
+    it('counts no edit and sends no answers when the caller may only read', async () => {
+      h.getSubmitFillBundle.mockResolvedValue(draft({ ...facts.form, permissions: [] }));
+      await renderForm();
+      fireEvent.pointerDown(screen.getByTestId('fill-form'));
+      fireEvent.input(screen.getByTestId('fill-form'));
+      act(() => h.onChange!({ data: { name: 'Changed by Form.io' } }, {}, true));
+      expect(watermark()).toHaveTextContent('Draft');
+      expect(answers()).toBeUndefined();
+    });
+  });
   it('shows the version the submission is on', async () => {
     await renderSignedOut();
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
@@ -252,7 +340,13 @@ describe('FormioV5SubmissionFillClient', () => {
     h.files = { option: { bcgovFile }, ready: true };
     await renderSignedOut();
     await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
-    expect(h.options?.bcgovFile).toEqual(bcgovFile);
+    expect(h.options?.bcgovFile).toEqual({ ...bcgovFile, offlineScope: 'sub-1' });
+  });
+
+  it('scopes pending files to the submission even with no file limits', async () => {
+    await renderSignedOut();
+    await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+    expect(h.options?.bcgovFile).toEqual({ offlineScope: 'sub-1' });
   });
 
   // The public caller's roles never count, and a members audience admits no one outside it.
@@ -561,6 +655,21 @@ describe('FormioV5SubmissionFillClient', () => {
       await submit({ a: 1 });
       expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1/success');
       expect(h.push).not.toHaveBeenCalled();
+      // Lets components such as BCGovFile clean up after a saved submit
+      expect(h.instance.emit).toHaveBeenCalledWith('submitDone', { data: { a: 1 } });
+    });
+
+    // submitDone turns Form.io's button back on, and the page has not left yet.
+    it('sends nothing more for a second click once the submit is applied', async () => {
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('current'));
+      await renderReady();
+      await submit({ a: 1 });
+      h.submitSobaFormSubmission.mockResolvedValue(writeResponse('pending', 'closed'));
+      await submit({ a: 1 });
+
+      expect(h.submitSobaFormSubmission).toHaveBeenCalledTimes(1);
+      expect(h.replace).toHaveBeenCalledTimes(1);
+      expect(h.replace).toHaveBeenCalledWith('/en/submission/sub-1/success');
     });
 
     it('stays on the form with the held notice when the submit conflicts', async () => {
@@ -576,7 +685,7 @@ describe('FormioV5SubmissionFillClient', () => {
         'Submit my version',
       );
       expect(h.instance.emit).toHaveBeenCalledWith('submitError', '');
-      expect(h.instance.emit).not.toHaveBeenCalledWith('submitDone');
+      expect(h.instance.emit.mock.calls.map(([event]) => event)).not.toContain('submitDone');
     });
 
     it('refuses another submit while the held notice shows', async () => {

@@ -59,6 +59,14 @@ services without changing the chart structure.
 - Kubernetes 1.24+
 - **PostgreSQL** — the database is **not** included in this chart and must be
   provisioned separately (managed service, Bitnami sub-chart, CrunchyDB operator, etc.)
+- **Valkey** and **ClamAV** — one of each per namespace, installed by hand from
+  `deployments/helm/valkey` and `deployments/helm/clamav` as releases named `valkey` and `clamav`
+  (see each chart's README). No pipeline installs them. This chart only adds the
+  `<release>-valkey` and `<release>-clamav` aliases that point at them. Every deployment runs the
+  cache, message bus and event streams on Valkey (`cache-redis`, `messagebus-redis`,
+  `eventstream-redis`), and the chart refuses the per-pod `*-memory` plugins. Releases that share a
+  namespace (test and UAT in `b82f30-test`, PR slots in `b82f30-dev`) share its Valkey under
+  per-release prefixes.
 
 ## Chart Structure
 
@@ -210,11 +218,21 @@ starts nothing. ConfigMap `<fullname>-backend-workflow-engine`:
 Notification sends email. `notification-noop` (the default) sends nothing; `notify-v1` calls BC Gov
 Notify with an API key. ConfigMap `<fullname>-backend-notification`:
 
-| Helm value                                | Env var                       | Used by                       |
-| ----------------------------------------- | ----------------------------- | ----------------------------- |
-| `backend.config.notificationDefaultCode`  | `NOTIFICATION_DEFAULT_CODE`   | default notification resolver |
-| `backend.notification.notifyV1.endpoint`  | `PLUGIN_NOTIFY_V1_ENDPOINT`   | notify-v1 adapter             |
-| `backend.notification.notifyV1.timeoutMs` | `PLUGIN_NOTIFY_V1_TIMEOUT_MS` | notify-v1 adapter             |
+| Helm value                                | Env var                              | Used by                       |
+| ----------------------------------------- | ------------------------------------ | ----------------------------- |
+| `backend.config.notificationDefaultCode`  | `NOTIFICATION_DEFAULT_CODE`          | default notification resolver |
+| `backend.notification.dailyLimit`         | `NOTIFICATION_DAILY_LIMIT`           | every email job               |
+| `backend.notification.dailyResetTimeZone` | `NOTIFICATION_DAILY_RESET_TIME_ZONE` | every email job               |
+| `backend.notification.notifyV1.endpoint`  | `PLUGIN_NOTIFY_V1_ENDPOINT`          | notify-v1 adapter             |
+| `backend.notification.notifyV1.timeoutMs` | `PLUGIN_NOTIFY_V1_TIMEOUT_MS`        | notify-v1 adapter             |
+
+The environment sends up to `NOTIFICATION_DAILY_LIMIT` emails a day (3000 when unset, under
+Notify's 100,000 a month over 31 days; 100 in PR environments), counting from midnight in
+`NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset). An email job past it waits
+until the next midnight. When Notify answers 429, every email job waits a minute, doubling with
+each 429 in a row, up to an hour. Each environment counts only its own sends, so environments that
+share a Notify key share its quota, and their limits together should stay under it. A
+`dailyLimit` outside 1 to 100000 fails the render; an invalid zone stops startup.
 
 ### Secret values (Vault template in backend Deployment)
 
@@ -254,25 +272,21 @@ is on; the After Submission tab shows on every workspace and form then. The list
 codes this environment runs, comma-separated; with none listed, a submit queues no actions. Set in
 ConfigMap `<fullname>-backend-app` only when non-empty:
 
-| Helm value                                                 | Env var                                                           | Used by                         |
-| ---------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------- |
-| `backend.config.postSubmissionActionPlugins`               | `POST_SUBMISSION_ACTION_PLUGINS`                                  | post-submission actions         |
-| `backend.config.postSubmissionEmailFormHourlyLimit`        | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_FORM_HOURLY_LIMIT`        | post-submission-email-addresses |
-| `backend.config.postSubmissionEmailWorkspaceHourlyLimit`   | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_WORKSPACE_HOURLY_LIMIT`   | post-submission-email-addresses |
-| `backend.config.postSubmissionEmailEnvironmentHourlyLimit` | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_ENVIRONMENT_HOURLY_LIMIT` | post-submission-email-addresses |
+| Helm value                                   | Env var                          | Used by                 |
+| -------------------------------------------- | -------------------------------- | ----------------------- |
+| `backend.config.postSubmissionActionPlugins` | `POST_SUBMISSION_ACTION_PLUGINS` | post-submission actions |
 
 `post-submission-log` only logs that it ran. No environment lists it; a local run can.
 
 `post-submission-email-addresses` emails a notice to a list of up to 100 addresses through the
-active notification plugin. The hourly limits (defaults 500 per form, 2000 per workspace, 5000 for
-the environment) are checked before a list starts; a list that would pass one is not sent and its
-job ends cancelled with the counts. Its feature, `backend.features.post-submission-email`, applies
-to every workspace and form while its status is `enabled`. Every environment lists the plugin and
-enables both features. Dev, PR and test send through Notify test, which delivers only to its
-safelist. UAT and prod keep `backend.features.notifications` disabled, so email jobs there end
-cancelled; sending needs that feature enabled, `notificationDefaultCode: notify-v1`,
+active notification plugin, within the daily email limit (see Notification Configuration); past
+it, the rest of a list waits for the next day. Its feature,
+`backend.features.post-submission-email`, applies to every workspace and form while its status is
+`enabled`. Every environment lists the plugin and enables both features. Dev, PR and test send
+through Notify test, which delivers only to its safelist. UAT and prod keep
+`backend.features.notifications` disabled, so email jobs there end cancelled; sending needs that
+feature enabled, `notificationDefaultCode: notify-v1`,
 `notification.notifyV1.endpoint`, and `PLUGIN_NOTIFY_V1_API_KEY` in the Vault secret.
-A limit outside 100 to 1000000 fails the render.
 
 To retire an action, take its code off the list first and remove its plugin in a later release.
 Jobs already queued for a plugin that no pod has stay queued.
@@ -284,7 +298,7 @@ success page. All three are on in dev, PR and test and off in UAT and prod. Both
 on. Copies send only while `backend.features.notifications` is enabled.
 
 Copy requests are checked against hourly limits of their own; a request past one is refused with
-429 `email_copy_limit_reached`. Sent copies also count toward the action emails' limits above. Set
+429 `email_copy_limit_reached`. Sent copies also count toward the daily email limit. Set
 in ConfigMap `<fullname>-backend-app` only when non-empty; a value outside 1 to 1000000 fails the
 render:
 
@@ -411,12 +425,15 @@ The chart supports both **OpenShift Routes** (default) and **Kubernetes Ingress*
 Both backend and frontend have independent `route` and `ingress` settings — set
 them in pairs.
 
-Hostnames are derived from the release name and `global.domain`:
+Hostnames are derived from the release name, `global.hostPrefix` and `global.domain`. The
+release name's leading `soba` is swapped for `global.hostPrefix` (default `submit`), so release
+`soba-dev` serves at `submit-dev`; object names keep the release name. `global.hostBase` sets the
+first label outright instead: prod uses `submit`, for `submit.<domain>` and `submit-api.<domain>`.
 
-- **Frontend:** one host for every `frontend.apps` entry, `<fullname>.<domain>`
-  (e.g. `soba-dev.apps.gov.bc.ca`), with each app at its own `routePath`
+- **Frontend:** one host for every `frontend.apps` entry, `<host base>.<domain>`
+  (e.g. `submit-dev.apps.gov.bc.ca`), with each app at its own `routePath`
   (`/designer`, `/forms`). Pin it with `frontend.host` (PR deployments point at the dev host).
-- **Backend API:** `<fullname>-api.<domain>` (e.g. `soba-pr-42-api.apps.gov.bc.ca`),
+- **Backend API:** `<host base>-api.<domain>` (e.g. `submit-pr-42-api.apps.gov.bc.ca`),
   served under `backend.basePath` (e.g. `/chefs`).
 
 Each `frontend.apps` entry renders its own Deployment/Service/Route/ConfigMap, differing by
@@ -462,10 +479,6 @@ backend:
     annotations:
       haproxy.router.openshift.io/timeout: "60s"
     extraPaths:
-      - name: files
-        path: /api/v1/submit/files
-        annotations:
-          haproxy.router.openshift.io/timeout: "300s"
       - name: files-api
         path: /api/v1/files
         annotations:
@@ -482,8 +495,8 @@ backend:
 
 That is what the chart ships: uploads at 300s on the file, template and print-upload paths, everything else at 60s. An upload writes nothing back until clamd finishes scanning (`clamav.timeoutMs`, 60s), so the router's 30s default would 504 a clean upload.
 
-Matching is by whole segment and prefix only — `/api/v1/submit/files` does not capture
-`/api/v1/submit/filestore`, and there is no suffix match. Document generation cannot be scoped this way: it sits at `/api/v1/{submit,design}/submissions/:id/print`, and the only prefix reaching it would swallow ordinary submission reads and writes. It is a synchronous call to CDOGS, so the base timeout has to cover it. Print with an uploaded template scans the upload before that call, so it has its own prefix, `/api/v1/design/print-upload`.
+Matching is by whole segment and prefix only — `/api/v1/files` does not capture
+`/api/v1/filestore`, and there is no suffix match. Document generation cannot be scoped this way: it sits at `/api/v1/{submit,design}/submissions/:id/print`, and the only prefix reaching it would swallow ordinary submission reads and writes. It is a synchronous call to CDOGS, so the base timeout has to cover it. Print with an uploaded template scans the upload before that call, so it has its own prefix, `/api/v1/design/print-upload`.
 
 `name` and `path` are required. `name` becomes the Route name and the `app.kubernetes.io/component` label, so it must be lowercase DNS-1123 and short enough to keep that label under 63 characters; duplicates are refused. `path` must start with `/` and needs `edge` or `reencrypt` termination, as `passthrough` cannot match on path. Host, Service and TLS come from the base Route. Each rule fails the render naming the entry.
 

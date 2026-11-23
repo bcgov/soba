@@ -4,7 +4,9 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: {{ include "soba.fullname" $root }}-backend
+  {{- /* Named after the host base: OpenShift rejects a host change on an existing Route, so a new
+  host gets new Routes (and helm removes the old ones) instead of an in-place edit. */}}
+  name: {{ include "soba.hostBase" $root }}-backend
   labels:
     {{- include "soba.labels" (dict "root" $root "component" "backend") | nindent 4 }}
   {{- with $baseAnnotations }}
@@ -55,7 +57,7 @@ spec:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: {{ include "soba.fullname" $root }}-backend-{{ $name }}
+  name: {{ include "soba.hostBase" $root }}-backend-{{ $name }}
   labels:
     {{- include "soba.labels" (dict "root" $root "component" $component) | nindent 4 }}
   {{- with $annotations }}

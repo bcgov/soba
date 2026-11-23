@@ -182,9 +182,10 @@ local metadata only; their consumers stay in the gateway.
 ## Settings drawers
 
 Workspace > Form Settings > API Keys lists the workspace's keys; a form's Settings > API Keys lists
-the workspace's keys, read-only, and the form's own. Each drawer follows the Groups tab: search and
-Add API Key above a server-paged table, Edit and Delete on the rows the drawer owns, and the add or
-edit form below the table. Delete is offered for `active` and `failed` keys.
+the workspace's keys, read-only, and the form's own. Each drawer follows the Groups drawer on the
+workspace Permissions tab: search and Add API Key above a server-paged table, Edit and Delete on the
+rows the drawer owns, and the add or edit form below the table. Delete is offered for `active` and
+`failed` keys.
 
 The add form takes the label, notes and types. Generate API Key creates the key and shows it once in
 a modal with a Copy button; Save then stores any change to the label, notes and types, and stays

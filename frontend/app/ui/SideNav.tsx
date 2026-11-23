@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Button } from '@bcgov/design-system-react-components';
 import { usePathname } from 'next/navigation';
@@ -26,6 +26,15 @@ interface SideNavProps {
   submitMode: boolean;
 }
 
+interface NavItem {
+  href: string;
+  title: string;
+  testId: string;
+  icon: ReactNode;
+  isActive: boolean;
+  hidden?: boolean;
+}
+
 export function SideNav({ designMode, submitMode }: Readonly<SideNavProps>) {
   const { authenticated } = useKeycloak();
   const { isSobaAdmin } = useIsSobaAdmin();
@@ -35,7 +44,7 @@ export function SideNav({ designMode, submitMode }: Readonly<SideNavProps>) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const homeIcon = <FaHouse className={styles.iconOutlineBootstrap} size={20} />;
-  const navItems = [];
+  const navItems: NavItem[] = [];
   if (authenticated && designMode) {
     navItems.push(
       {
@@ -88,6 +97,7 @@ export function SideNav({ designMode, submitMode }: Readonly<SideNavProps>) {
     });
   }
 
+  // Hidden until the feedback and help pages have content.
   navItems.push(
     {
       href: `/${locale}/feedback`,
@@ -95,6 +105,7 @@ export function SideNav({ designMode, submitMode }: Readonly<SideNavProps>) {
       testId: 'feedback-nav',
       icon: <FaRegMessage size={20} />,
       isActive: pathname.startsWith(`/${locale}/feedback`),
+      hidden: true,
     },
     {
       href: `/${locale}/help`,
@@ -102,6 +113,7 @@ export function SideNav({ designMode, submitMode }: Readonly<SideNavProps>) {
       testId: 'help-nav',
       icon: <FaRegCircleQuestion size={20} />,
       isActive: pathname.startsWith(`/${locale}/help`),
+      hidden: true,
     },
   );
 
@@ -109,7 +121,7 @@ export function SideNav({ designMode, submitMode }: Readonly<SideNavProps>) {
     <nav className={`d-flex flex-column py-3 px-2 ${styles.sideNav}`}>
       <ul id="sidenav-items" className="nav flex-column gap-2">
         {navItems.map((item) => (
-          <li className="nav-item" key={item.href}>
+          <li className="nav-item" key={item.href} hidden={item.hidden}>
             <Link
               href={item.href}
               data-testid={item.testId}

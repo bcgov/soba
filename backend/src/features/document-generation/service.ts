@@ -26,7 +26,10 @@ import {
   type DocumentTemplateWithFile,
 } from '../../core/db/repos/documentTemplateRepo';
 import { SubmissionService } from '../../core/services/submissionService';
-import type { DocumentRenderRequest } from '../../core/integrations/document-generation/DocumentGenerationAdapter';
+import type {
+  DocumentRenderRequest,
+  PrintContext,
+} from '../../core/integrations/document-generation/DocumentGenerationAdapter';
 import {
   templateFileType,
   type TemplateFileType,
@@ -35,6 +38,7 @@ import { upstreamStatusOf } from '../../core/http/httpErrorMapper';
 import { env } from '../../core/config/env';
 import {
   ApiErrorCodes,
+  PrintStatus,
   type PrintOptions,
   type StaffPrintFacts,
   type SubmissionPrintFacts,
@@ -45,11 +49,14 @@ import { readTemplateContent } from './templateContent';
 import { scanUpload } from '../../core/services/scanUpload';
 import { TEMPLATE_NOT_RENDERED, toRenderError } from './renderError';
 import { withRenderSlot } from './renderSlots';
+import { printContextOf, printSourceOf, submittedRevisionContext } from './printSource';
 
 export interface PrintInput {
   submissionId: string;
   templateId: string;
   options?: PrintOptions;
+  /** Answers not saved, rendered as unsaved in place of the saved ones. */
+  data?: Record<string, unknown>;
 }
 
 /** A template the caller supplies for one print; it is not stored. */
@@ -144,7 +151,8 @@ async function recordAudit(params: {
 }): Promise<void> {
   const createdBy = params.audit.actorId;
   if (!createdBy) {
-    // Shouldn't happen: both surfaces resolve an actor (the public user on submit); flag if it does.
+    // Shouldn't happen: every surface resolves an actor (the public user on submit, the system
+    // user in a job); flag if it does.
     log.warn(
       { mode: params.audit.mode },
       'skipping document-generation audit: no actor to attribute',
@@ -173,16 +181,20 @@ async function recordAudit(params: {
   }
 }
 
-/** The audit context of a print; `stored` is null for an uploaded template. */
+/**
+ * The audit context of a print; `stored` is null for an uploaded template. Unsaved answers are no
+ * revision, so they record none.
+ */
 const printAudit = (
   record: SubmissionRecord,
   actorId: string | null | undefined,
   stored: DocumentTemplateWithFile | null,
+  context: PrintContext,
 ): AuditContext => ({
   mode: DocumentGenerationMode.print,
   actorId,
   submissionId: record.id,
-  revisionId: record.headRevisionId,
+  revisionId: context.status === PrintStatus.unsaved ? null : record.headRevisionId,
   templateId: stored?.template.id ?? null,
   templateFileId: stored?.file.id ?? null,
 });
@@ -221,10 +233,11 @@ async function resolveBackendCode(scope: ResolvedScope): Promise<string | null> 
 async function renderScope(
   caller: CallerIdentity,
   submissionId: string,
+  operation: typeof SubmitterOperation.render | typeof SubmitterOperation.printUnsaved,
 ): Promise<ResolvedScope | 'notfound' | 'denied'> {
   const loaded = await findSubmissionForCaller(submissionId, caller);
   if (!loaded) return 'notfound';
-  if (!allowsSubmitterOperation(SubmitterOperation.render, loaded, caller)) return 'denied';
+  if (!allowsSubmitterOperation(operation, loaded, caller)) return 'denied';
   const { workspaceId, formId, formVersionId } = loaded.submission;
   return { workspaceId, formId, formVersionId };
 }
@@ -289,7 +302,7 @@ async function callBackend(
 async function renderWith(
   scope: ResolvedScope,
   stored: DocumentTemplateWithFile,
-  body: { options?: PrintOptions; data: Record<string, unknown> },
+  body: { options?: PrintOptions; data: Record<string, unknown>; context: PrintContext },
   audit: AuditContext,
 ): Promise<DocumentRenderOutcome> {
   const code = await resolveBackendCode(scope);
@@ -317,7 +330,12 @@ async function renderWith(
       return callBackend(
         code,
         scope,
-        { template: { content, fileType }, options: body.options ?? {}, data: body.data },
+        {
+          template: { content, fileType },
+          options: body.options ?? {},
+          data: body.data,
+          context: body.context,
+        },
         audit,
         templateId,
       );
@@ -326,7 +344,10 @@ async function renderWith(
   return rendered === 'busy' ? { status: 'busy' } : rendered;
 }
 
-/** Render the submission's saved answers with a template stored on its form version. */
+/**
+ * Render with a template stored on the submission's form version: the answers sent, as unsaved, or
+ * the saved answers.
+ */
 async function printStored(
   scope: ResolvedScope,
   record: SubmissionRecord,
@@ -340,16 +361,65 @@ async function printStored(
   );
   if (!stored) return { status: 'template-notfound' };
 
-  const data = await savedAnswers(scope.workspaceId, record);
-  if (!data) return NO_SAVED_DATA;
+  const saved = input.data ? null : await savedAnswers(scope.workspaceId, record);
+  const source = printSourceOf({ saved, sent: input.data, workflowState: record.workflowState });
+  if (!source) return NO_SAVED_DATA;
 
+  const context = printContextOf(record, source.status);
   return renderWith(
     scope,
     stored,
-    { options: input.options, data },
-    printAudit(record, actorId, stored),
+    { options: input.options, data: source.data, context },
+    printAudit(record, actorId, stored, context),
   );
 }
+
+/** A job's render of one submitted revision's answers. */
+export interface RevisionRenderInput {
+  workspaceId: string;
+  formId: string;
+  formVersionId: string;
+  submissionId: string;
+  confirmationCode: string;
+  revisionId: string;
+  revisionNo: number;
+  answers: Record<string, unknown>;
+  actorId: string;
+}
+
+/** Render from a job. No caller is checked: the job checks the submission before it renders. */
+export const jobDocumentService = {
+  /**
+   * Render the answers as a PDF with the CDOGS template on the form version, with the submitted
+   * revision's print context, audited in `package` mode against the revision. template-notfound
+   * when the version has none.
+   */
+  async renderRevision(input: RevisionRenderInput): Promise<DocumentRenderOutcome> {
+    const [stored] = await listLiveDocumentTemplates(
+      input.formVersionId,
+      DocumentTemplateType.cdogs,
+    );
+    if (!stored) return { status: 'template-notfound' };
+    const { workspaceId, formId, formVersionId } = input;
+    return renderWith(
+      { workspaceId, formId, formVersionId },
+      stored,
+      {
+        options: { convertTo: 'pdf' },
+        data: input.answers,
+        context: submittedRevisionContext(input),
+      },
+      {
+        mode: DocumentGenerationMode.package,
+        actorId: input.actorId,
+        submissionId: input.submissionId,
+        revisionId: input.revisionId,
+        templateId: stored.template.id,
+        templateFileId: stored.file.id,
+      },
+    );
+  },
+};
 
 /** Print from the submit surface: the submitter rules decide, and only stored templates render. */
 export const documentGenerationService = {
@@ -358,7 +428,7 @@ export const documentGenerationService = {
     caller: CallerIdentity,
     submissionId: string,
   ): Promise<SubmitterPrintFactsOutcome> {
-    const scope = await renderScope(caller, submissionId);
+    const scope = await renderScope(caller, submissionId, SubmitterOperation.render);
     if (scope === 'notfound' || scope === 'denied') return { status: scope };
     const { templates, renderAvailable } = await printFactsFor(scope);
     return {
@@ -367,9 +437,13 @@ export const documentGenerationService = {
     };
   },
 
-  /** Render from the submission's persisted answer data (read from the form engine). */
+  /**
+   * Render the answers sent, as unsaved, or the submission's saved answers. Only a caller who could
+   * save answers may send them.
+   */
   async print(caller: CallerIdentity, input: PrintInput): Promise<DocumentRenderOutcome> {
-    const scope = await renderScope(caller, input.submissionId);
+    const operation = input.data ? SubmitterOperation.printUnsaved : SubmitterOperation.render;
+    const scope = await renderScope(caller, input.submissionId, operation);
     if (scope === 'notfound' || scope === 'denied') return { status: scope };
     const record = await getSubmissionRecordById(scope.workspaceId, input.submissionId);
     if (!record) return { status: 'notfound' };
@@ -402,7 +476,7 @@ export const staffDocumentService = {
   async print(
     workspaceId: string,
     actorId: string,
-    input: PrintInput,
+    input: Omit<PrintInput, 'data'>,
   ): Promise<DocumentRenderOutcome> {
     const record = await getSubmissionRecordById(workspaceId, input.submissionId);
     if (!record) return { status: 'notfound' };
@@ -435,14 +509,23 @@ export const staffDocumentService = {
     const { scope, submissionId, backendCode } = prepared;
     const record = await getSubmissionRecordById(scope.workspaceId, submissionId);
     if (!record) return { status: 'notfound' };
-    const data = await savedAnswers(scope.workspaceId, record);
-    if (!data) return NO_SAVED_DATA;
+    const source = printSourceOf({
+      saved: await savedAnswers(scope.workspaceId, record),
+      workflowState: record.workflowState,
+    });
+    if (!source) return NO_SAVED_DATA;
 
+    const context = printContextOf(record, source.status);
     return callBackend(
       backendCode,
       scope,
-      { template: { content: template.content, fileType: template.fileType }, options, data },
-      printAudit(record, actorId, null),
+      {
+        template: { content: template.content, fileType: template.fileType },
+        options,
+        data: source.data,
+        context,
+      },
+      printAudit(record, actorId, null, context),
       'inline',
     );
   },
