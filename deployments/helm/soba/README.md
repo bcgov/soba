@@ -425,12 +425,14 @@ The chart supports both **OpenShift Routes** (default) and **Kubernetes Ingress*
 Both backend and frontend have independent `route` and `ingress` settings — set
 them in pairs.
 
-Hostnames are derived from the release name and `global.domain`:
+Hostnames are derived from the release name, `global.hostPrefix` and `global.domain`. The
+release name's leading `soba` is swapped for `global.hostPrefix` (default `submit`), so release
+`soba-dev` serves at `submit-dev`; object names keep the release name.
 
-- **Frontend:** one host for every `frontend.apps` entry, `<fullname>.<domain>`
-  (e.g. `soba-dev.apps.gov.bc.ca`), with each app at its own `routePath`
+- **Frontend:** one host for every `frontend.apps` entry, `<host base>.<domain>`
+  (e.g. `submit-dev.apps.gov.bc.ca`), with each app at its own `routePath`
   (`/designer`, `/forms`). Pin it with `frontend.host` (PR deployments point at the dev host).
-- **Backend API:** `<fullname>-api.<domain>` (e.g. `soba-pr-42-api.apps.gov.bc.ca`),
+- **Backend API:** `<host base>-api.<domain>` (e.g. `submit-pr-42-api.apps.gov.bc.ca`),
   served under `backend.basePath` (e.g. `/chefs`).
 
 Each `frontend.apps` entry renders its own Deployment/Service/Route/ConfigMap, differing by

@@ -1,5 +1,9 @@
 global:
   domain: apps.gov.bc.ca
+  # Public hostnames swap the release name's leading chart name for this prefix, so release
+  # soba-test serves at submit-test.<domain> and submit-test-api.<domain>. Object names keep the
+  # release name. Blank uses the release name as is.
+  hostPrefix: submit
   namespace: ""
   # Set true to remove "keep" policy on Secrets/PVCs (e.g. PR teardown)
   forceCleanup: false
@@ -352,7 +356,8 @@ frontend:
     repository: ghcr.io/bcgov/soba/frontend
     tag: latest
     pullPolicy: IfNotPresent
-  # Host shared by every app; they are told apart by routePath. Blank = <fullname>.<domain>.
+  # Host shared by every app; they are told apart by routePath. Blank = <host base>.<domain>
+  # (see global.hostPrefix).
   host: ""
   replicas: 1
   livenessProbe:

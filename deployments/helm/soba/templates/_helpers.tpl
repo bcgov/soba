@@ -84,11 +84,26 @@ If mongodb is internal, point at the in-cluster service; otherwise use mongodb.e
 {{- end }}
 
 {{/*
+First label of every public hostname: the fullname with its leading chart name swapped for
+global.hostPrefix (soba-test -> submit-test, soba-pr-42 -> submit-pr-42). Object names keep the
+fullname.
+*/}}
+{{- define "soba.hostBase" -}}
+{{- $full := include "soba.fullname" . -}}
+{{- $name := include "soba.name" . -}}
+{{- if and .Values.global.hostPrefix (hasPrefix $name $full) -}}
+{{- printf "%s%s" .Values.global.hostPrefix (trimPrefix $name $full) -}}
+{{- else -}}
+{{- $full -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Public host shared by every frontend app (Route / Ingress); apps are told apart by routePath.
 Usage: {{ include "soba.frontendHost" $root }}
 */}}
 {{- define "soba.frontendHost" -}}
-{{- .Values.frontend.host | default (printf "%s.%s" (include "soba.fullname" .) .Values.global.domain) -}}
+{{- .Values.frontend.host | default (printf "%s.%s" (include "soba.hostBase" .) .Values.global.domain) -}}
 {{- end }}
 
 {{/*
@@ -120,7 +135,7 @@ The https:// origin every frontend app shares. Feeds the backend CORS allowlist.
 Backend public URL host (browser and NEXT_PUBLIC_SOBA_API_BASE_URL).
 */}}
 {{- define "soba.backendHost" -}}
-{{- printf "%s-api.%s" (include "soba.fullname" .) .Values.global.domain }}
+{{- printf "%s-api.%s" (include "soba.hostBase" .) .Values.global.domain }}
 {{- end }}
 
 {{/*

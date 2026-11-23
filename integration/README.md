@@ -60,9 +60,9 @@ The configured environment URLs are:
 
 | `DEP_ENV` | Frontend URL |
 | --- | --- |
-| `dev` | `https://soba-dev.apps.silver.devops.gov.bc.ca/designer/en` |
-| `test` | `https://soba-test.apps.silver.devops.gov.bc.ca/designer/en` |
-| `61` (example PR) | `https://soba-dev.apps.silver.devops.gov.bc.ca/designer-61/en` |
+| `dev` | `https://submit-dev.apps.gold.devops.gov.bc.ca/designer/en` |
+| `test` | `https://submit-test.apps.gold.devops.gov.bc.ca/designer/en` |
+| `61` (example PR) | `https://submit-dev.apps.gold.devops.gov.bc.ca/designer-61/en` |
 
 The suite loads `.env` automatically. Existing shell environment variables take precedence.
 For a locally running application, set `BASE_URL` to its full frontend URL and start the

@@ -80,7 +80,7 @@ jobs:
       packages: write
     environment:
       name: prod
-      url: https://${{ env.ACRONYM }}-prod.${{ vars.OC_DOMAIN }}/designer
+      url: https://submit-prod.${{ vars.OC_DOMAIN }}/designer
     env:
       NAMESPACE: ${{ vars.OC_NAMESPACE }}
       OC_SERVER: ${{ vars.OC_SERVER }}
