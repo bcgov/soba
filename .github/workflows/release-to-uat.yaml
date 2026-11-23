@@ -216,7 +216,8 @@ jobs:
           REPOSITORY_LOWER="${REPOSITORY,,}"
           IMAGE_ROOT="$REGISTRY/$REPOSITORY_LOWER"
           digest() {
-            docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' |
+            local image_ref="$1"
+            docker buildx imagetools inspect "$image_ref" --format '{{json .Manifest}}' |
               jq -er '.digest | select(test("^sha256:[0-9a-f]{64}$"))'
           }
           for entry in 'backend|' 'frontend|-designer' 'frontend|-forms' 'temporal-worker|'; do
