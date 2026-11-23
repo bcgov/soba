@@ -13,6 +13,12 @@ let kcInstance: Keycloak.KeycloakInstance | null = null;
 // Distinguishes "the session ended" from "not booted yet": both leave kcInstance null, but only the
 // first means a caller's token is dead and must not be sent.
 let sessionEnded = false;
+// Set once a logout redirect starts, so signInAfterRefusal cannot cancel it.
+let loggingOut = false;
+
+/** Home page: where logout returns, and sign-in on an existing instance given no address. */
+const homeUrl = (): string | undefined =>
+  typeof window !== 'undefined' ? window.location.origin + getBasePath() : undefined;
 
 export type KeycloakState = {
   token?: string;
@@ -77,6 +83,7 @@ export const initKeycloak = createAsyncThunk<InitResult, void, { rejectValue: st
       // store instance in module-level variable (not in Redux state)
       kcInstance = kc;
       sessionEnded = false;
+      loggingOut = false;
 
       if (kc.idTokenParsed) {
         await kc.updateToken(30);
@@ -143,7 +150,11 @@ const slice = createSlice({
 export const { setToken, setIdTokenParsed, setAuthenticated, clear } = slice.actions;
 
 // Helper thunks
-export const login = () => async (dispatch: AppDispatch) => {
+/**
+ * Signs in, returning to `redirectUri`. Without one, a new instance returns to the current page
+ * (the keycloak-js default) and an existing one to the home page.
+ */
+export const login = (redirectUri?: string) => async (dispatch: AppDispatch) => {
   let kc: Keycloak.KeycloakInstance | null = kcInstance;
   try {
     if (!kc) {
@@ -157,28 +168,38 @@ export const login = () => async (dispatch: AppDispatch) => {
       sessionEnded = false;
     }
     // prefer a forced login flow
-    await kc.init({ onLoad: 'login-required', checkLoginIframe: false, pkceMethod: 'S256' });
+    await kc.init({
+      onLoad: 'login-required',
+      checkLoginIframe: false,
+      pkceMethod: 'S256',
+      redirectUri,
+    });
     dispatch(setToken(kc.token ?? undefined));
     dispatch(setIdTokenParsed(kc.idTokenParsed as Keycloak.KeycloakTokenParsed | undefined));
     dispatch(setAuthenticated(!!kc.authenticated));
   } catch {
     // fallback to direct login redirect
     try {
-      const opts = {
-        redirectUri:
-          typeof window !== 'undefined' ? window.location.origin + getBasePath() : undefined,
-      };
-      await kc?.login(opts);
+      await kc?.login({ redirectUri: redirectUri ?? homeUrl() });
     } catch {
       // no-op
     }
   }
 };
 
+/** Sign-in nobody asked for, after a refused read; skipped once a logout redirect starts. */
+export const signInAfterRefusal = (redirectUri: string) => async (dispatch: AppDispatch) => {
+  if (loggingOut) return;
+  await dispatch(login(redirectUri));
+};
+
 export const logout = () => (dispatch: AppDispatch) => {
   const kc: Keycloak.KeycloakInstance | null = kcInstance;
   if (kc) {
-    void kc.logout();
+    loggingOut = true;
+    kc.logout({ redirectUri: homeUrl() }).catch(() => {
+      loggingOut = false;
+    });
   }
   kcInstance = null;
   disableFormioBrowserAuth();

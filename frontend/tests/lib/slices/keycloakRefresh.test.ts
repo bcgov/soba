@@ -9,6 +9,7 @@ const kc = {
   updateToken: vi.fn(),
   init: vi.fn().mockResolvedValue(true),
   login: vi.fn(),
+  logout: vi.fn().mockResolvedValue(undefined),
 };
 
 // A function expression, not an arrow: the slice calls `new Keycloak(...)`.
@@ -27,7 +28,7 @@ vi.mock('@/src/features/formio-v5/disableFormioBrowserAuth', () => ({
   disableFormioBrowserAuth: vi.fn(),
 }));
 
-const { initKeycloak, login, refreshAccessToken, getKeycloakInstance } =
+const { initKeycloak, login, logout, refreshAccessToken, getKeycloakInstance, signInAfterRefusal } =
   await import('@/lib/slices/keycloakSlice');
 const { default: makeStore } = await import('@/lib/store');
 
@@ -84,6 +85,110 @@ describe('login', () => {
     await store.dispatch(login());
 
     expect(kc.login).toHaveBeenCalledWith({ redirectUri: `${window.location.origin}/chefs` });
+  });
+
+  it('returns to the address it is given after sign-in', async () => {
+    const store = await storeWithSession();
+    kc.init.mockRejectedValueOnce(new Error("A 'Keycloak' instance can only be initialized once."));
+
+    await store.dispatch(login('http://app.test/en/submission/sub-1'));
+
+    expect(kc.login).toHaveBeenCalledWith({ redirectUri: 'http://app.test/en/submission/sub-1' });
+  });
+
+  // With no instance yet, the forced login flow runs and must carry the address too.
+  it('passes the address to a forced login when there is no instance', async () => {
+    await makeStore().dispatch(login('http://app.test/en/submission/sub-1'));
+
+    expect(kc.init).toHaveBeenCalledWith(
+      expect.objectContaining({
+        onLoad: 'login-required',
+        redirectUri: 'http://app.test/en/submission/sub-1',
+      }),
+    );
+  });
+
+  // Without an address the forced flow keeps the keycloak-js default: the current page.
+  it('leaves a forced login with no address on the current page', async () => {
+    await makeStore().dispatch(login());
+
+    expect(kc.init).toHaveBeenCalledWith(
+      expect.objectContaining({ onLoad: 'login-required', redirectUri: undefined }),
+    );
+  });
+});
+
+describe('logout', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dropKeycloakInstance();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns to the home page', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/chefs');
+    const store = await storeWithSession();
+
+    store.dispatch(logout());
+
+    expect(kc.logout).toHaveBeenCalledWith({ redirectUri: `${window.location.origin}/chefs` });
+  });
+
+  // keycloak-js resolves logout as soon as the redirect starts, while the page is still here.
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  // A read refused after logout's clear() would start a sign-in that cancels the logout.
+  it('skips the sign-in after a refusal while the logout redirect is under way', async () => {
+    const store = await storeWithSession();
+    store.dispatch(logout());
+    await settle();
+
+    await store.dispatch(signInAfterRefusal('http://app.test/en/submission/sub-1'));
+
+    expect(kc.init).toHaveBeenCalledTimes(1);
+    expect(kc.login).not.toHaveBeenCalled();
+  });
+
+  // A logout the browser did not follow, such as one cancelled at the leave prompt.
+  it('still signs in when asked after a logout that did not leave the page', async () => {
+    const store = await storeWithSession();
+    store.dispatch(logout());
+    await settle();
+
+    await store.dispatch(login());
+
+    expect(kc.init).toHaveBeenCalledTimes(2);
+    expect(kc.init).toHaveBeenLastCalledWith(expect.objectContaining({ onLoad: 'login-required' }));
+  });
+
+  it('lets the sign-in after a refusal through once the logout fails', async () => {
+    const store = await storeWithSession();
+    kc.logout.mockRejectedValueOnce(new Error('logout failed'));
+    store.dispatch(logout());
+    await settle();
+
+    await store.dispatch(signInAfterRefusal('http://app.test/en/submission/sub-1'));
+
+    expect(kc.init).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        onLoad: 'login-required',
+        redirectUri: 'http://app.test/en/submission/sub-1',
+      }),
+    );
+  });
+
+  it('lets the sign-in after a refusal through once Keycloak boots afresh', async () => {
+    const store = await storeWithSession();
+    store.dispatch(logout());
+    await store.dispatch(initKeycloak());
+    kc.init.mockRejectedValueOnce(new Error("A 'Keycloak' instance can only be initialized once."));
+
+    await store.dispatch(signInAfterRefusal('http://app.test/en/submission/sub-1'));
+
+    expect(kc.login).toHaveBeenCalledWith({ redirectUri: 'http://app.test/en/submission/sub-1' });
   });
 });
 
