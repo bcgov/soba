@@ -111,8 +111,6 @@ jobs:
       platforms: ${{ steps.vars.outputs.platforms }}
       image_version: ${{ steps.vars.outputs.image_version }}
       matrix: ${{ steps.vars.outputs.matrix }}
-      source_sha: ${{ steps.source.outputs.source_sha }}
-      app_version: ${{ steps.source.outputs.app_version }}
     steps:
       - name: Set variables
         id: vars
@@ -181,17 +179,6 @@ jobs:
             echo "image_version=local" >> $GITHUB_OUTPUT
           fi
 
-      - name: Checkout image source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ steps.vars.outputs.ref }}
-
-      - name: Read source metadata
-        id: source
-        run: |
-          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "app_version=$(jq -r .version backend/package.json)" >> "$GITHUB_OUTPUT"
-
   build:
     needs: prepare
     permissions:
@@ -205,7 +192,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.prepare.outputs.source_sha }}
+          ref: ${{ needs.prepare.outputs.ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -226,8 +213,8 @@ jobs:
           file: ${{ matrix.dockerfile_dir }}/${{ matrix.dockerfile || 'Dockerfile' }}
           platforms: ${{ matrix.platform }}
           labels: |
-            org.opencontainers.image.revision=${{ needs.prepare.outputs.source_sha }}
-            org.opencontainers.image.version=${{ needs.prepare.outputs.app_version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.image_version }}
           build-args: ${{ matrix.base_path != '' && format('BASE_PATH={0}', matrix.base_path) || '' }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
           provenance: false
@@ -259,7 +246,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.prepare.outputs.source_sha }}
+          ref: ${{ needs.prepare.outputs.ref }}
 
       - name: Set variables
         id: vars
