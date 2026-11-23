@@ -84,14 +84,16 @@ If mongodb is internal, point at the in-cluster service; otherwise use mongodb.e
 {{- end }}
 
 {{/*
-First label of every public hostname: the fullname with its leading chart name swapped for
-global.hostPrefix (soba-test -> submit-test, soba-pr-42 -> submit-pr-42). Object names keep the
-fullname.
+First label of every public hostname: global.hostBase when set, otherwise the fullname with its
+leading chart name swapped for global.hostPrefix (soba-test -> submit-test, soba-pr-42 ->
+submit-pr-42). Object names keep the fullname.
 */}}
 {{- define "soba.hostBase" -}}
 {{- $full := include "soba.fullname" . -}}
 {{- $name := include "soba.name" . -}}
-{{- if and .Values.global.hostPrefix (hasPrefix $name $full) -}}
+{{- if .Values.global.hostBase -}}
+{{- .Values.global.hostBase -}}
+{{- else if and .Values.global.hostPrefix (hasPrefix $name $full) -}}
 {{- printf "%s%s" .Values.global.hostPrefix (trimPrefix $name $full) -}}
 {{- else -}}
 {{- $full -}}

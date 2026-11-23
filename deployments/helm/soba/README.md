@@ -427,7 +427,8 @@ them in pairs.
 
 Hostnames are derived from the release name, `global.hostPrefix` and `global.domain`. The
 release name's leading `soba` is swapped for `global.hostPrefix` (default `submit`), so release
-`soba-dev` serves at `submit-dev`; object names keep the release name.
+`soba-dev` serves at `submit-dev`; object names keep the release name. `global.hostBase` sets the
+first label outright instead: prod uses `submit`, for `submit.<domain>` and `submit-api.<domain>`.
 
 - **Frontend:** one host for every `frontend.apps` entry, `<host base>.<domain>`
   (e.g. `submit-dev.apps.gov.bc.ca`), with each app at its own `routePath`

@@ -1,4 +1,8 @@
 # Production — higher replicas, resources, HPA enabled, external Form.io likely
+global:
+  # Public hosts without an environment suffix: submit.<domain> and submit-api.<domain>.
+  hostBase: submit
+
 backend:
   # Development data generator: stated explicitly rather than left to the default.
   features:

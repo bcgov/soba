@@ -4,6 +4,9 @@ global:
   # soba-test serves at submit-test.<domain> and submit-test-api.<domain>. Object names keep the
   # release name. Blank uses the release name as is.
   hostPrefix: submit
+  # First label of every public hostname, used as is instead of the hostPrefix swap (prod sets
+  # "submit" for submit.<domain> and submit-api.<domain>). Blank derives it from the release name.
+  hostBase: ""
   namespace: ""
   # Set true to remove "keep" policy on Secrets/PVCs (e.g. PR teardown)
   forceCleanup: false
