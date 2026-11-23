@@ -265,9 +265,12 @@ codes this environment runs, comma-separated; with none listed, a submit queues 
 code with no installed plugin, or one whose settings keep it from loading, stops the backend from
 starting. Set in ConfigMap `<fullname>-backend-app` only when non-empty:
 
-| Helm value                                   | Env var                          | Used by                 |
-| -------------------------------------------- | -------------------------------- | ----------------------- |
-| `backend.config.postSubmissionActionPlugins` | `POST_SUBMISSION_ACTION_PLUGINS` | post-submission actions |
+| Helm value                                               | Env var                                               | Used by                       |
+| -------------------------------------------------------- | ----------------------------------------------------- | ----------------------------- |
+| `backend.config.postSubmissionActionPlugins`             | `POST_SUBMISSION_ACTION_PLUGINS`                      | post-submission actions       |
+| `backend.config.postSubmissionEmailPackageMaxFileMb`     | `PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_MAX_FILE_MB`    | post-submission-email-package |
+| `backend.config.postSubmissionEmailPackageMaxPackageMb`  | `PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_MAX_PACKAGE_MB` | post-submission-email-package |
+| `backend.config.postSubmissionEmailPackageRetentionDays` | `PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_RETENTION_DAYS` | post-submission-email-package |
 
 `post-submission-log` only logs that it ran. No environment lists it; a local run can.
 
@@ -280,6 +283,45 @@ through Notify test, which delivers only to its safelist. UAT and prod keep
 `backend.features.notifications` disabled, so email jobs there end cancelled; sending needs that
 feature enabled, `notificationDefaultCode: notify-v1`,
 `notification.notifyV1.endpoint`, and `PLUGIN_NOTIFY_V1_API_KEY` in the Vault secret.
+
+`post-submission-email-package` (Submit to Email) emails each address on a list of up to 100 a link
+to a package of a submission when it is first submitted: a zip of a PDF rendered with the form
+version's CDOGS template and the files uploaded with the submission. The package is built in temp
+storage, stored as the job's result in the job results storage, and downloaded only by signed-in
+users who can read the submission, while the feature is on for its form. Its emails count toward
+the daily email limit. A package is kept `postSubmissionEmailPackageRetentionDays` (default 7),
+counted again each time its email step starts. While that step has not succeeded, the package is
+kept until the step's job is deleted under `backend.jobs.deadRetentionDays` (default 90), so a
+re-run can still send it; deleting the submission frees it at the next sweep.
+
+Its feature, `backend.features.post-submission-email-package`, is scoped: while its status is
+`enabled`, it applies only to the workspaces and forms granted it on the Administration "Feature
+access" page (`/admin/feature-scopes`). Dev, PR, test, UAT and prod list the plugin. Dev and PR
+enable the feature; test, UAT and prod keep it `disabled`. PR keeps packages one day, with its other
+job results. To turn it on in an environment:
+
+1. Set `backend.features.post-submission-email-package: "enabled"` in its values file and deploy;
+   the migration job applies the status.
+2. Grant the workspaces or forms that should use it on the Feature access page.
+3. For the emails to go out, enable `backend.features.notifications` with notify-v1, as above.
+   Until then, package jobs end cancelled before they build anything.
+4. Check that the job results storage works there; UAT and prod have not stored a job result yet.
+5. Give each form version that should send packages a CDOGS template. A submission to a version
+   without one sends nothing.
+6. On a granted workspace's or form's After Submission tab, turn Submit to Email on and add its
+   addresses.
+7. Optionally, set the size and retention settings in the table above. Empty keeps 25 MB per
+   upload, 100 MB per package and 7 days, and a value out of range fails the render.
+
+To turn it off:
+
+- At once, for some workspaces or forms: on the Feature access page, set their grants inactive or
+  delete them. Submits stop queuing packages, queued package jobs end cancelled when they start,
+  and links already emailed stop downloading.
+- Everywhere: set the status to `"disabled"` in the values file and deploy.
+
+Taking the code off `postSubmissionActionPlugins`, or turning `post-submission` off, stops new
+packages but leaves links already emailed working.
 
 To retire an action, take its code off the list first and remove its plugin in a later release.
 Jobs already queued for a plugin that no pod has stay queued.
@@ -307,10 +349,12 @@ render:
 
 A background job can keep one file it produced, such as a submission export. Result files are not
 virus-scanned: no one uploads them. They are kept for `backend.jobs.resultRetentionDays` (default 7)
-and removed by the job sweeper, as are the files of jobs that failed or were stopped. A job whose file
+and removed by the job sweeper, as are the files of jobs that failed or were stopped. Submit to
+Email packages are kept by rules of their own (see Post-Submission Action Configuration). A job whose file
 would pass `backend.jobs.resultMaxBytes` (default 200 MiB) fails. PR slots use 50 MiB and 1 day, as
 their file store volume is 1 Gi. A running CSV export stages its result and a spool of its ticked
-cells, which can be several times larger, in temp storage. With tempstorage-os that is the
+cells, which can be several times larger, in temp storage, and a package build stages its zip there,
+with a copy of any upload whose size is not known. With tempstorage-os that is the
 backend's `/tmp`, an emptyDir of `backend.tempStorage.tmpSizeLimit` (default 2Gi); past it the
 kubelet evicts the pod.
 

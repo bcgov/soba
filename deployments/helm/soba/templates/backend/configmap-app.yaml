@@ -66,6 +66,15 @@ data:
   {{- with include "soba.optionalSetting" .Values.backend.config.postSubmissionActionPlugins }}
   POST_SUBMISSION_ACTION_PLUGINS: {{ . }}
   {{- end }}
+  {{- with include "soba.wholeNumberSetting" (dict "key" "backend.config.postSubmissionEmailPackageMaxFileMb" "value" .Values.backend.config.postSubmissionEmailPackageMaxFileMb "max" 1024) }}
+  PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_MAX_FILE_MB: {{ . }}
+  {{- end }}
+  {{- with include "soba.wholeNumberSetting" (dict "key" "backend.config.postSubmissionEmailPackageMaxPackageMb" "value" .Values.backend.config.postSubmissionEmailPackageMaxPackageMb "max" 1024) }}
+  PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_MAX_PACKAGE_MB: {{ . }}
+  {{- end }}
+  {{- with include "soba.wholeNumberSetting" (dict "key" "backend.config.postSubmissionEmailPackageRetentionDays" "value" .Values.backend.config.postSubmissionEmailPackageRetentionDays "max" 365) }}
+  PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_RETENTION_DAYS: {{ . }}
+  {{- end }}
   {{- with include "soba.wholeNumberSetting" (dict "key" "backend.config.submitterEmailCopySubmissionHourlyLimit" "value" .Values.backend.config.submitterEmailCopySubmissionHourlyLimit "max" 1000000) }}
   SUBMITTER_EMAIL_COPY_SUBMISSION_HOURLY_LIMIT: {{ . }}
   {{- end }}
