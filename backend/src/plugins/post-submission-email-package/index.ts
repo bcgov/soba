@@ -43,6 +43,7 @@ export const postSubmissionActionPluginDefinition: PostSubmissionActionPluginDef
       {
         name: POST_SUBMISSION_EMAIL_PACKAGE_EMAIL_STEP,
         pool: JobPool.light,
+        emails: { recipients: 'options' },
         // About an hour of retries at the default backoff, to ride out a provider outage.
         maxAttempts: 8,
         timeoutMs: 300_000,

@@ -77,7 +77,12 @@ describe('post-submission action plugins', () => {
 
   it("keeps a plugin's steps, and skips one with a duplicate, bad or misspelled step", () => {
     expect(findInstalledPostSubmissionAction('post-submission-test-steps')?.steps).toEqual([
-      expect.objectContaining({ name: 'send-email', pool: 'light', maxAttempts: 12 }),
+      expect.objectContaining({
+        name: 'send-email',
+        pool: 'light',
+        maxAttempts: 12,
+        emails: { recipients: 'options' },
+      }),
     ]);
     expect(
       findInstalledPostSubmissionAction('post-submission-test-steps-duplicate'),
@@ -87,6 +92,13 @@ describe('post-submission action plugins', () => {
     ).toBeUndefined();
     expect(
       findInstalledPostSubmissionAction('post-submission-test-steps-misspelled'),
+    ).toBeUndefined();
+  });
+
+  it('skips a plugin whose emails name another source of recipients, or a key it does not know', () => {
+    expect(findInstalledPostSubmissionAction('post-submission-test-bad-emails')).toBeUndefined();
+    expect(
+      findInstalledPostSubmissionAction('post-submission-test-misspelled-emails'),
     ).toBeUndefined();
   });
 
@@ -131,6 +143,25 @@ describe('post-submission action plugins', () => {
       'post-submission-test-steps',
       'submission-export',
     ]);
+  });
+
+  it('gives the job type of a step that emails its options list its emails, and none to others', () => {
+    const registry = getJobRegistry();
+    const types = [
+      'post-submission-test-steps:send-email',
+      'post-submission-test-steps',
+      'post-submission-test-echo',
+      'submission.status-email',
+      'submission.email-copy',
+      'submission-export',
+    ];
+    expect(types.filter((type) => !registry.get(type))).toEqual([]);
+    expect(types.filter((type) => registry.get(type)?.emails)).toEqual([
+      'post-submission-test-steps:send-email',
+    ]);
+    expect(registry.get('post-submission-test-steps:send-email')?.emails).toEqual({
+      recipients: 'options',
+    });
   });
 
   it('names a later step by its action, then the step', () => {

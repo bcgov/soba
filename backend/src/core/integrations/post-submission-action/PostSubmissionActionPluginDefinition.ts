@@ -3,7 +3,7 @@ import type { Logger } from 'pino';
 import type { z } from 'zod';
 import type { PostSubmissionActionScope } from '@soba/lib';
 import type { JobPoolCode } from '../../config/env';
-import type { StoredJobResult } from '../../jobs/registry';
+import type { JobEmails, StoredJobResult } from '../../jobs/registry';
 import type { SendEmail } from '../notification/NotificationAdapter';
 import type { TempResource, TempStorageAdapter } from '../temp-storage/TempStorageAdapter';
 
@@ -183,6 +183,8 @@ export interface PostSubmissionActionContext<TOptions> {
 /** How one step of an action runs as a job. */
 export interface PostSubmissionActionJobSettings<TOptions = Record<string, unknown>> {
   pool: JobPoolCode;
+  /** Set on a step that emails the `to` list in its options, so the Jobs pages count it. */
+  emails?: JobEmails;
   maxAttempts?: number;
   timeoutMs?: number;
   /**

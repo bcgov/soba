@@ -10,6 +10,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { PostSubmissionActionScopeSchema } from '@soba/lib';
 import { env, MAX_RETENTION_DAYS } from '../../config/env';
+import { JOB_EMAIL_RECIPIENTS } from '../../jobs/registry';
 import { log } from '../../logging';
 import {
   createPluginConfigReader,
@@ -97,6 +98,7 @@ const ActionJobSettingsShape = {
   maxAttempts: z.number().int().positive().optional(),
   timeoutMs: z.number().int().positive().optional(),
   resultRetentionDays: z.number().int().positive().max(MAX_RETENTION_DAYS).optional(),
+  emails: z.strictObject({ recipients: z.enum(JOB_EMAIL_RECIPIENTS) }).optional(),
   run: z.custom((value) => typeof value === 'function', 'Expected a function'),
 };
 

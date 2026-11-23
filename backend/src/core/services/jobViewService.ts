@@ -33,6 +33,7 @@ import { getPostSubmissionActionPluginDefinitions } from '../integrations/plugin
 import { getJobRegistry } from '../jobs/catalog';
 import { nudgeJobs } from '../jobs/nudge';
 import { listJobOutputs, toJobResult, type JobOutput } from '../jobs/outputs';
+import type { JobTypeDefinition } from '../jobs/registry';
 import { getJobSettings } from '../jobs/settings';
 import { log } from '../logging';
 
@@ -132,16 +133,18 @@ const addressesOf = (params: Record<string, unknown>): string[] | null => {
 };
 
 /**
- * Where a job's emails stand. A job whose options list its addresses is counted against that list.
- * One that reads its recipients when it runs, such as a status email, has no list until it runs, so
- * only the addresses it has sent to or had refused are counted, and its total and those not sent
- * yet are left unknown. Null when there is nothing to count.
+ * Where a job's emails stand. A job whose type emails the `to` list in its options is counted against
+ * that list, with the total and those still to send. Any other job is counted from what it sent: the
+ * addresses it has sent to or had refused, its total and those not sent yet unknown. That covers a
+ * job that finds its recipients when it runs, such as a status email, a step that only builds what a
+ * later step emails, and a type this backend no longer runs. Null when there is nothing to count.
  */
 export const emailCountsOf = (
+  type: Pick<JobTypeDefinition, 'emails'> | undefined,
   params: Record<string, unknown>,
   sends: readonly JobNotificationSend[],
 ): JobEmailCounts | null => {
-  const listed = addressesOf(params);
+  const listed = type?.emails?.recipients === 'options' ? addressesOf(params) : null;
   if (listed) return countEmails(listed, sends);
   if (sends.length === 0) return null;
   const tried = countEmails([...new Set(sends.flatMap((send) => send.recipients.to))], sends);
@@ -237,7 +240,7 @@ const loadJob = async (scope: JobScope, id: string): Promise<LoadedJob> => {
     row,
     parent,
     children,
-    emailCounts: emailCountsOf(row.params, sends),
+    emailCounts: emailCountsOf(getJobRegistry().get(row.type), row.params, sends),
     output: outputs.get(row.id) ?? null,
   };
 };

@@ -58,6 +58,7 @@ const stepJobDefinition = (
   maxAttempts: step.maxAttempts,
   timeoutMs: step.timeoutMs,
   resultRetentionDays: step.resultRetentionDays,
+  emails: step.emails,
   run: async ({
     job,
     signal,

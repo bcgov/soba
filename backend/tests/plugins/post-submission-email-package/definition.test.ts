@@ -67,6 +67,8 @@ describe('post-submission-email-package', () => {
     const plugin = await pluginWith(undefined);
     expect(plugin.code).toBe(POST_SUBMISSION_EMAIL_PACKAGE_CODE);
     expect(plugin.job).toMatchObject({ pool: 'heavy', maxAttempts: 8, timeoutMs: 300_000 });
+    // It only builds; the Jobs pages count no emails against the addresses in its options.
+    expect(plugin.job.emails).toBeUndefined();
   });
 
   it('keeps the package 7 days by default, or the days its setting names', async () => {
@@ -82,6 +84,7 @@ describe('post-submission-email-package', () => {
       pool: 'light',
       maxAttempts: 8,
       timeoutMs: 300_000,
+      emails: { recipients: 'options' },
     });
     expect(postSubmissionActionStepType(plugin.code, 'email')).toBe(
       'post-submission-email-package:email',
