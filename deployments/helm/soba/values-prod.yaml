@@ -27,6 +27,8 @@ backend:
   config:
     logLevel: warn
     documentGenerationDefaultCode: cdogs-v2
+    # Needs the clamav release (deployments/helm/clamav, values-prod.yaml) in this namespace.
+    virusScanDefaultCode: virusscan-clamav
     tenantEngineDefaultCode: cstar-v1
     # Switch to aps-credential-issuer-v3 after adding the Vault keys.
     credentialIssuerDefaultCode: credential-issuer-noop

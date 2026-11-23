@@ -53,13 +53,14 @@ spec:
             name: signatures
           - mountPath: /run/clamav
             name: run
-          # Image builds clamav under /usr/local, so clamd/freshclam read config
-          # from /usr/local/etc (not /etc). Confirm on a live pod: clamconf.
-          - mountPath: /usr/local/etc/clamd.conf
+          # The image's run.sh starts freshclam and clamd with --config-file
+          # /etc/*.conf when those exist, and falls back to the defaults baked
+          # into /usr/local/etc otherwise.
+          - mountPath: /etc/clamd.conf
             name: config-volume
             readOnly: true
             subPath: clamd.conf
-          - mountPath: /usr/local/etc/freshclam.conf
+          - mountPath: /etc/freshclam.conf
             name: config-volume
             readOnly: true
             subPath: freshclam.conf

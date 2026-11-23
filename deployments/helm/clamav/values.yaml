@@ -15,10 +15,10 @@ service:
 clamav:
   # clamav.image -- The clamav docker image
   image: ghcr.io/bcgov/chefs-clamav
-  # clamav.tag -- The clamav image tag. Pinned to an immutable sha tag (equal to
-  # latest when pinned) for reproducible deploys; freshclam pulls definitions at
-  # runtime so this does not stale virus signatures.
-  tag: sha-82c03f0
+  # clamav.tag -- The clamav image tag (ClamAV 1.4.6 on UBI 9). Pinned to a sha tag
+  # so every pod runs the same build; freshclam pulls definitions when the pod
+  # starts, so the pin does not freeze virus signatures at build time.
+  tag: sha-7855e41
   # clamav.imagePullPolicy -- IfNotPresent
   imagePullPolicy: IfNotPresent
   replicaCount: 1

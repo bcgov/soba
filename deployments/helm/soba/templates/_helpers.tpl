@@ -311,6 +311,19 @@ valkey alias Service, which they share — so it exists whenever any is on redis
 {{- end }}
 
 {{/*
+Fails the render when the cache, message bus or event stream is unset or on a per-pod *-memory
+plugin. Every deployment runs them on the namespace's Valkey.
+*/}}
+{{- define "soba.validateValkeyPlugins" -}}
+{{- range $key := list "cacheDefaultCode" "messagebusDefaultCode" "eventStreamDefaultCode" -}}
+{{- $code := index $.Values.backend.config $key | default "" -}}
+{{- if or (not $code) (hasSuffix "-memory" $code) -}}
+{{- fail (printf "backend.config.%s is '%s'; deployments run it on the namespace's Valkey (the *-redis plugin), not in pod memory" $key $code) -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Feature status env vars for the backend, consumed by the seed step.
 
 Must stay inline: the only consumer is a pre-install/pre-upgrade hook Job, and Helm creates hook

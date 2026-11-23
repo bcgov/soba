@@ -59,6 +59,14 @@ services without changing the chart structure.
 - Kubernetes 1.24+
 - **PostgreSQL** — the database is **not** included in this chart and must be
   provisioned separately (managed service, Bitnami sub-chart, CrunchyDB operator, etc.)
+- **Valkey** and **ClamAV** — one of each per namespace, installed by hand from
+  `deployments/helm/valkey` and `deployments/helm/clamav` as releases named `valkey` and `clamav`
+  (see each chart's README). No pipeline installs them. This chart only adds the
+  `<release>-valkey` and `<release>-clamav` aliases that point at them. Every deployment runs the
+  cache, message bus and event streams on Valkey (`cache-redis`, `messagebus-redis`,
+  `eventstream-redis`), and the chart refuses the per-pod `*-memory` plugins. Releases that share a
+  namespace (test and UAT in `b82f30-test`, PR slots in `b82f30-dev`) share its Valkey under
+  per-release prefixes.
 
 ## Chart Structure
 

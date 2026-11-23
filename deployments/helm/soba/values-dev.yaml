@@ -23,9 +23,6 @@ backend:
       memory: 512Mi
   config:
     logLevel: debug
-    cacheDefaultCode: cache-redis
-    messagebusDefaultCode: messagebus-redis
-    eventStreamDefaultCode: eventstream-redis
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
     credentialIssuerDefaultCode: aps-credential-issuer-v3

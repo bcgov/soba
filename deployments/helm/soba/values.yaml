@@ -125,15 +125,14 @@ backend:
     gitTag: ""
     imageTag: ""
     formEngineDefaultCode: formio-v5
-    # Cache plugin. Default cache-memory (per-pod). Set cache-redis in a per-env values file
-    # (values-<env>.yaml) once that namespace's Valkey chart is deployed and confirmed reachable —
-    # cache-redis without a reachable Valkey is worse than cache-memory (no caching, warn per
-    # reconnect). See the valkey block below for the shared-cache wiring.
     # Document generation backend code the consumer defaults to.
     documentGenerationDefaultCode: docgen-noop
-    cacheDefaultCode: cache-memory
-    messagebusDefaultCode: messagebus-memory
-    eventStreamDefaultCode: eventstream-memory
+    # Cache, message bus and event streams run on the namespace's Valkey (deployments/helm/valkey,
+    # installed by hand before soba) in every deployment. The chart refuses the per-pod *-memory
+    # plugins, which are for local development only. See the valkey block below for the wiring.
+    cacheDefaultCode: cache-redis
+    messagebusDefaultCode: messagebus-redis
+    eventStreamDefaultCode: eventstream-redis
     # Temp storage plugin. Default tempstorage-os stages temp bytes under
     # os.tmpdir(), the per-pod /tmp emptyDir. Override to tempstorage-mount for a shared
     # RWX PVC across replicas (see the tempStorage block below).
@@ -529,9 +528,9 @@ clamav:
 # providing the shared cache, message bus and event streams (tune its persistence/eviction in the
 # valkey chart per what it hosts). The backend always targets an in-namespace
 # <release>-valkey alias Service on redis://<release>-valkey:port, so backend config never changes
-# per env — only externalName does. The alias Service is created when either cacheDefaultCode ==
-# cache-redis or messagebusDefaultCode == messagebus-redis; each plugin's PLUGIN_*_REDIS_* env is
-# emitted only when that plugin is on redis.
+# per env — only externalName does. The alias Service is created when any of cacheDefaultCode,
+# messagebusDefaultCode or eventStreamDefaultCode is a *-redis plugin (all three, by default); each
+# plugin's PLUGIN_*_REDIS_* env is emitted only when that plugin is on redis.
 valkey:
   # Real valkey Service the <release>-valkey alias points at. Empty defaults to the valkey Service
   # in THIS namespace; override for cross-namespace (e.g. a PR pointing at dev's valkey).
