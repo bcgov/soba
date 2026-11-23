@@ -101,8 +101,9 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA=$(git rev-parse --short HEAD)
+          BRANCH="${{ steps.release.outputs.branch }}"
           printf 'short_sha=%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
-          printf 'uat_tag=soba-uat-%s\n' "$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          printf 'uat_tag=soba-uat-%s\n' "${BRANCH#release/}" >> "$GITHUB_OUTPUT"
 
   approve-uat:
     name: Approve UAT promotion
