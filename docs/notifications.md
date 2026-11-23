@@ -32,12 +32,12 @@ Notify's test service delivers only to the addresses on its safelist.
 `backend/src/core/integrations/notification/email/` builds every email. It has two layers: the
 layout frames any email, and a block for each kind of email fills it.
 
-| file                 | role                                                                                                                                                                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `html.ts`            | `markup`, a template tag that escapes every value unless it is markup the tag built, and `SafeHtml`, which nothing else can make. A look-alike object or `true` throws                                   |
-| `language.ts`        | `EmailLanguage` (`en`, `fr`), `EmailLanguages` (adds `both`) and `DEFAULT_EMAIL_LANGUAGE`                                                                                                                |
-| `layout.ts`          | `renderEmail(parts, languages)`: the container, the order of `both`, "(Le français suit)", the divider, the footer and a one-line subject. Also `paragraph`, `link`, `languageSection`, `withLineBreaks` |
-| `submissionEmail.ts` | the block for an email about a submission: `defineSubmissionEmail` and `renderSubmissionEmail`                                                                                                           |
+| file                 | role                                                                                                                                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `html.ts`            | `markup`, a template tag that escapes every value unless it is markup the tag built, and `SafeHtml`, which nothing else can make. A look-alike object or `true` throws                                              |
+| `language.ts`        | `EmailLanguage` (`en`, `fr`), `EmailLanguages` (adds `both`) and `DEFAULT_EMAIL_LANGUAGE`                                                                                                                           |
+| `layout.ts`          | `renderEmail(parts, languages)`: the container, the order of `both`, "(Le français suit)", the divider, the footer and a one-line subject. Also `heading`, `paragraph`, `link`, `languageSection`, `withLineBreaks` |
+| `submissionEmail.ts` | the block for an email about a submission: `defineSubmissionEmail` and `renderSubmissionEmail`                                                                                                                      |
 
 The tag is named `markup`, not `html`: Prettier reformats the contents of any template tagged
 `html`, which would change the emails.
@@ -97,12 +97,14 @@ const content = renderSubmissionEmail(
 ```
 
 For each language, the submission block renders the Confirmation ID in bold, the sentence and the
-link. An email may also name a second link, with `secondLinkText` in its template and `secondLink`
-in its facts, such as a signed-in submitter's past submissions; the block renders it after the
-first, and leaves it out when either is missing. After every language's section it adds the
-reviewer's comment, once, under "Comments:", "Commentaires :", or "Comments: / Commentaires :" in an
-email in both. The subject ends with the Confirmation ID, as ` (code)`, so mail clients do not
-thread every email about one form into a single conversation.
+link. A template may add a `title`, rendered as a heading above the Confirmation ID, and a
+`linksIntro`, a line before the links that is left out when the email has no link. An email may
+also name a second link, with `secondLinkText` in its template and `secondLink` in its facts, such
+as a signed-in submitter's past submissions; the block renders it after the first, and leaves it
+out when either is missing. After every language's section it adds the reviewer's comment, once,
+under "Comments:", "Commentaires :", or "Comments: / Commentaires :" in an email in both. The
+subject ends with the Confirmation ID, as ` (code)`, so mail clients do not thread every email
+about one form into a single conversation.
 
 - **Form names** go through `cleanName` before a template sees them: no control or format
   characters, no links, one line, at most 200 characters.

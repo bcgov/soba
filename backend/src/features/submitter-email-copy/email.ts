@@ -3,21 +3,28 @@ import type { RenderedEmail } from '../../core/integrations/notification/email/l
 import {
   defineSubmissionEmail,
   renderSubmissionEmail,
+  type SubmissionEmailVars,
 } from '../../core/integrations/notification/email/submissionEmail';
 import { formsMySubmissionsUrl, formsSubmissionUrl } from '../../core/appLinks';
 
+const SUBMITTED_EN = ({ form }: SubmissionEmailVars) => `${form} submitted`;
+const SUBMITTED_FR = ({ form }: SubmissionEmailVars) => `Formulaire soumis : ${form}`;
+
 export const EMAIL_COPY = defineSubmissionEmail({
   en: {
-    subject: ({ form }) => `Your submission to ${form} was submitted`,
-    sentence: ({ form }) =>
-      `Thank you for your ${form} submission. You asked for this copy on the confirmation screen.`,
+    subject: SUBMITTED_EN,
+    title: SUBMITTED_EN,
+    sentence: ({ form }) => `Thank you for your ${form} submission.`,
+    linksIntro: 'You can view your submission details by visiting the following links:',
     linkText: 'View this submission',
     secondLinkText: 'View your past submissions (sign in required)',
   },
   fr: {
-    subject: ({ form }) => `Votre soumission à ${form} a été soumise`,
-    sentence: ({ form }) =>
-      `Merci pour votre soumission pour ${form}. Vous avez demandé cette copie à partir de l’écran de confirmation.`,
+    subject: SUBMITTED_FR,
+    title: SUBMITTED_FR,
+    sentence: ({ form }) => `Merci pour votre soumission pour ${form}.`,
+    linksIntro:
+      'Vous pouvez consulter les détails de votre soumission en visitant les liens suivants :',
     linkText: 'Voir cette soumission',
     secondLinkText: 'Voir vos soumissions antérieures (connexion requise)',
   },
