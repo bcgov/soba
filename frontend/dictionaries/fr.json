@@ -414,7 +414,8 @@
       "submissionExport": "Exportation des soumissions",
       "submissionStatusChanged": "Statut modifié",
       "submissionStatusEmail": "Courriel de statut",
-      "submissionEmailCopy": "Copie par courriel au soumissionnaire"
+      "submissionEmailCopy": "Copie par courriel au soumissionnaire",
+      "actionStep": "{action} : {step}"
     },
     "detail": {
       "heading": "Tâche",
@@ -1123,6 +1124,17 @@
       "enabled": "Envoyer ces courriels",
       "help": "Chaque adresse reçoit son propre courriel avec le nom du formulaire, l’ID de confirmation et un lien vers la soumission, qui exige une connexion. Au-delà de la limite quotidienne d’envoi, les courriels attendent et sont envoyés après sa remise à zéro, à minuit.",
       "required": "Ajoutez au moins une adresse, ou désactivez ces courriels."
+    },
+    "emailPackage": {
+      "label": "Soumettre par courriel",
+      "description": "Lorsqu'une soumission est soumise pour la première fois, envoie à chaque adresse de la liste un lien vers un paquet de celle-ci : un PDF des réponses et les fichiers téléversés, dans un seul fichier zip.",
+      "enabled": "Envoyer le paquet de la soumission",
+      "help": "Chaque adresse reçoit son propre courriel avec le nom du formulaire, l'ID de confirmation et un lien vers le paquet. Le téléchargement exige une connexion et l'accès aux soumissions du formulaire. Au-delà de la limite quotidienne d'envoi, les courriels attendent et sont envoyés après sa remise à zéro, à minuit.",
+      "required": "Ajoutez au moins une adresse, ou désactivez le paquet.",
+      "privacyNotice": "Le paquet contient les réponses de la soumission et les fichiers téléversés. Une copie téléchargée se trouve hors de CHEFS : n'ajoutez que des personnes qui doivent en conserver une.",
+      "templateNoticeWorkspace": "Un paquet n'est envoyé que pour les soumissions à une version de formulaire qui a un modèle CDOGS dans Modèles de documents. Les formulaires sans modèle n'envoient rien.",
+      "templateNoticeForm": "Un paquet n'est envoyé que si la version soumise du formulaire a un modèle CDOGS dans Modèles de documents. Sans modèle, rien n'est envoyé.",
+      "emailStep": "courriels"
     },
     "log": {
       "label": "Consigner chaque soumission",

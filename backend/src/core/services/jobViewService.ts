@@ -8,6 +8,7 @@ import type {
   StaffJobDetail,
   StaffJobListItem,
 } from '@soba/lib';
+import { postSubmissionActionStepType } from '@soba/lib';
 import { JobPool } from '../config/env';
 import { JobStatus, JobType } from '../db/codes';
 import {
@@ -28,7 +29,6 @@ import {
 } from '../db/repos/notificationAuditRepo';
 import { ConflictError, NotFoundError } from '../errors';
 import { isHandledSend, isRefusedSend } from '../integrations/notification/sendOutcome';
-import { actionStepType } from '../integrations/post-submission-action/PostSubmissionActionRegistry';
 import { getPostSubmissionActionPluginDefinitions } from '../integrations/plugins/PluginRegistry';
 import { getJobRegistry } from '../jobs/catalog';
 import { nudgeJobs } from '../jobs/nudge';
@@ -315,7 +315,7 @@ export const listJobTypes = (): JobTypeItem[] => {
       ...(plugin.steps ?? []).map(
         (step) =>
           [
-            actionStepType(plugin.code, step.name),
+            postSubmissionActionStepType(plugin.code, step.name),
             `${plugin.metadata.name} (${step.name})`,
           ] as const,
       ),

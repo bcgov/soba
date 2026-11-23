@@ -1,5 +1,6 @@
 import {
   POST_SUBMISSION_EMAIL_PACKAGE_CODE,
+  POST_SUBMISSION_EMAIL_PACKAGE_EMAIL_STEP,
   PostSubmissionEmailPackageOptionsSchema,
   type PostSubmissionEmailPackageOptions,
 } from '@soba/lib';
@@ -40,7 +41,7 @@ export const postSubmissionActionPluginDefinition: PostSubmissionActionPluginDef
     },
     steps: [
       {
-        name: 'email',
+        name: POST_SUBMISSION_EMAIL_PACKAGE_EMAIL_STEP,
         pool: JobPool.light,
         // About an hour of retries at the default backoff, to ride out a provider outage.
         maxAttempts: 8,

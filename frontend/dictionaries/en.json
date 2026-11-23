@@ -414,7 +414,8 @@
       "submissionExport": "Submission export",
       "submissionStatusChanged": "Status changed",
       "submissionStatusEmail": "Status email",
-      "submissionEmailCopy": "Submitter email copy"
+      "submissionEmailCopy": "Submitter email copy",
+      "actionStep": "{action}: {step}"
     },
     "detail": {
       "heading": "Job",
@@ -1123,6 +1124,17 @@
       "enabled": "Send these emails",
       "help": "Each address gets its own email with the form name, the confirmation ID and a link to the submission, which needs sign-in. Past the daily email limit, emails wait and are sent after it resets at midnight.",
       "required": "Add at least one address, or turn these emails off."
+    },
+    "emailPackage": {
+      "label": "Submit to Email",
+      "description": "When a submission is first submitted, emails each address on the list a link to a package of it: a PDF of the answers and the uploaded files, in one zip.",
+      "enabled": "Send the submission package",
+      "help": "Each address gets its own email with the form name, the confirmation ID and a link to the package. Downloading needs sign-in and access to the form's submissions. Past the daily email limit, emails wait and are sent after it resets at midnight.",
+      "required": "Add at least one address, or turn the package off.",
+      "privacyNotice": "The package holds the submission's answers and uploaded files. A downloaded copy is outside CHEFS, so add only people who should keep one.",
+      "templateNoticeWorkspace": "A package is sent only for submissions to a form version with a CDOGS template under Document Templates. Forms without one send nothing.",
+      "templateNoticeForm": "A package is sent only when the submitted form version has a CDOGS template under Document Templates. Without one, nothing is sent.",
+      "emailStep": "emails"
     },
     "log": {
       "label": "Log each submission",

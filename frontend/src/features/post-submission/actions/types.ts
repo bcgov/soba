@@ -58,4 +58,6 @@ export interface PostSubmissionActionUi {
   problem: (values: PostSubmissionActionValues, dict: Dictionary) => string | null;
   /** The values as they are saved. */
   saved: (values: PostSubmissionActionValues) => PostSubmissionActionValues;
+  /** Names on the Jobs pages for the action's steps after the first, by step name. */
+  stepLabels?: Readonly<Record<string, (dict: Dictionary) => string>>;
 }

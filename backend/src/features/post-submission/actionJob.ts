@@ -1,9 +1,9 @@
+import { postSubmissionActionStepType } from '@soba/lib';
 import type { ChildJob } from '../../core/db/repos/jobRepo';
 import type {
   PostSubmissionActionJobSettings,
   PostSubmissionActionPluginDefinition,
 } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
-import { actionStepType } from '../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
 import { getPostSubmissionActionPluginDefinitions } from '../../core/integrations/plugins/PluginRegistry';
 import type { JobFacts } from '../../core/jobs/facts';
 import type { JobTypeDefinition } from '../../core/jobs/registry';
@@ -22,7 +22,7 @@ const actionSteps = (plugin: PostSubmissionActionPluginDefinition): ActionStep[]
   { ...plugin.job, type: plugin.code },
   ...(plugin.steps ?? []).map((step) => ({
     ...step,
-    type: actionStepType(plugin.code, step.name),
+    type: postSubmissionActionStepType(plugin.code, step.name),
   })),
 ];
 

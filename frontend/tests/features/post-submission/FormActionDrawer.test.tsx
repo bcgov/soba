@@ -37,6 +37,8 @@ import type { PostSubmissionActionUi } from '@/src/features/post-submission/acti
 const dict: Dictionary = en;
 const EMAIL = 'post-submission-email-addresses';
 const LOG = 'post-submission-log';
+const PACKAGE = 'post-submission-email-package';
+const pkg = en.postSubmission.emailPackage;
 const OFF: PostSubmissionActionValues = { enabled: false, options: {} };
 const TEAM: PostSubmissionActionValues = { enabled: true, options: { to: ['team@example.com'] } };
 
@@ -312,6 +314,51 @@ describe('FormActionDrawer', () => {
       en.postSubmission.addressList.recipients,
     );
     expect(screen.queryByTestId('post-submission-email-view')).not.toBeInTheDocument();
+  });
+
+  it("shows Submit to Email's warning and its template note for a form, then its own fields", async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(inheriting(TEAM));
+    renderDrawer(item(PACKAGE));
+    await waitFor(() => expect(inputIn(`${PACKAGE}-inherit`)).toBeEnabled());
+
+    expect(mockGetSettings).toHaveBeenCalledWith('token', 'f1', `post-submission/${PACKAGE}`);
+    expect(screen.getByTestId(`accordion-${PACKAGE}`)).toHaveTextContent(pkg.label);
+    expect(screen.getByTestId(`${PACKAGE}-description`)).toHaveTextContent(pkg.description);
+    expect(screen.getByTestId(`${PACKAGE}-notice-1`)).toHaveTextContent(pkg.privacyNotice);
+    expect(screen.getByTestId(`${PACKAGE}-notice-1`)).toHaveClass('warning');
+    expect(screen.getByTestId(`${PACKAGE}-notice-2`)).toHaveTextContent(pkg.templateNoticeForm);
+    expect(screen.getByTestId(`${PACKAGE}-notice-2`)).toHaveClass('info');
+    expect(screen.getByTestId(`${PACKAGE}-view-list`)).toHaveTextContent('team@example.com');
+
+    await user.click(inputIn(`${PACKAGE}-inherit`));
+    expect(screen.getByTestId(`${PACKAGE}-notice-2`)).toHaveTextContent(pkg.templateNoticeForm);
+    expect(screen.getByTestId(`${PACKAGE}-help`)).toHaveTextContent(pkg.help);
+    expect(screen.getByTestId(`${PACKAGE}-enabled`)).toHaveTextContent(pkg.enabled);
+    await user.type(inputIn(`${PACKAGE}-input`), 'form@example.com{Enter}');
+    await user.click(saveButton(PACKAGE));
+
+    await waitFor(() => expect(mockSetSettings).toHaveBeenCalledTimes(1));
+    expect(savedBody()).toEqual({
+      inherit: false,
+      values: { enabled: true, options: { to: ['team@example.com', 'form@example.com'] } },
+      version: 0,
+    });
+  });
+
+  it('says in its own words that Submit to Email needs an address on a form set alone', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(inheriting(OFF));
+    renderDrawer(item(PACKAGE, { workspaceConfigurable: false }));
+    await waitFor(() => expect(inputIn(`${PACKAGE}-input`)).toBeEnabled());
+
+    expect(screen.getByTestId(`${PACKAGE}-form-only`)).toHaveTextContent(
+      en.postSubmission.formOnlyNote,
+    );
+    expect(screen.getByTestId(`${PACKAGE}-notice-2`)).toHaveTextContent(pkg.templateNoticeForm);
+    await user.click(inputIn(`${PACKAGE}-enabled`));
+    expect(screen.getByTestId(`${PACKAGE}-list`)).toHaveTextContent(pkg.required);
+    expect(saveButton(PACKAGE)).toBeDisabled();
   });
 
   it('shows no notes for an action without any', async () => {

@@ -1,5 +1,4 @@
-import { POST_SUBMISSION_EMAIL_PACKAGE_CODE } from '@soba/lib';
-import { actionStepType } from '../../../src/core/integrations/post-submission-action/PostSubmissionActionRegistry';
+import { POST_SUBMISSION_EMAIL_PACKAGE_CODE, postSubmissionActionStepType } from '@soba/lib';
 
 const RETENTION = 'PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_RETENTION_DAYS';
 const LISTED = { POST_SUBMISSION_ACTION_PLUGINS: POST_SUBMISSION_EMAIL_PACKAGE_CODE };
@@ -84,6 +83,8 @@ describe('post-submission-email-package', () => {
       maxAttempts: 8,
       timeoutMs: 300_000,
     });
-    expect(actionStepType(plugin.code, 'email')).toBe('post-submission-email-package:email');
+    expect(postSubmissionActionStepType(plugin.code, 'email')).toBe(
+      'post-submission-email-package:email',
+    );
   });
 });

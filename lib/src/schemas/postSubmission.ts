@@ -12,6 +12,13 @@ export const POST_SUBMISSION_SETTINGS_KEY = 'post-submission';
 /** The email-package action's plugin and feature code, and its package job's type. */
 export const POST_SUBMISSION_EMAIL_PACKAGE_CODE = 'post-submission-email-package';
 
+/** The email-package action's second step, which emails the package's link. */
+export const POST_SUBMISSION_EMAIL_PACKAGE_EMAIL_STEP = 'email';
+
+/** The job type of an action's step after the first: the action's code, then the step's name. */
+export const postSubmissionActionStepType = (code: string, step: string): string =>
+  `${code}:${step}`;
+
 /** Where an action is set: a workspace default its forms inherit, or one form. */
 export const PostSubmissionActionScopeSchema = z.enum(['workspace', 'form']);
 export type PostSubmissionActionScope = z.infer<typeof PostSubmissionActionScopeSchema>;

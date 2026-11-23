@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
 import en from '@/dictionaries/en.json';
+import fr from '@/dictionaries/fr.json';
 import type { Dictionary } from '@/src/types/dictionary';
 import type { PostSubmissionActionValues } from '@/src/types/postSubmission';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
@@ -29,6 +30,7 @@ import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import WorkspaceActionDrawer from '@/src/features/post-submission/ui/WorkspaceActionDrawer';
 import { emailAddressesAction } from '@/src/features/post-submission/actions/email';
 import { addressListAction } from '@/src/features/post-submission/actions/addressList';
+import { emailPackageAction } from '@/src/features/post-submission/actions/email-package';
 import type { PostSubmissionActionUi } from '@/src/features/post-submission/actions/types';
 
 const dict: Dictionary = en;
@@ -40,13 +42,13 @@ const saved = (values: PostSubmissionActionValues, version = 1) => ({ values, ve
 
 let store: ReturnType<typeof makeStore>;
 
-function renderDrawer(ui: PostSubmissionActionUi = emailAddressesAction) {
+function renderDrawer(ui: PostSubmissionActionUi = emailAddressesAction, code = CODE) {
   return render(
     <Provider store={store}>
       <SWRConfig
         value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
       >
-        <WorkspaceActionDrawer dict={dict} workspaceId="ws1" code={CODE} ui={ui} />
+        <WorkspaceActionDrawer dict={dict} workspaceId="ws1" code={code} ui={ui} />
       </SWRConfig>
     </Provider>,
   );
@@ -345,5 +347,51 @@ describe('WorkspaceActionDrawer with another address-list action', () => {
     ]);
     expect(screen.getByTestId('other-duplicates')).toHaveTextContent('a@example.com');
     expect(screen.queryByTestId('post-submission-email-chip')).not.toBeInTheDocument();
+  });
+});
+
+describe('WorkspaceActionDrawer with Submit to Email', () => {
+  const PACKAGE = 'post-submission-email-package';
+  const pkg = en.postSubmission.emailPackage;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store = makeStore();
+    store.dispatch(setToken('token'));
+    store.dispatch(setAuthenticated(true));
+    mockSetSettings.mockImplementation((_token, _ws, _key, body) => Promise.resolve(body));
+  });
+
+  it("shows its warning and the workspace's template note, and saves the workspace's list", async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(saved({ enabled: false, options: {} }));
+    renderDrawer(emailPackageAction, PACKAGE);
+    const field = () =>
+      screen.getByTestId(`${PACKAGE}-input`).querySelector('input') as HTMLElement;
+    await waitFor(() => expect(field()).toBeEnabled());
+
+    expect(mockGetSettings).toHaveBeenCalledWith('token', 'ws1', `post-submission/${PACKAGE}`);
+    expect(screen.getByTestId(`accordion-${PACKAGE}`)).toHaveTextContent(pkg.label);
+    expect(screen.getByTestId(`${PACKAGE}-notice-1`)).toHaveTextContent(pkg.privacyNotice);
+    expect(screen.getByTestId(`${PACKAGE}-notice-2`)).toHaveTextContent(
+      pkg.templateNoticeWorkspace,
+    );
+    expect(screen.queryByTestId(`${PACKAGE}-notice-3`)).not.toBeInTheDocument();
+    // The workspace drawer shows the form drawer's help, so it names no form in particular.
+    expect(screen.getByTestId(`${PACKAGE}-help`)).toHaveTextContent(pkg.help);
+    expect(pkg.help).not.toMatch(/this form/i);
+    expect(fr.postSubmission.emailPackage.help).not.toMatch(/ce formulaire/i);
+
+    await user.click(
+      screen.getByTestId(`${PACKAGE}-enabled`).querySelector('input') as HTMLElement,
+    );
+    await user.type(field(), 'staff@gov.bc.ca{Enter}');
+    await user.click(screen.getByTestId(`form-settings-${PACKAGE}-save`));
+
+    await waitFor(() => expect(mockSetSettings).toHaveBeenCalledTimes(1));
+    expect(mockSetSettings.mock.calls[0][3]).toEqual({
+      values: { enabled: true, options: { to: ['staff@gov.bc.ca'] } },
+      version: 1,
+    });
   });
 });
