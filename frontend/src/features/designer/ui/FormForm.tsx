@@ -739,7 +739,8 @@ function FormForm({ formId }: Readonly<{ formId: string }>) {
         title={dict.form.unsavedChangesTitle}
         onClose={() => void answerLeave('stay')}
         isCloseable={!isSaving}
-        isDismissable={!isSaving}
+        // Escape is not user activation, so the next Back after it could not be held; a click is.
+        isDismissable={false}
         size="sm"
         footer={
           <>

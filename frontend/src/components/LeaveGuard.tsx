@@ -26,6 +26,8 @@ export function LeaveGuard({ active }: Readonly<{ active: boolean }>) {
       cancelLabel={t.stay}
       onConfirm={leave}
       onCancel={() => setPending(null)}
+      // Escape is not user activation, so the next Back after it could not be held; a click is.
+      isDismissable={false}
     />
   );
 }

@@ -47,6 +47,8 @@ type Webform = EditableFormInstance & {
     refs: { removeLink?: unknown[]; fileBrowse?: unknown };
     setValue: (value: unknown) => void;
   };
+  onChange: (flags: unknown) => void;
+  setSubmission: (submission: Submission) => Promise<unknown>;
 };
 
 const settle = (ms = 800) => act(() => new Promise((resolve) => setTimeout(resolve, ms)));
@@ -107,6 +109,29 @@ describe('EditableFormView on the real Form.io', () => {
     await settle();
 
     expect(webform.data).toMatchObject({ name: 'normalized' });
+    expect(onDataChange).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it('does not take answers set after a click for an edit', async () => {
+    const { webform, onDataChange, view } = await renderEditor({ name: 'original' });
+
+    fireEvent.pointerDown(screen.getByTestId('editor'));
+    await act(() => webform.setSubmission({ data: { name: 'reloaded' } } as Submission));
+    await settle();
+
+    expect(onDataChange).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  // Validate On: Blur reports a change, without `modified`, when a field the user entered is left.
+  it('does not take a change that leaves the answers as they were for an edit', async () => {
+    const { webform, onDataChange, view } = await renderEditor({ name: 'original' });
+
+    fireEvent.pointerDown(screen.getByTestId('editor'));
+    act(() => webform.onChange({}));
+    await settle();
+
     expect(onDataChange).not.toHaveBeenCalled();
     view.unmount();
   });

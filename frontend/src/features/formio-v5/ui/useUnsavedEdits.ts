@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { type FormEvent, useCallback, useMemo, useRef, useState } from 'react';
 import { useUserChange } from './useUserChange';
 
 // Form.io reports a field's change 100ms after its input.
@@ -26,8 +26,6 @@ export function useUnsavedEdits({
   const savedEdits = useRef(0);
   const saved = useRef(!nothingSaved);
   const echoUntil = useRef(0);
-  // The answers at Form.io's last change, so a change that leaves them as they were is not an edit.
-  const lastAnswers = useRef<string | null>(null);
   const [unsaved, setUnsaved] = useState(nothingSaved);
   // Edits not yet held by an applied save; unlike `unsaved`, false on a blank new form.
   const [edited, setEdited] = useState(canWrite && carried);
@@ -39,23 +37,24 @@ export function useUnsavedEdits({
     setEdited(true);
   }, [canWrite]);
 
-  const onInputCapture = useCallback(() => {
-    echoUntil.current = Date.now() + ECHO_MS;
-    markEdited();
-  }, [markEdited]);
+  const onInputCapture = useCallback(
+    (event: FormEvent) => {
+      // A Select's search box filters the options; the answer changes only when one is picked.
+      if (event.target instanceof Element && event.target.matches('.choices__input')) return;
+      echoUntil.current = Date.now() + ECHO_MS;
+      markEdited();
+    },
+    [markEdited],
+  );
 
   const onFormChange = useCallback(
-    (value: { data?: unknown } | undefined, _flags: unknown, modified: boolean) => {
-      const answers = JSON.stringify(value?.data ?? null);
-      const unchanged = answers === lastAnswers.current;
-      lastAnswers.current = answers;
+    (value: { data?: unknown } | undefined, flags: unknown, modified: boolean) => {
+      const userChange = isUserChange(value, flags, modified);
       if (Date.now() < echoUntil.current) {
         echoUntil.current = 0;
         return;
       }
-      // Form.io's own change on blur, such as Validate On: Blur, leaves the answers as they were.
-      if (!modified && unchanged) return;
-      if (isUserChange(modified)) markEdited();
+      if (userChange) markEdited();
     },
     [isUserChange, markEdited],
   );

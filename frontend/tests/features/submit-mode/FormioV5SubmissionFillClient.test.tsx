@@ -785,6 +785,26 @@ describe('FormioV5SubmissionFillClient', () => {
         expect(asked()).toBe(false);
       });
 
+      // Form.io sets the loaded answers with `fromSubmission`, which a click while loading must not make an edit.
+      it('does not count the answers loading after a click while the form loads', async () => {
+        h.getSubmitFillBundle.mockResolvedValue(savedDraft());
+        await renderLoaded();
+        fireEvent.pointerDown(screen.getByTestId('submission-fill'));
+        act(() => h.onChange?.({ data: { a: 1 } }, { fromSubmission: true }, false));
+        await clickNav();
+        expect(asked()).toBe(false);
+      });
+
+      it("does not count typing in a Select's search box", async () => {
+        await renderLoaded();
+        const search = document.createElement('input');
+        search.className = 'choices__input';
+        screen.getByTestId('submission-fill').appendChild(search);
+        fireEvent.input(search, { target: { value: 'ab' } });
+        await clickNav();
+        expect(asked()).toBe(false);
+      });
+
       // Validate On: Blur reports a change, without `modified`, when a field the filler entered is left.
       it('does not count a change that leaves the answers as they were', async () => {
         h.getSubmitFillBundle.mockResolvedValue(savedDraft());
@@ -804,6 +824,15 @@ describe('FormioV5SubmissionFillClient', () => {
         await userEvent.click(screen.getByTestId('confirm-modal-cancel'));
         await waitFor(() => expect(asked()).toBe(false));
         expect(followed).not.toHaveBeenCalled();
+      });
+
+      // Escape is not user activation, so a Back after it could not be held.
+      it('keeps asking on Escape', async () => {
+        await renderLoaded();
+        edit();
+        await clickNav();
+        await userEvent.keyboard('{Escape}');
+        expect(asked()).toBe(true);
       });
 
       it('follows the link once the loss is confirmed', async () => {
