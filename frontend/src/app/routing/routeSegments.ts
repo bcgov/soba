@@ -25,7 +25,8 @@ export const ROUTE_KIND_BY_SEGMENT: Readonly<Record<string, RouteKind>> = {
   'my-forms': WORKSPACE_APP, // app/[lang]/my-forms
   'my-submissions': WORKSPACE_APP, // app/[lang]/my-submissions
   // Public fill/submit route: reachable without signing in; the backend authorizes against the
-  // form's audience (a non-public form returns 401 and the renderer shows an error).
+  // form's audience. A non-public form answers a signed-out visitor 401 and the page starts
+  // sign-in.
   form: PUBLIC, // app/[lang]/form/[formId]
   // Public fill route for an already-opened submission (resume by id); the backend allows only
   // participants on the submission.

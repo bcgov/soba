@@ -74,12 +74,24 @@ Signed in but still waiting for a token is not ready either. `sobaFetch` would s
 call with no Authorization header rather than wait, and get a 401.
 
 For the submit surface use `useMaybeAuthedSWR`, which allows an anonymous read. Its key
-must say which identity it is, or signing in gets served the anonymous reader's copy:
+must say which identity it is, or signing in gets served the anonymous reader's copy.
+
+Once a page has read signed in, it keeps that identity. When the session ends, `tokenFor`
+from `useCallToken` throws `SessionExpiredError` instead of sending the read anonymously,
+where the refusal would send the user to sign in. The fill pages pin the same way through
+`useFillSession`.
 
 ```ts
-!initStarted || initializing || !submissionId
-  ? null
-  : ['submit-submission', submissionId, token ? 'user' : 'anonymous'];
+const [signedInHere, setSignedInHere] = useState(false);
+if (token && !signedInHere) setSignedInHere(true);
+const signedIn = signedInHere || !!token;
+
+useMaybeAuthedSWR(
+  !initStarted || initializing || !submissionId
+    ? null
+    : ['submit-submission', submissionId, signedIn ? 'user' : 'anonymous'],
+  () => loadSubmitSubmission(tokenFor(signedIn), submissionId),
+);
 ```
 
 `!initStarted` is the guard that matters. Before Keycloak has run, "no token" is the

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { Provider } from 'react-redux';
-import { SWRConfig } from 'swr';
+import { SWRConfig, useSWRConfig } from 'swr';
 
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
@@ -59,7 +59,7 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   getSubmitSubmissionData: (...args: unknown[]) => getSubmitSubmissionData(...args),
 }));
 
-// Keycloak is the external boundary for the sign-in cases; the slice and store stay real.
+// Keycloak is the external boundary when signing in and out; the slice and store stay real.
 const kc = vi.hoisted(() => ({
   token: undefined as string | undefined,
   authenticated: false,
@@ -128,8 +128,8 @@ async function renderView(success = false) {
 }
 
 describe('SubmissionView', () => {
-  // Keycloak never runs here, so the init lifecycle is driven directly: nothing is read until it
-  // has answered.
+  // Keycloak itself runs only when signing in and out; elsewhere the init lifecycle is driven
+  // directly: nothing is read until it has answered.
   function initAnswered() {
     store.dispatch({ type: initKeycloak.pending.type });
     store.dispatch({ type: initKeycloak.fulfilled.type, payload: { authenticated: false } });
@@ -419,7 +419,7 @@ describe('SubmissionView', () => {
     expect(getSubmitSubmission).toHaveBeenCalledWith('token', 'sub-1');
   });
 
-  describe('signed-out refusal', () => {
+  describe('signing in and out', () => {
     const refused = new ApiError('Not authorized to access this submission', 401, 'read_denied');
 
     // Boots Keycloak through the real slice, as the header does on page load.
@@ -432,10 +432,45 @@ describe('SubmissionView', () => {
       });
     };
 
+    let swrMutate: ReturnType<typeof useSWRConfig>['mutate'] | undefined;
+    function CaptureMutate() {
+      swrMutate = useSWRConfig().mutate;
+      return null;
+    }
+
+    // Signed in, with SWR's mutate exposed. An anonymous read is refused.
+    const renderSignedIn = async () => {
+      const submission = await getSubmitSubmission();
+      await boot(true);
+      getSubmitSubmission.mockImplementation((token: string | undefined) =>
+        token ? Promise.resolve(submission) : Promise.reject(refused),
+      );
+      await act(async () => {
+        render(
+          <Provider store={store}>
+            <SWRConfig
+              value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
+            >
+              <CaptureMutate />
+              <SubmissionView />
+            </SWRConfig>
+          </Provider>,
+        );
+      });
+      await screen.findByTestId('submission-view-form');
+    };
+
+    // The header's sweep once a session ends: every read emptied and read again.
+    const sweepReads = () =>
+      act(async () => {
+        await swrMutate!(() => true, undefined, { revalidate: true });
+      });
+
     beforeEach(() => {
       store.dispatch(clear());
       store = makeStore();
-      kc.logout.mockReturnValue(new Promise(() => undefined));
+      // keycloak-js resolves logout once the redirect starts.
+      kc.logout.mockResolvedValue(undefined);
     });
 
     afterEach(() => {
@@ -443,6 +478,7 @@ describe('SubmissionView', () => {
     });
 
     it('sends a signed-out visitor refused with 401 to sign in, back to this address', async () => {
+      globalThis.history.pushState(null, '', '/en/submission/sub-1');
       await boot(false);
       getSubmitSubmission.mockRejectedValue(refused);
       kc.init.mockRejectedValueOnce(
@@ -452,27 +488,41 @@ describe('SubmissionView', () => {
       await renderView();
 
       await waitFor(() =>
-        expect(kc.login).toHaveBeenCalledWith({ redirectUri: globalThis.location.href }),
+        expect(kc.login).toHaveBeenCalledWith({
+          redirectUri: `${globalThis.location.origin}/en/submission/sub-1`,
+        }),
       );
+      expect(screen.getByRole('progressbar', { name: 'Loading...' })).toBeInTheDocument();
       expect(screen.queryByTestId('submission-view-loaderror')).not.toBeInTheDocument();
     });
 
-    // clear() turns the read anonymous and it is refused; signing in then would cancel the logout.
-    it('does not send someone logging out back to sign in', async () => {
-      const submission = await getSubmitSubmission();
-      await boot(true);
-      getSubmitSubmission.mockImplementation((token: string | undefined) =>
-        token ? Promise.resolve(submission) : Promise.reject(refused),
-      );
-      await renderView();
-      await screen.findByTestId('submission-view-form');
+    // An anonymous read would be refused, and signing in then would cancel the logout.
+    it('neither reads anonymously nor signs in while logging out', async () => {
+      await renderSignedIn();
 
       await act(async () => {
         store.dispatch(logout());
       });
+      await sweepReads();
 
-      await waitFor(() => expect(getSubmitSubmission).toHaveBeenCalledWith(undefined, 'sub-1'));
       expect(kc.logout).toHaveBeenCalled();
+      expect(getSubmitSubmission).not.toHaveBeenCalledWith(undefined, 'sub-1');
+      expect(kc.login).not.toHaveBeenCalled();
+      expect(kc.init).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports a session that ended here instead of signing in again', async () => {
+      await renderSignedIn();
+
+      await act(async () => {
+        store.dispatch(clear());
+      });
+      await sweepReads();
+
+      await waitFor(() =>
+        expect(screen.getByTestId('submission-view-session-expired')).toBeInTheDocument(),
+      );
+      expect(getSubmitSubmission).not.toHaveBeenCalledWith(undefined, 'sub-1');
       expect(kc.login).not.toHaveBeenCalled();
       expect(kc.init).toHaveBeenCalledTimes(1);
     });

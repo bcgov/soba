@@ -6,6 +6,7 @@ import {
   refreshToken,
   initKeycloak,
   getKeycloakInstance,
+  signInAfterRefusal,
 } from '../slices/keycloakSlice';
 
 export function useKeycloak() {
@@ -13,6 +14,10 @@ export function useKeycloak() {
   const state = useAppSelector((s) => s.keycloak);
 
   const doLogin = useCallback((redirectUri?: string) => dispatch(login(redirectUri)), [dispatch]);
+  const doSignInAfterRefusal = useCallback(
+    (redirectUri: string) => dispatch(signInAfterRefusal(redirectUri)),
+    [dispatch],
+  );
   const doLogout = useCallback(() => dispatch(logout()), [dispatch]);
   const doRefresh = useCallback(() => dispatch(refreshToken()), [dispatch]);
   const doInit = useCallback(() => dispatch(initKeycloak()), [dispatch]);
@@ -26,6 +31,7 @@ export function useKeycloak() {
     initStarted: state.initStarted,
     error: state.error,
     login: doLogin,
+    signInAfterRefusal: doSignInAfterRefusal,
     logout: doLogout,
     refresh: doRefresh,
     init: doInit,

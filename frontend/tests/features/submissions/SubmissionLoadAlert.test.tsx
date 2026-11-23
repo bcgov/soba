@@ -14,7 +14,7 @@ const h = vi.hoisted(() => ({
     initializing: false,
     initStarted: true,
     error: undefined,
-    login: vi.fn(),
+    signInAfterRefusal: vi.fn(),
   },
 }));
 
@@ -29,28 +29,32 @@ const refused = (status: number): DataError => ({
 });
 
 beforeEach(() => {
-  h.kc = { ...h.kc, authenticated: false, login: vi.fn() };
+  h.kc = { ...h.kc, authenticated: false, signInAfterRefusal: vi.fn() };
 });
 
 describe('SubmissionLoadAlert', () => {
   it('sends a signed-out visitor refused with 401 to sign in, without the no-access message', () => {
     render(<SubmissionLoadAlert error={refused(401)} />);
-    expect(h.kc.login).toHaveBeenCalledWith(globalThis.location.href);
-    expect(screen.queryByText(en.apiErrors.read_denied)).toBeNull();
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(h.kc.signInAfterRefusal).toHaveBeenCalledWith(globalThis.location.href);
+    expect(screen.getByRole('progressbar', { name: en.general.loading })).toBeInTheDocument();
+    expect(screen.queryByText(en.apiErrors.read_denied)).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('does not send a signed-in caller to sign in again on a 401', () => {
     h.kc.authenticated = true;
     render(<SubmissionLoadAlert error={refused(401)} />);
-    expect(h.kc.login).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(h.kc.signInAfterRefusal).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
-  it('shows the refusal to a signed-in caller refused with 403', () => {
-    h.kc.authenticated = true;
+  it.each([
+    ['signed in', true],
+    ['signed out', false],
+  ])('shows the refusal for a 403 to a caller %s', (_label, authenticated) => {
+    h.kc.authenticated = authenticated;
     render(<SubmissionLoadAlert error={refused(403)} />);
-    expect(h.kc.login).not.toHaveBeenCalled();
-    expect(screen.getByTestId('submission-view-noaccess')).toBeTruthy();
+    expect(h.kc.signInAfterRefusal).not.toHaveBeenCalled();
+    expect(screen.getByTestId('submission-view-noaccess')).toBeInTheDocument();
   });
 });

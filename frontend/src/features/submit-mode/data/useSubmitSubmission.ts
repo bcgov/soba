@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
+import { useCallToken } from '@/src/shared/api/callToken';
 import {
   getSubmitSubmission,
   getSubmitSubmissionData,
@@ -27,13 +28,19 @@ async function loadSubmitSubmission(token: string | undefined, submissionId: str
 /** The confirmation read: works signed in or anonymously for a participant on the submission. */
 export function useSubmitSubmission(submissionId: string): Resource<SubmitSubmission> {
   const { token, initializing, initStarted } = useKeycloak();
+  const { tokenFor } = useCallToken();
+  // Pinned once signed in: after the session ends a read fails as ended rather than going out
+  // anonymously.
+  const [signedInHere, setSignedInHere] = useState(false);
+  if (token && !signedInHere) setSignedInHere(true);
+  const signedIn = signedInHere || !!token;
   // Wait for Keycloak to answer before reading. Before init, "no token" is the default rather than
   // an answer. The identity is part of the key so signing in does not read the anonymous copy.
   const ready = initStarted && !initializing && !!submissionId;
 
   const { data, error, isLoading, mutate } = useMaybeAuthedSWR(
-    ready ? ['submit-submission', submissionId, token ? 'user' : 'anonymous'] : null,
-    (authToken) => loadSubmitSubmission(authToken, submissionId),
+    ready ? ['submit-submission', submissionId, signedIn ? 'user' : 'anonymous'] : null,
+    () => loadSubmitSubmission(tokenFor(signedIn), submissionId),
   );
 
   const refresh = useCallback(async () => {

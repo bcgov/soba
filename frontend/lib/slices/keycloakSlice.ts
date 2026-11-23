@@ -13,10 +13,10 @@ let kcInstance: Keycloak.KeycloakInstance | null = null;
 // Distinguishes "the session ended" from "not booted yet": both leave kcInstance null, but only the
 // first means a caller's token is dead and must not be sent.
 let sessionEnded = false;
-// Set once a logout redirect starts, so a sign-in that clear() triggers cannot cancel it.
+// Set once a logout redirect starts, so signInAfterRefusal cannot cancel it.
 let loggingOut = false;
 
-/** The app's home page, where sign-in returns by default and logout always returns. */
+/** Home page: where logout returns, and sign-in on an existing instance given no address. */
 const homeUrl = (): string | undefined =>
   typeof window !== 'undefined' ? window.location.origin + getBasePath() : undefined;
 
@@ -152,10 +152,9 @@ export const { setToken, setIdTokenParsed, setAuthenticated, clear } = slice.act
 // Helper thunks
 /**
  * Signs in, returning to `redirectUri`. Without one, a new instance returns to the current page
- * (the keycloak-js default) and an existing one to the home page. Does nothing during a logout.
+ * (the keycloak-js default) and an existing one to the home page.
  */
 export const login = (redirectUri?: string) => async (dispatch: AppDispatch) => {
-  if (loggingOut) return;
   let kc: Keycloak.KeycloakInstance | null = kcInstance;
   try {
     if (!kc) {
@@ -186,6 +185,12 @@ export const login = (redirectUri?: string) => async (dispatch: AppDispatch) => 
       // no-op
     }
   }
+};
+
+/** Sign-in nobody asked for, after a refused read; skipped once a logout redirect starts. */
+export const signInAfterRefusal = (redirectUri: string) => async (dispatch: AppDispatch) => {
+  if (loggingOut) return;
+  await dispatch(login(redirectUri));
 };
 
 export const logout = () => (dispatch: AppDispatch) => {

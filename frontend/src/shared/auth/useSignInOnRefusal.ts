@@ -10,7 +10,13 @@ import { isUnauthorized } from '@/src/shared/api/dataError';
  * when signed in or Keycloak is down. Back from sign-in redirects again; a failed one keeps spinning.
  */
 export function useSignInOnRefusal(error: DataError | null): boolean {
-  const { authenticated, initializing, initStarted, error: keycloakError, login } = useKeycloak();
+  const {
+    authenticated,
+    initializing,
+    initStarted,
+    error: keycloakError,
+    signInAfterRefusal,
+  } = useKeycloak();
   const refused =
     initStarted &&
     !initializing &&
@@ -19,8 +25,8 @@ export function useSignInOnRefusal(error: DataError | null): boolean {
     isUnauthorized(error?.cause);
 
   useEffect(() => {
-    if (refused) void login(globalThis.location.href);
-  }, [refused, login]);
+    if (refused) void signInAfterRefusal(globalThis.location.href);
+  }, [refused, signInAfterRefusal]);
 
   return refused;
 }

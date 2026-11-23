@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   getSubmitFillBundle: vi.fn(),
   saveSobaFormSubmission: vi.fn(),
   submitSobaFormSubmission: vi.fn(),
+  signInAfterRefusal: vi.fn(),
   formData: {} as Record<string, unknown>,
   instance: {
     emit: vi.fn(),
@@ -36,6 +37,7 @@ const h = vi.hoisted(() => ({
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
     general: {
+      loading: 'Loading...',
       sessionExpired: 'Your session has ended.',
       noAccess: 'You do not have access.',
       version: 'Version',
@@ -103,6 +105,11 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   getSubmitFillBundle: (...args: unknown[]) => h.getSubmitFillBundle(...args),
   saveSobaFormSubmission: (...args: unknown[]) => h.saveSobaFormSubmission(...args),
   submitSobaFormSubmission: (...args: unknown[]) => h.submitSobaFormSubmission(...args),
+}));
+
+vi.mock('@/lib/slices/keycloakSlice', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/slices/keycloakSlice')>()),
+  signInAfterRefusal: (redirectUri: string) => () => h.signInAfterRefusal(redirectUri),
 }));
 
 vi.mock('@/src/features/formio-v5/useBcgovFileOption', () => ({
@@ -545,6 +552,22 @@ describe('FormioV5SubmissionFillClient', () => {
       ),
     );
     expect(screen.queryByText('Not authorized to access this submission')).not.toBeInTheDocument();
+  });
+
+  it('sends a signed-out visitor refused with 401 to sign in, back to this address', async () => {
+    globalThis.history.pushState(null, '', '/en/submit/sub-1');
+    h.getSubmitFillBundle.mockRejectedValue(
+      new ApiError('Not authorized to access this submission', 401, 'read_denied'),
+    );
+    await renderSignedOut();
+    await waitFor(() =>
+      expect(h.signInAfterRefusal).toHaveBeenCalledWith(
+        `${globalThis.location.origin}/en/submit/sub-1`,
+      ),
+    );
+    expect(screen.getByRole('progressbar', { name: 'Loading...' })).toBeInTheDocument();
+    expect(screen.queryByTestId('submission-view-loaderror')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('fill-form')).not.toBeInTheDocument();
   });
 
   it.each([

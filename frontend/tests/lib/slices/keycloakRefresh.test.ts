@@ -28,7 +28,7 @@ vi.mock('@/src/features/formio-v5/disableFormioBrowserAuth', () => ({
   disableFormioBrowserAuth: vi.fn(),
 }));
 
-const { initKeycloak, login, logout, refreshAccessToken, getKeycloakInstance } =
+const { initKeycloak, login, logout, refreshAccessToken, getKeycloakInstance, signInAfterRefusal } =
   await import('@/lib/slices/keycloakSlice');
 const { default: makeStore } = await import('@/lib/store');
 
@@ -137,24 +137,56 @@ describe('logout', () => {
     expect(kc.logout).toHaveBeenCalledWith({ redirectUri: `${window.location.origin}/chefs` });
   });
 
-  // clear() turns a page's reads anonymous; a sign-in started by their refusal would cancel logout.
-  it('ignores a sign-in started while the logout redirect is under way', async () => {
+  // keycloak-js resolves logout as soon as the redirect starts, while the page is still here.
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  // A read refused after logout's clear() would start a sign-in that cancels the logout.
+  it('skips the sign-in after a refusal while the logout redirect is under way', async () => {
     const store = await storeWithSession();
     store.dispatch(logout());
+    await settle();
 
-    await store.dispatch(login('http://app.test/en/submission/sub-1'));
+    await store.dispatch(signInAfterRefusal('http://app.test/en/submission/sub-1'));
 
     expect(kc.init).toHaveBeenCalledTimes(1);
     expect(kc.login).not.toHaveBeenCalled();
   });
 
-  it('allows sign-in again once Keycloak boots afresh', async () => {
+  // A logout the browser did not follow, such as one cancelled at the leave prompt.
+  it('still signs in when asked after a logout that did not leave the page', async () => {
+    const store = await storeWithSession();
+    store.dispatch(logout());
+    await settle();
+
+    await store.dispatch(login());
+
+    expect(kc.init).toHaveBeenCalledTimes(2);
+    expect(kc.init).toHaveBeenLastCalledWith(expect.objectContaining({ onLoad: 'login-required' }));
+  });
+
+  it('lets the sign-in after a refusal through once the logout fails', async () => {
+    const store = await storeWithSession();
+    kc.logout.mockRejectedValueOnce(new Error('logout failed'));
+    store.dispatch(logout());
+    await settle();
+
+    await store.dispatch(signInAfterRefusal('http://app.test/en/submission/sub-1'));
+
+    expect(kc.init).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        onLoad: 'login-required',
+        redirectUri: 'http://app.test/en/submission/sub-1',
+      }),
+    );
+  });
+
+  it('lets the sign-in after a refusal through once Keycloak boots afresh', async () => {
     const store = await storeWithSession();
     store.dispatch(logout());
     await store.dispatch(initKeycloak());
     kc.init.mockRejectedValueOnce(new Error("A 'Keycloak' instance can only be initialized once."));
 
-    await store.dispatch(login('http://app.test/en/submission/sub-1'));
+    await store.dispatch(signInAfterRefusal('http://app.test/en/submission/sub-1'));
 
     expect(kc.login).toHaveBeenCalledWith({ redirectUri: 'http://app.test/en/submission/sub-1' });
   });

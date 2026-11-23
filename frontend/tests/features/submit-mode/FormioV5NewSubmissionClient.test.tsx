@@ -14,7 +14,7 @@ const h = vi.hoisted(() => ({
   saveSobaFormSubmission: vi.fn(),
   submitSobaFormSubmission: vi.fn(),
   getSubmitFillBundle: vi.fn(),
-  login: vi.fn(),
+  signInAfterRefusal: vi.fn(),
   formData: {} as Record<string, unknown>,
   instance: {
     emit: vi.fn(),
@@ -117,7 +117,7 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 
 vi.mock('@/lib/slices/keycloakSlice', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/slices/keycloakSlice')>()),
-  login: (redirectUri?: string) => () => h.login(redirectUri),
+  signInAfterRefusal: (redirectUri: string) => () => h.signInAfterRefusal(redirectUri),
 }));
 
 vi.mock('@/src/features/formio-v5/useBcgovFileOption', () => ({
@@ -912,14 +912,32 @@ describe('FormioV5NewSubmissionClient', () => {
       new ApiError('Not authorized to submit this form', 401, 'open_denied'),
     );
     await renderPage();
-    await waitFor(() => expect(h.login).toHaveBeenCalledWith(globalThis.location.href));
+    await waitFor(() =>
+      expect(h.signInAfterRefusal).toHaveBeenCalledWith(
+        `${globalThis.location.origin}/en/form/form-1`,
+      ),
+    );
+    expect(screen.getByRole('progressbar', { name: 'Loading...' })).toBeInTheDocument();
     expect(screen.queryByTestId('new-submission-loaderror')).not.toBeInTheDocument();
     expect(screen.queryByTestId('fill-form')).not.toBeInTheDocument();
   });
 
+  it('says why when the form read is refused to a signed-in caller', async () => {
+    h.getSubmitForm.mockRejectedValue(
+      new ApiError('Not authorized to submit this form', 403, 'open_denied'),
+    );
+    await renderPage({ authenticated: true, token: 'token' });
+    await waitFor(() =>
+      expect(screen.getByTestId('new-submission-refused')).toHaveTextContent(
+        'You are not able to submit this form.',
+      ),
+    );
+    expect(h.signInAfterRefusal).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
-      'refused to a signed-in caller',
+      'refused with 403',
       new ApiError('Not authorized to submit this form', 403, 'open_denied'),
       'new-submission-refused',
       'You are not able to submit this form.',
