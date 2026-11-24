@@ -3,7 +3,7 @@ import type { Logger } from 'pino';
 import { NotificationOutcome } from '../../db/codes';
 import { JobCancelledError, type JobDeferredError } from '../../jobs/errors';
 import { deferUntilPauseEnds, deferUntilReset } from './emailBudget';
-import type { JobNotifications } from './JobNotifications';
+import type { EmailRoom, JobNotifications } from './JobNotifications';
 import type { SendEmail } from './NotificationAdapter';
 import { isRefusedSend } from './sendOutcome';
 
@@ -27,6 +27,13 @@ const normalize = (address: string): string => address.trim().toLowerCase();
 
 const isAddress = (address: string): boolean => EmailAddressSchema.safeParse(address).success;
 
+/** The wait the room calls for: until the provider's pause ends, or the reset when none is left. */
+const waitFor = ({ room, resetInMs, pauseLeftMs }: EmailRoom): JobDeferredError | null => {
+  if (pauseLeftMs !== null) return deferUntilPauseEnds(pauseLeftMs);
+  if (room === 0) return deferUntilReset(resetInMs);
+  return null;
+};
+
 /** Sends to each address in turn, reading the room before each send (see `sendEachAddress`). */
 const sendInTurn = async (
   { notifications, signal }: SendEachAddressContext,
@@ -36,11 +43,10 @@ const sendInTurn = async (
   const sendFrom = async (index: number, tally: Tally): Promise<Tally> => {
     if (index === addresses.length) return tally;
     signal.throwIfAborted();
-    const { room, resetInMs, pauseLeftMs } = await notifications.emailRoom();
+    const wait = waitFor(await notifications.emailRoom());
     // A stop that came during the read: another worker may hold the job now.
     signal.throwIfAborted();
-    if (pauseLeftMs !== null) return { ...tally, deferral: deferUntilPauseEnds(pauseLeftMs) };
-    if (room === 0) return { ...tally, deferral: deferUntilReset(resetInMs) };
+    if (wait) return { ...tally, deferral: wait };
     const result = await notifications.sendEmail({
       recipients: { to: [addresses[index]] },
       content,
@@ -64,6 +70,21 @@ const sendInTurn = async (
     return sendFrom(index + 1, { ...tally, sent: tally.sent + 1 });
   };
   return sendFrom(0, { sent: 0, refused: 0 });
+};
+
+/**
+ * Throws as `sendEachAddress` would before its first send: `JobCancelledError` while notifications
+ * are off, and a `JobDeferredError`, which uses no attempt, while there is no room today or the
+ * provider's pause lasts.
+ */
+export const assertCanSend = async ({
+  notifications,
+  signal,
+}: Pick<SendEachAddressContext, 'notifications' | 'signal'>): Promise<void> => {
+  if (!(await notifications.enabled())) throw new JobCancelledError(NOTIFICATIONS_OFF);
+  const wait = waitFor(await notifications.emailRoom());
+  signal.throwIfAborted();
+  if (wait) throw wait;
 };
 
 /**

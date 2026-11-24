@@ -18,6 +18,8 @@ export interface ConfirmModalProps {
   /** Holds the confirm button off, such as while the message waits on a read. */
   confirmDisabled?: boolean;
   danger?: boolean;
+  /** Off for a prompt that has to be answered rather than dismissed with Escape or a backdrop click. */
+  isDismissable?: boolean;
 }
 
 /** Prompt before an action that cannot be undone. */
@@ -32,6 +34,7 @@ export function ConfirmModal({
   pending = false,
   confirmDisabled = false,
   danger = false,
+  isDismissable,
 }: Readonly<ConfirmModalProps>) {
   const dict = useDictionary();
 
@@ -41,6 +44,7 @@ export function ConfirmModal({
       title={title}
       onClose={onCancel}
       size="sm"
+      isDismissable={isDismissable}
       footer={
         <>
           <Button

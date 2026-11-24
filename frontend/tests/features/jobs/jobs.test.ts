@@ -38,6 +38,31 @@ describe('job types', () => {
     expect(submissionJobTypes()).toContain('submission.email-copy');
   });
 
+  it.each([
+    ['en', en as Dictionary, 'Submit to Email', 'Submit to Email: emails'],
+    ['fr', fr as Dictionary, 'Soumettre par courriel', 'Soumettre par courriel : courriels'],
+  ])('names a Submit to Email job and its email step in %s', (_language, dict, build, email) => {
+    expect(jobTypeLabel('post-submission-email-package', dict)).toEqual({ text: build });
+    expect(jobTypeLabel('post-submission-email-package:email', dict)).toEqual({ text: email });
+  });
+
+  it("names a step this build does not know by the server's name, else its type, in English", () => {
+    const type = 'post-submission-email-package:other';
+    const types = [{ type, name: 'Submit to Email (other)' }];
+    expect(jobTypeLabel(type, en as Dictionary, types)).toEqual({
+      text: 'Submit to Email (other)',
+      lang: 'en',
+    });
+    expect(jobTypeLabel(type, en as Dictionary)).toEqual({ text: type, lang: 'en' });
+  });
+
+  it("lists an action's later steps after the action among a submission's job types", () => {
+    const types = submissionJobTypes();
+    const build = types.indexOf('post-submission-email-package');
+    expect(build).toBeGreaterThan(-1);
+    expect(types[build + 1]).toBe('post-submission-email-package:email');
+  });
+
   it("lists status changes and their emails among a submission's job types", () => {
     expect(submissionJobTypes()).toEqual(
       expect.arrayContaining(['submission.status-changed', 'submission.status-email']),

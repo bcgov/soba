@@ -214,17 +214,16 @@ test('User can validate job status, type and form dropdowns for a workspace', as
   await expect(typeDropdown).toHaveAttribute('aria-expanded', 'true');
   await expect(listbox).toBeVisible();
 
-  // Deployments with Submit to Email list both the action and its delivery step.
-  const submitToEmailTypes = ['Submit to Email', 'Submit to Email: emails'];
-  const hasSubmitToEmail = await listbox
-    .getByRole('option', { name: submitToEmailTypes[0], exact: true })
-    .isVisible();
-
+  const emailPackage = dictionaries.postSubmission.emailPackage;
   const expectedTypes = [
     dictionaries.jobs.allTypes,
     dictionaries.jobs.types.submissionSubmitted,
     dictionaries.postSubmission.email.label,
-    ...(hasSubmitToEmail ? submitToEmailTypes : []),
+    emailPackage.label,
+    // An action's later step is listed after the action, named "<action>: <step>".
+    dictionaries.jobs.types.actionStep
+      .replace('{action}', emailPackage.label)
+      .replace('{step}', emailPackage.emailStep),
     dictionaries.postSubmission.log.label,
     dictionaries.jobs.types.submissionStatusChanged,
     dictionaries.jobs.types.submissionStatusEmail,

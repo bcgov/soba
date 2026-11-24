@@ -4,7 +4,11 @@ import type {
   JobEmailResult,
   JobNotifications,
 } from '../../../../src/core/integrations/notification/JobNotifications';
-import { sendEachAddress } from '../../../../src/core/integrations/notification/sendEachAddress';
+import {
+  assertCanSend,
+  NOTIFICATIONS_OFF,
+  sendEachAddress,
+} from '../../../../src/core/integrations/notification/sendEachAddress';
 import { isRefusedSend } from '../../../../src/core/integrations/notification/sendOutcome';
 import {
   DAILY_LIMIT_REACHED,
@@ -374,5 +378,55 @@ describe('sendEachAddress', () => {
       run(['a@example.com', 'b@example.com'], fake.notifications, { signal: controller.signal }),
     ).rejects.toBe('lease_lost');
     expect(fake.recipients()).toEqual(['a@example.com']);
+  });
+});
+
+describe('assertCanSend', () => {
+  const check = (notifications: JobNotifications, signal = new AbortController().signal) =>
+    assertCanSend({ notifications, signal });
+
+  it('resolves while notifications are on and there is room', async () => {
+    await expect(check(fakeNotifications().notifications)).resolves.toBeUndefined();
+  });
+
+  it('cancels while notifications are off, without reading the room', async () => {
+    const fake = fakeNotifications({ enabled: false });
+
+    const stopped = await check(fake.notifications).catch((err: unknown) => err);
+
+    expect(stopped).toBeInstanceOf(JobCancelledError);
+    expect((stopped as Error).message).toBe(NOTIFICATIONS_OFF);
+    expect(fake.notifications.emailRoom).not.toHaveBeenCalled();
+  });
+
+  it('waits for the daily reset when no room is left today', async () => {
+    const deferral = await check(fakeNotifications({ room: 0 }).notifications).catch(
+      (err: unknown) => err,
+    );
+
+    expect(deferral).toBeInstanceOf(JobDeferredError);
+    expect((deferral as JobDeferredError).message).toBe(DAILY_LIMIT_REACHED);
+    expect((deferral as JobDeferredError).delayMs).toBeGreaterThanOrEqual(RESET_IN_MS);
+  });
+
+  it("waits out the provider's pause even with room left", async () => {
+    const deferral = await check(
+      fakeNotifications({ pauseLeftMs: PAUSE_LEFT_MS }).notifications,
+    ).catch((err: unknown) => err);
+
+    expect(deferral).toBeInstanceOf(JobDeferredError);
+    expect((deferral as JobDeferredError).message).toBe(PROVIDER_LIMIT_REACHED);
+    expect((deferral as JobDeferredError).delayMs).toBeGreaterThanOrEqual(PAUSE_LEFT_MS);
+  });
+
+  it("throws the runner's abort reason given while it read the room", async () => {
+    const controller = new AbortController();
+    const fake = fakeNotifications();
+    fake.notifications.emailRoom = jest.fn(() => {
+      controller.abort('lease_lost');
+      return Promise.resolve({ room: 3000, resetInMs: RESET_IN_MS, pauseLeftMs: null });
+    });
+
+    await expect(check(fake.notifications, controller.signal)).rejects.toBe('lease_lost');
   });
 });

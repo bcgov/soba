@@ -3,7 +3,7 @@ import type { Logger } from 'pino';
 import type { z } from 'zod';
 import type { PostSubmissionActionScope } from '@soba/lib';
 import type { JobPoolCode } from '../../config/env';
-import type { StoredJobResult } from '../../jobs/registry';
+import type { JobEmails, StoredJobResult } from '../../jobs/registry';
 import type { SendEmail } from '../notification/NotificationAdapter';
 import type { TempResource, TempStorageAdapter } from '../temp-storage/TempStorageAdapter';
 
@@ -59,21 +59,34 @@ export interface PostSubmissionActionNotifications {
     addresses: readonly string[],
     content: PostSubmissionActionEmailContent,
   ): Promise<void>;
+  /**
+   * Throws as `sendToEach` would before its first send: `JobCancelledError` while notifications are
+   * off, and `JobDeferredError` while there is no room today or the provider's pause lasts. Call it
+   * before work whose only use is an email, so that work waits too.
+   */
+  ready(): Promise<void>;
 }
 
 /** Which submits queue an action: every submit, or the submission's first only. */
 export type PostSubmissionActionSubmits = 'every' | 'first';
 
 /**
- * How a render ended: `ok` with the document; `no-template` when the form version has no CDOGS
+ * How a render ended: `ok` with the document and the name of the template file it was rendered
+ * from, such as `permit-report.docx`; `no-template` when the form version has no CDOGS
  * template; `unavailable` when no document generation backend serves the form; `busy` when every
  * render slot is taken; `refused` when the template is not renderable, the backend refused it or
  * the data, or the revision is not one of the submission's submitted revisions; `failed` when the
  * backend or the template's storage failed.
  */
 export type PostSubmissionActionRenderOutcome =
-  | { status: 'ok'; data: Buffer; contentType?: string }
+  | { status: 'ok'; data: Buffer; contentType?: string; templateName: string }
   | { status: 'no-template' | 'unavailable' | 'busy' | 'refused' | 'failed' };
+
+/** A render's status when it produced no document. */
+export type PostSubmissionActionRenderStop = Exclude<
+  PostSubmissionActionRenderOutcome['status'],
+  'ok'
+>;
 
 /** A file uploaded to the job's submission, open for reading. */
 export interface PostSubmissionActionUpload {
@@ -170,6 +183,8 @@ export interface PostSubmissionActionContext<TOptions> {
 /** How one step of an action runs as a job. */
 export interface PostSubmissionActionJobSettings<TOptions = Record<string, unknown>> {
   pool: JobPoolCode;
+  /** Set on a step that emails the `to` list in its options, so the Jobs pages count it. */
+  emails?: JobEmails;
   maxAttempts?: number;
   timeoutMs?: number;
   /**

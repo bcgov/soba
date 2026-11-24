@@ -132,6 +132,20 @@ describe('ScopedJobsPanel', () => {
     expect(sent.has('formId')).toBe(false);
   });
 
+  it("keeps a filter on an action's later step and sends it", async () => {
+    mockSearch.value = 'formJobs.type=post-submission-email-package%3Aemail';
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    const server = stubJobsServer(listJobs('/design/forms/f1/jobs', []));
+    await renderPanel(FORM_SCOPE);
+
+    await waitFor(() =>
+      expect(requests(server, '/design/forms/f1/jobs').at(-1)!.searchParams.get('type')).toBe(
+        'post-submission-email-package:email',
+      ),
+    );
+    expect(replaceState).not.toHaveBeenCalled();
+  });
+
   it("lists a workspace's jobs with their forms, and narrows to the form chosen", async () => {
     mockSearch.value = `workspaceJobs.formId=${FORM_ID}`;
     const server = stubJobsServer(

@@ -231,8 +231,12 @@ Notify's 100,000 a month over 31 days; 100 in PR environments), counting from mi
 `NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset). An email job past it waits
 until the next midnight. When Notify answers 429, every email job waits a minute, doubling with
 each 429 in a row, up to an hour. Each environment counts only its own sends, so environments that
-share a Notify key share its quota, and their limits together should stay under it. A
-`dailyLimit` outside 1 to 100000 fails the render; an invalid zone stops startup.
+share a Notify key share its quota, and their limits together should stay under it. Every backend
+pod reads the same count, but sends in flight together can pass the limit by up to the backend's
+pods times `JOB_LIGHT_CONCURRENCY` on a day that reaches it, so keep `dailyLimit` that far under
+3225 (100,000 / 31). Prod sets 3200: 6 pods at most, 4 light workers each, so at most 3224 a day.
+Lower it when either grows. A `dailyLimit` outside 1 to 100000 fails the render; an invalid zone
+stops startup.
 
 ### Secret values (Vault template in backend Deployment)
 
@@ -269,12 +273,16 @@ either key is missing.
 
 Actions that run after a submit are plugins, run as jobs while `backend.features.post-submission`
 is on; the After Submission tab shows on every workspace and form then. The list names the action
-codes this environment runs, comma-separated; with none listed, a submit queues no actions. Set in
-ConfigMap `<fullname>-backend-app` only when non-empty:
+codes this environment runs, comma-separated; with none listed, a submit queues no actions. A listed
+code with no installed plugin, or one whose settings keep it from loading, stops the backend from
+starting. Set in ConfigMap `<fullname>-backend-app` only when non-empty:
 
-| Helm value                                   | Env var                          | Used by                 |
-| -------------------------------------------- | -------------------------------- | ----------------------- |
-| `backend.config.postSubmissionActionPlugins` | `POST_SUBMISSION_ACTION_PLUGINS` | post-submission actions |
+| Helm value                                               | Env var                                               | Used by                       |
+| -------------------------------------------------------- | ----------------------------------------------------- | ----------------------------- |
+| `backend.config.postSubmissionActionPlugins`             | `POST_SUBMISSION_ACTION_PLUGINS`                      | post-submission actions       |
+| `backend.config.postSubmissionEmailPackageMaxFileMb`     | `PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_MAX_FILE_MB`    | post-submission-email-package |
+| `backend.config.postSubmissionEmailPackageMaxPackageMb`  | `PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_MAX_PACKAGE_MB` | post-submission-email-package |
+| `backend.config.postSubmissionEmailPackageRetentionDays` | `PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_RETENTION_DAYS` | post-submission-email-package |
 
 `post-submission-log` only logs that it ran. No environment lists it; a local run can.
 
@@ -282,11 +290,48 @@ ConfigMap `<fullname>-backend-app` only when non-empty:
 active notification plugin, within the daily email limit (see Notification Configuration); past
 it, the rest of a list waits for the next day. Its feature,
 `backend.features.post-submission-email`, applies to every workspace and form while its status is
-`enabled`. Every environment lists the plugin and enables both features. Dev, PR and test send
-through Notify test, which delivers only to its safelist. UAT and prod keep
-`backend.features.notifications` disabled, so email jobs there end cancelled; sending needs that
-feature enabled, `notificationDefaultCode: notify-v1`,
-`notification.notifyV1.endpoint`, and `PLUGIN_NOTIFY_V1_API_KEY` in the Vault secret.
+`enabled`. Every environment lists the plugin and enables both features. Dev, PR, test and UAT send
+through Notify test, which delivers only to its safelist; prod sends through Notify. Sending needs
+`backend.features.notifications` enabled, `notificationDefaultCode: notify-v1`,
+`notification.notifyV1.endpoint`, and `PLUGIN_NOTIFY_V1_API_KEY` in the Vault secret; without them,
+email jobs end cancelled.
+
+`post-submission-email-package` (Submit to Email) emails each address on a list of up to 100 a link
+to a package of a submission when it is first submitted: a zip of a PDF rendered with the form
+version's CDOGS template and the files uploaded with the submission. The package is built in temp
+storage, stored as the job's result in the job results storage, and downloaded only by signed-in
+users who can read the submission, while the feature is on for its form. Its emails count toward
+the daily email limit. A package is kept `postSubmissionEmailPackageRetentionDays` (default 7),
+counted again each time its email step starts. While that step has not succeeded, the package is
+kept until the step's job is deleted under `backend.jobs.deadRetentionDays` (default 90), so a
+re-run can still send it; deleting the submission frees it at the next sweep.
+
+Its feature, `backend.features.post-submission-email-package`, is scoped: while its status is
+`enabled`, it applies only to the workspaces and forms granted it on the Administration "Feature
+access" page (`/admin/feature-scopes`). Every environment lists the plugin and enables the feature,
+so it is off for each workspace and form until granted. PR keeps packages one day, with its other
+job results. Without notifications enabled, package jobs end cancelled before they build anything.
+To use it in a workspace or form:
+
+1. Grant the workspace or form on the Feature access page.
+2. Check that the job results storage works in that environment; UAT and prod have not stored a job
+   result yet.
+3. Give each form version that should send packages a CDOGS template. A submission to a version
+   without one sends nothing.
+4. On the granted workspace's or form's After Submission tab, turn Submit to Email on and add its
+   addresses.
+5. Optionally, set the size and retention settings in the table above. Empty keeps 25 MB per
+   upload, 100 MB per package and 7 days, and a value out of range fails the render.
+
+To turn it off:
+
+- At once, for some workspaces or forms: on the Feature access page, set their grants inactive or
+  delete them. Submits stop queuing packages, queued package jobs end cancelled when they start,
+  and links already emailed stop downloading.
+- Everywhere: set the status to `"disabled"` in the values file and deploy.
+
+Taking the code off `postSubmissionActionPlugins`, or turning `post-submission` off, stops new
+packages but leaves links already emailed working.
 
 To retire an action, take its code off the list first and remove its plugin in a later release.
 Jobs already queued for a plugin that no pod has stay queued.
@@ -294,7 +339,7 @@ Jobs already queued for a plugin that no pod has stay queued.
 The confirmation screen settings are gated by `backend.features.confirmation-screen`, and each
 setting by a feature of its own: `confirmation-email-copy` lets submitters email themselves a copy
 of their confirmation, and `confirmation-id-visibility` lets a form hide the Confirmation ID on its
-success page. All three are on in dev, PR and test and off in UAT and prod. Both settings default
+success page. All three are on in every environment. Both settings default
 on. Copies send only while `backend.features.notifications` is enabled.
 
 Copy requests are checked against hourly limits of their own; a request past one is refused with
@@ -314,10 +359,12 @@ render:
 
 A background job can keep one file it produced, such as a submission export. Result files are not
 virus-scanned: no one uploads them. They are kept for `backend.jobs.resultRetentionDays` (default 7)
-and removed by the job sweeper, as are the files of jobs that failed or were stopped. A job whose file
+and removed by the job sweeper, as are the files of jobs that failed or were stopped. Submit to
+Email packages are kept by rules of their own (see Post-Submission Action Configuration). A job whose file
 would pass `backend.jobs.resultMaxBytes` (default 200 MiB) fails. PR slots use 50 MiB and 1 day, as
 their file store volume is 1 Gi. A running CSV export stages its result and a spool of its ticked
-cells, which can be several times larger, in temp storage. With tempstorage-os that is the
+cells, which can be several times larger, in temp storage, and a package build stages its zip there,
+with a copy of any upload whose size is not known. With tempstorage-os that is the
 backend's `/tmp`, an emptyDir of `backend.tempStorage.tmpSizeLimit` (default 2Gi); past it the
 kubelet evicts the pod.
 
@@ -336,8 +383,8 @@ to start with a results profile that is not configured, and the chart fails on o
 recording it leaves the object behind, as can an interrupted multipart upload; a bucket lifecycle
 rule that aborts incomplete uploads and expires `jobs/` objects after the retention cleans those up.
 
-Submission export (`backend.features.submission-export`) is on in dev, PR and test and off in UAT and
-prod; the designer app's `featuresAllowed` lists it.
+Submission export (`backend.features.submission-export`) is on in every environment; the designer
+app's `featuresAllowed` lists it.
 
 ## Database Migration
 
@@ -632,14 +679,14 @@ product environment's appId) from Vault. A missing key keeps the backend pod fro
 [credential issuer](../../../docs/credential-issuer.md)
 for permissions, readiness limitations, and lifecycle behavior.
 
-The dev, PR, test and prod values files each declare their own issuer configuration. They use
+The dev, PR, test, UAT and prod values files each declare their own issuer configuration. They use
 `https://api.gov.bc.ca/ds/api/v3` for the Directory API and
 `https://authz.apps.gov.bc.ca/auth/realms/aps/protocol/openid-connect/token` for service-account tokens.
 The gateway service's public route is the URL consumers call; it is not the Directory API URL.
 
-Dev, PR and test run `aps-credential-issuer-v3` with `backend.features.api-keys` on; the others run
-`credential-issuer-noop` with the feature off. PRs read dev's Vault secret, so they share dev's gateway ID
-and product environment appId, and a key made on a PR stays in dev's gateway after the PR closes. Follow
+Every environment runs `aps-credential-issuer-v3` with `backend.features.api-keys` on. PRs read
+dev's Vault secret, so they share dev's gateway ID and product environment appId, and a key made on
+a PR stays in dev's gateway after the PR closes. Follow
 [Obtain the product environment appId](../../../docs/credential-issuer.md#obtain-the-product-environment-appid)
 to log in to the Portal, query products for the deployment's gateway in the API console, and copy
 the appropriate service's `environments[].appId` into its Vault secret.

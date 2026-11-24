@@ -1,5 +1,8 @@
 import type { Logger } from 'pino';
-import { sendEachAddress } from '../../core/integrations/notification/sendEachAddress';
+import {
+  assertCanSend,
+  sendEachAddress,
+} from '../../core/integrations/notification/sendEachAddress';
 import type { PostSubmissionActionNotifications } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
 import type { JobFacts } from '../../core/jobs/facts';
 import { getSystemUser } from '../../core/services/systemUser';
@@ -27,4 +30,5 @@ export const actionNotifications = (
       addresses,
       content,
     ),
+  ready: () => assertCanSend({ notifications: jobNotifications(job, systemUserId), signal }),
 });

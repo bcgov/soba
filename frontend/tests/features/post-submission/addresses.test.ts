@@ -4,7 +4,7 @@ import {
   addressesOf,
   splitAddresses,
   withAddresses,
-} from '@/src/features/post-submission/actions/email/addresses';
+} from '@/src/features/post-submission/actions/addressList/addresses';
 
 describe('splitAddresses', () => {
   it('splits a typed or pasted list on commas, semicolons and spaces', () => {
@@ -65,7 +65,7 @@ describe('addAddresses', () => {
   });
 });
 
-describe('the email options', () => {
+describe('the address-list options', () => {
   const values = { enabled: false, options: {} };
 
   it('keeps no options for an empty list', () => {

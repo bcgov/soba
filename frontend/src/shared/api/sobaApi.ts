@@ -50,6 +50,7 @@ export {
   listSobaSubmissionExports,
   stopSobaSubmissionExport,
   downloadSobaSubmissionExport,
+  downloadSobaSubmissionPackage,
 } from './sobaApiDesign';
 // Submit-mode (public-capable, /submit/*)
 export {

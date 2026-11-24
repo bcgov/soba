@@ -23,6 +23,7 @@ export const postSubmissionActionPluginDefinition: PostSubmissionActionPluginDef
     optionsSchema: PostSubmissionEmailAddressesOptionsSchema,
     job: {
       pool: JobPool.light,
+      emails: { recipients: 'options' },
       // About an hour of retries at the default backoff, to ride out a provider outage.
       maxAttempts: 8,
       timeoutMs: 300_000,

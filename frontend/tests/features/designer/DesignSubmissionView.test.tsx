@@ -9,10 +9,12 @@ import { ApiErrorCodes } from '@soba/lib';
 import { navLink } from '@/src/shared/list/listQueryMemory';
 import { SubmissionReviewStatuses } from '@/src/types/submissionReview';
 
-const { mockPush, leaveWarning } = vi.hoisted(() => ({
-  mockPush: vi.fn(),
-  leaveWarning: vi.fn(),
-}));
+const { mockPush, leaveWarning } = vi.hoisted(() => {
+  // The leave guard calls it once the person agrees, and re-registers whenever it changes, so it
+  // keeps one identity, as the real one does.
+  const release = () => undefined;
+  return { mockPush: vi.fn(), leaveWarning: vi.fn(() => release) };
+});
 
 vi.mock('@/src/shared/hooks/useLeaveWarning', () => ({ useLeaveWarning: leaveWarning }));
 
@@ -923,6 +925,26 @@ describe('DesignSubmissionView staff edits', () => {
 
       expect(mockPush).not.toHaveBeenCalled();
       expect(screen.getByTestId('submission-edit-update')).toBeEnabled();
+    });
+
+    it('asks before a link elsewhere loses changed answers', async () => {
+      const user = userEvent.setup();
+      await renderView({ submissionId: SUBMISSION_ID });
+      const link = document.body.appendChild(document.createElement('a'));
+      link.href = '/en/forms';
+      // Records the link being followed; a held click never reaches it.
+      const followed = vi.fn((event: MouseEvent) => event.preventDefault());
+      link.addEventListener('click', followed);
+
+      await user.click(await screen.findByTestId('submission-edit'));
+      await user.click(screen.getByTestId('submission-edit-form'));
+      await user.click(link);
+
+      expect(await screen.findByTestId('confirm-modal-confirm')).toBeInTheDocument();
+      expect(followed).not.toHaveBeenCalled();
+      await user.click(screen.getByTestId('confirm-modal-confirm'));
+      expect(followed).toHaveBeenCalledTimes(1);
+      link.remove();
     });
 
     it('goes back once the loss is confirmed', async () => {

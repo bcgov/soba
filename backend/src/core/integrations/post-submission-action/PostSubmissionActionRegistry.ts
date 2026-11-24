@@ -7,9 +7,6 @@ export const getEnabledPostSubmissionActionCodes = (): string[] => [
   ...new Set(env.getPostSubmissionActionPlugins()),
 ];
 
-/** The job type of an action's step after the first: the action's code, then the step's name. */
-export const actionStepType = (code: string, name: string): string => `${code}:${name}`;
-
 /** The installed action plugins this environment enables, in POST_SUBMISSION_ACTION_PLUGINS order. */
 export const getPostSubmissionActions = (): PostSubmissionActionPluginDefinition[] => {
   const enabled = getEnabledPostSubmissionActionCodes();
@@ -21,6 +18,22 @@ export const getPostSubmissionActions = (): PostSubmissionActionPluginDefinition
     const definition = installed.get(code);
     return definition ? [definition] : [];
   });
+};
+
+/**
+ * Throws when POST_SUBMISSION_ACTION_PLUGINS names a code with no installed plugin, such as one that
+ * failed to load, since a submission received meanwhile would never queue that action.
+ */
+export const assertPostSubmissionActionsInstalled = (): void => {
+  const installed = new Set(
+    getPostSubmissionActionPluginDefinitions().map((plugin) => plugin.code),
+  );
+  const missing = getEnabledPostSubmissionActionCodes().filter((code) => !installed.has(code));
+  if (missing.length > 0) {
+    throw new Error(
+      `POST_SUBMISSION_ACTION_PLUGINS names plugins that are not installed or did not load: ${missing.join(', ')}`,
+    );
+  }
 };
 
 /** An enabled, installed action plugin by code. */

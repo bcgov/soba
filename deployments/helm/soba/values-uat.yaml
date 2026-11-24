@@ -9,6 +9,7 @@ backend:
     notifications: "enabled"
     post-submission: "enabled"
     post-submission-email: "enabled"
+    post-submission-email-package: "enabled"
     submission-export: "enabled"
     user-search: "enabled"
   replicas: 3
@@ -36,7 +37,7 @@ backend:
     notificationDefaultCode: notify-v1
     userSearchPlugins: css-v1,user-search-soba
     # Emails go through Notify test, which only delivers to its safelist.
-    postSubmissionActionPlugins: post-submission-email-addresses
+    postSubmissionActionPlugins: post-submission-email-addresses,post-submission-email-package
   credentialIssuer:
     apsCredentialIssuerV3:
       apiBaseUrl: https://api.gov.bc.ca/ds/api/v3
@@ -68,7 +69,7 @@ frontend:
   resources:
     requests:
       cpu: 85m
-      memory: 384Mi
+      memory: 256Mi
     limits:
       cpu: "1"
       memory: 1Gi

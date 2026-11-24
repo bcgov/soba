@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { SWRConfig } from 'swr';
 import en from '@/dictionaries/en.json';
+import fr from '@/dictionaries/fr.json';
 import type { Dictionary } from '@/src/types/dictionary';
 import type { PostSubmissionActionValues } from '@/src/types/postSubmission';
 import { ApiError } from '@/src/shared/api/sobaHelpers';
@@ -28,27 +29,26 @@ import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import WorkspaceActionDrawer from '@/src/features/post-submission/ui/WorkspaceActionDrawer';
 import { emailAddressesAction } from '@/src/features/post-submission/actions/email';
+import { addressListAction } from '@/src/features/post-submission/actions/addressList';
+import { emailPackageAction } from '@/src/features/post-submission/actions/email-package';
+import type { PostSubmissionActionUi } from '@/src/features/post-submission/actions/types';
 
 const dict: Dictionary = en;
-const t = en.postSubmission.email;
+const t = en.postSubmission.addressList;
+const { required } = en.postSubmission.email;
 const CODE = 'post-submission-email-addresses';
 
 const saved = (values: PostSubmissionActionValues, version = 1) => ({ values, version });
 
 let store: ReturnType<typeof makeStore>;
 
-function renderDrawer() {
+function renderDrawer(ui: PostSubmissionActionUi = emailAddressesAction, code = CODE) {
   return render(
     <Provider store={store}>
       <SWRConfig
         value={{ provider: () => new Map(), dedupingInterval: 0, shouldRetryOnError: false }}
       >
-        <WorkspaceActionDrawer
-          dict={dict}
-          workspaceId="ws1"
-          code={CODE}
-          ui={emailAddressesAction}
-        />
+        <WorkspaceActionDrawer dict={dict} workspaceId="ws1" code={code} ui={ui} />
       </SWRConfig>
     </Provider>,
   );
@@ -90,6 +90,9 @@ describe('WorkspaceActionDrawer with the email action', () => {
     expect(chips()).toEqual(['team@example.com']);
     expect(list()).toHaveTextContent('Addresses: 1 / 100');
     expect(enabledBox()).toBeChecked();
+    expect(screen.getByTestId('post-submission-email-help')).toHaveTextContent(
+      en.postSubmission.email.help,
+    );
   });
 
   it('adds what is typed on Enter without saving the drawer', async () => {
@@ -248,8 +251,8 @@ describe('WorkspaceActionDrawer with the email action', () => {
     await loaded();
     await user.click(enabledBox());
 
-    expect(list()).toHaveTextContent(t.required);
-    expect(screen.getByTestId('post-submission-email-status')).toHaveTextContent(t.required);
+    expect(list()).toHaveTextContent(required);
+    expect(screen.getByTestId('post-submission-email-status')).toHaveTextContent(required);
     expect(saveButton()).toBeDisabled();
   });
 
@@ -259,7 +262,7 @@ describe('WorkspaceActionDrawer with the email action', () => {
     await user.click(removeButton('team@example.com'));
 
     expect(screen.getByTestId('post-submission-email-status')).toHaveTextContent(
-      `Removed: team@example.com ${t.required}`,
+      `Removed: team@example.com ${required}`,
     );
   });
 
@@ -295,5 +298,102 @@ describe('WorkspaceActionDrawer with the email action', () => {
       }),
     );
     expect(chips()).toEqual(['mine@example.com']);
+  });
+});
+
+describe('WorkspaceActionDrawer with another address-list action', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store = makeStore();
+    store.dispatch(setToken('token'));
+    store.dispatch(setAuthenticated(true));
+  });
+
+  const other = addressListAction({
+    copy: () => ({
+      label: 'Other action',
+      description: 'Sends something else.',
+      enabled: 'Send it',
+      help: 'Each address gets something else.',
+      required: 'Add an address for it.',
+    }),
+    testIdPrefix: 'other',
+    notices: (_dict, scope) => [
+      { key: 'note', variant: 'warning', text: `A note for the ${scope}` },
+    ],
+  });
+
+  it("uses the action's own words, test ids and notes for the workspace", async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(saved({ enabled: false, options: {} }));
+    renderDrawer(other);
+    const field = () => screen.getByTestId('other-input').querySelector('input') as HTMLElement;
+    await waitFor(() => expect(field()).toBeEnabled());
+
+    expect(screen.getByTestId(`accordion-${CODE}`)).toHaveTextContent('Other action');
+    expect(screen.getByTestId(`${CODE}-description`)).toHaveTextContent('Sends something else.');
+    expect(screen.getByTestId(`${CODE}-notice-note`)).toHaveTextContent('A note for the workspace');
+    expect(screen.getByTestId(`${CODE}-notice-note`)).toHaveClass('warning');
+    expect(screen.getByTestId('other-help')).toHaveTextContent('Each address gets something else.');
+    expect(screen.getByTestId('other-enabled')).toHaveTextContent('Send it');
+    expect(screen.queryByTestId('post-submission-email-input')).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('other-enabled').querySelector('input') as HTMLElement);
+    expect(screen.getByTestId('other-list')).toHaveTextContent('Add an address for it.');
+    expect(screen.getByTestId('other-status')).toHaveTextContent('Add an address for it.');
+
+    await user.type(field(), 'a@example.com{Enter}');
+    await user.type(field(), 'a@example.com{Enter}');
+    expect(screen.getAllByTestId('other-chip').map((chip) => chip.textContent)).toEqual([
+      'a@example.com',
+    ]);
+    expect(screen.getByTestId('other-duplicates')).toHaveTextContent('a@example.com');
+    expect(screen.queryByTestId('post-submission-email-chip')).not.toBeInTheDocument();
+  });
+});
+
+describe('WorkspaceActionDrawer with Submit to Email', () => {
+  const PACKAGE = 'post-submission-email-package';
+  const pkg = en.postSubmission.emailPackage;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store = makeStore();
+    store.dispatch(setToken('token'));
+    store.dispatch(setAuthenticated(true));
+    mockSetSettings.mockImplementation((_token, _ws, _key, body) => Promise.resolve(body));
+  });
+
+  it("shows its warning and the workspace's template note, and saves the workspace's list", async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(saved({ enabled: false, options: {} }));
+    renderDrawer(emailPackageAction, PACKAGE);
+    const field = () =>
+      screen.getByTestId(`${PACKAGE}-input`).querySelector('input') as HTMLElement;
+    await waitFor(() => expect(field()).toBeEnabled());
+
+    expect(mockGetSettings).toHaveBeenCalledWith('token', 'ws1', `post-submission/${PACKAGE}`);
+    expect(screen.getByTestId(`accordion-${PACKAGE}`)).toHaveTextContent(pkg.label);
+    expect(screen.getByTestId(`${PACKAGE}-notice-privacy`)).toHaveTextContent(pkg.privacyNotice);
+    expect(screen.getByTestId(`${PACKAGE}-notice-template`)).toHaveTextContent(
+      pkg.templateNoticeWorkspace,
+    );
+    expect(screen.queryAllByTestId(new RegExp(`^${PACKAGE}-notice-`))).toHaveLength(2);
+    // The workspace drawer shows the form drawer's help, so it names no form in particular.
+    expect(screen.getByTestId(`${PACKAGE}-help`)).toHaveTextContent(pkg.help);
+    expect(pkg.help).not.toMatch(/this form/i);
+    expect(fr.postSubmission.emailPackage.help).not.toMatch(/ce formulaire/i);
+
+    await user.click(
+      screen.getByTestId(`${PACKAGE}-enabled`).querySelector('input') as HTMLElement,
+    );
+    await user.type(field(), 'staff@gov.bc.ca{Enter}');
+    await user.click(screen.getByTestId(`form-settings-${PACKAGE}-save`));
+
+    await waitFor(() => expect(mockSetSettings).toHaveBeenCalledTimes(1));
+    expect(mockSetSettings.mock.calls[0][3]).toEqual({
+      values: { enabled: true, options: { to: ['staff@gov.bc.ca'] } },
+      version: 1,
+    });
   });
 });
