@@ -6,7 +6,7 @@ global:
 backend:
   # Development data generator: stated explicitly rather than left to the default.
   features:
-    api-keys: "disabled"
+    api-keys: "enabled"
     confirmation-email-copy: "enabled"
     confirmation-id-visibility: "enabled"
     confirmation-screen: "enabled"
@@ -14,7 +14,7 @@ backend:
     notifications: "enabled"
     post-submission: "enabled"
     post-submission-email: "enabled"
-    post-submission-email-package: "disabled"
+    post-submission-email-package: "enabled"
     submission-export: "enabled"
     user-search: "enabled"
   replicas: 3
@@ -40,8 +40,7 @@ backend:
     # Needs the clamav release (deployments/helm/clamav, values-prod.yaml) in this namespace.
     virusScanDefaultCode: virusscan-clamav
     tenantEngineDefaultCode: cstar-v1
-    # Switch to aps-credential-issuer-v3 after adding the Vault keys.
-    credentialIssuerDefaultCode: credential-issuer-noop
+    credentialIssuerDefaultCode: aps-credential-issuer-v3
     cacheDefaultCode: cache-redis
     messagebusDefaultCode: messagebus-redis
     eventStreamDefaultCode: eventstream-redis

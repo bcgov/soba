@@ -11,7 +11,7 @@ backend:
     notifications: "enabled"
     post-submission: "enabled"
     post-submission-email: "enabled"
-    post-submission-email-package: "disabled"
+    post-submission-email-package: "enabled"
     submission-export: "enabled"
     user-search: "enabled"
   replicas: 2

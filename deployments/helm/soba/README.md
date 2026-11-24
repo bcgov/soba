@@ -290,11 +290,11 @@ starting. Set in ConfigMap `<fullname>-backend-app` only when non-empty:
 active notification plugin, within the daily email limit (see Notification Configuration); past
 it, the rest of a list waits for the next day. Its feature,
 `backend.features.post-submission-email`, applies to every workspace and form while its status is
-`enabled`. Every environment lists the plugin and enables both features. Dev, PR and test send
-through Notify test, which delivers only to its safelist. UAT and prod keep
-`backend.features.notifications` disabled, so email jobs there end cancelled; sending needs that
-feature enabled, `notificationDefaultCode: notify-v1`,
-`notification.notifyV1.endpoint`, and `PLUGIN_NOTIFY_V1_API_KEY` in the Vault secret.
+`enabled`. Every environment lists the plugin and enables both features. Dev, PR, test and UAT send
+through Notify test, which delivers only to its safelist; prod sends through Notify. Sending needs
+`backend.features.notifications` enabled, `notificationDefaultCode: notify-v1`,
+`notification.notifyV1.endpoint`, and `PLUGIN_NOTIFY_V1_API_KEY` in the Vault secret; without them,
+email jobs end cancelled.
 
 `post-submission-email-package` (Submit to Email) emails each address on a list of up to 100 a link
 to a package of a submission when it is first submitted: a zip of a PDF rendered with the form
@@ -308,21 +308,19 @@ re-run can still send it; deleting the submission frees it at the next sweep.
 
 Its feature, `backend.features.post-submission-email-package`, is scoped: while its status is
 `enabled`, it applies only to the workspaces and forms granted it on the Administration "Feature
-access" page (`/admin/feature-scopes`). Dev, PR, test, UAT and prod list the plugin. Dev and PR
-enable the feature; test, UAT and prod keep it `disabled`. PR keeps packages one day, with its other
-job results. To turn it on in an environment:
+access" page (`/admin/feature-scopes`). Every environment lists the plugin and enables the feature,
+so it is off for each workspace and form until granted. PR keeps packages one day, with its other
+job results. Without notifications enabled, package jobs end cancelled before they build anything.
+To use it in a workspace or form:
 
-1. Set `backend.features.post-submission-email-package: "enabled"` in its values file and deploy;
-   the migration job applies the status.
-2. Grant the workspaces or forms that should use it on the Feature access page.
-3. For the emails to go out, enable `backend.features.notifications` with notify-v1, as above.
-   Until then, package jobs end cancelled before they build anything.
-4. Check that the job results storage works there; UAT and prod have not stored a job result yet.
-5. Give each form version that should send packages a CDOGS template. A submission to a version
+1. Grant the workspace or form on the Feature access page.
+2. Check that the job results storage works in that environment; UAT and prod have not stored a job
+   result yet.
+3. Give each form version that should send packages a CDOGS template. A submission to a version
    without one sends nothing.
-6. On a granted workspace's or form's After Submission tab, turn Submit to Email on and add its
+4. On the granted workspace's or form's After Submission tab, turn Submit to Email on and add its
    addresses.
-7. Optionally, set the size and retention settings in the table above. Empty keeps 25 MB per
+5. Optionally, set the size and retention settings in the table above. Empty keeps 25 MB per
    upload, 100 MB per package and 7 days, and a value out of range fails the render.
 
 To turn it off:
@@ -341,7 +339,7 @@ Jobs already queued for a plugin that no pod has stay queued.
 The confirmation screen settings are gated by `backend.features.confirmation-screen`, and each
 setting by a feature of its own: `confirmation-email-copy` lets submitters email themselves a copy
 of their confirmation, and `confirmation-id-visibility` lets a form hide the Confirmation ID on its
-success page. All three are on in dev, PR and test and off in UAT and prod. Both settings default
+success page. All three are on in every environment. Both settings default
 on. Copies send only while `backend.features.notifications` is enabled.
 
 Copy requests are checked against hourly limits of their own; a request past one is refused with
@@ -385,8 +383,8 @@ to start with a results profile that is not configured, and the chart fails on o
 recording it leaves the object behind, as can an interrupted multipart upload; a bucket lifecycle
 rule that aborts incomplete uploads and expires `jobs/` objects after the retention cleans those up.
 
-Submission export (`backend.features.submission-export`) is on in dev, PR and test and off in UAT and
-prod; the designer app's `featuresAllowed` lists it.
+Submission export (`backend.features.submission-export`) is on in every environment; the designer
+app's `featuresAllowed` lists it.
 
 ## Database Migration
 
@@ -681,14 +679,14 @@ product environment's appId) from Vault. A missing key keeps the backend pod fro
 [credential issuer](../../../docs/credential-issuer.md)
 for permissions, readiness limitations, and lifecycle behavior.
 
-The dev, PR, test and prod values files each declare their own issuer configuration. They use
+The dev, PR, test, UAT and prod values files each declare their own issuer configuration. They use
 `https://api.gov.bc.ca/ds/api/v3` for the Directory API and
 `https://authz.apps.gov.bc.ca/auth/realms/aps/protocol/openid-connect/token` for service-account tokens.
 The gateway service's public route is the URL consumers call; it is not the Directory API URL.
 
-Dev, PR and test run `aps-credential-issuer-v3` with `backend.features.api-keys` on; the others run
-`credential-issuer-noop` with the feature off. PRs read dev's Vault secret, so they share dev's gateway ID
-and product environment appId, and a key made on a PR stays in dev's gateway after the PR closes. Follow
+Every environment runs `aps-credential-issuer-v3` with `backend.features.api-keys` on. PRs read
+dev's Vault secret, so they share dev's gateway ID and product environment appId, and a key made on
+a PR stays in dev's gateway after the PR closes. Follow
 [Obtain the product environment appId](../../../docs/credential-issuer.md#obtain-the-product-environment-appid)
 to log in to the Portal, query products for the deployment's gateway in the API console, and copy
 the appropriate service's `environments[].appId` into its Vault secret.
