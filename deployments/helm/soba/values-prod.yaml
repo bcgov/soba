@@ -77,6 +77,8 @@ backend:
       apiBaseUrl: https://workflow.apps.gold.devops.gov.bc.ca/api/v1
 
 frontend:
+  externalHosts:
+    - submit.api.gov.bc.ca
   replicas: 3
   resources:
     requests:

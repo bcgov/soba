@@ -486,7 +486,10 @@ first label outright instead: prod uses `submit`, for `submit.<domain>` and `sub
 Each `frontend.apps` entry renders its own Deployment/Service/Route/ConfigMap, differing by
 `featuresAllowed` (the mode) and `routePath` (the URL). They share an image repository, but
 the tag carries the app name: Next bakes `basePath` at build time, so each path needs its own
-image. The backend `CORS_ORIGIN` defaults to the shared frontend origin; set
+image. The backend `CORS_ORIGIN` defaults to the shared frontend origin plus `https://<host>` for
+each `frontend.externalHosts` entry: hosts that serve the apps from outside the chart, such as the
+API gateway or a vanity domain (each environment's values file lists them; PRs use dev's). Pages
+loaded there still call the backend's Route, so they need that origin. Set
 `backend.config.corsOrigin` to override.
 
 ### Route annotations

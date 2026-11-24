@@ -127,10 +127,15 @@ Usage: {{ include "soba.frontendAppUrlFor" (dict "root" $root "name" "forms") }}
 {{- end }}
 
 {{/*
-The https:// origin every frontend app shares. Feeds the backend CORS allowlist.
+Comma-separated https:// origins the frontend apps are served from: their own host plus every
+frontend.externalHosts entry. Feeds the backend CORS allowlist.
 */}}
 {{- define "soba.frontendOrigins" -}}
-{{- printf "https://%s" (include "soba.frontendHost" .) -}}
+{{- $origins := list (printf "https://%s" (include "soba.frontendHost" .)) -}}
+{{- range .Values.frontend.externalHosts }}
+{{- $origins = append $origins (printf "https://%s" .) -}}
+{{- end }}
+{{- join "," $origins -}}
 {{- end }}
 
 {{/*
