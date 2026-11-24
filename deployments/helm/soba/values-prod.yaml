@@ -69,7 +69,9 @@ frontend:
   resources:
     requests:
       cpu: 250m
-      memory: 512Mi
+      # An idle frontend pod uses about 100Mi; the 1Gi limit covers spikes. Six pods per app at full
+      # autoscale have to fit the namespace's 32Gi request quota alongside ClamAV, Mongo and Postgres.
+      memory: 256Mi
     limits:
       cpu: "1"
       memory: 1Gi
