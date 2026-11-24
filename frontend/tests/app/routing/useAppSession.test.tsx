@@ -10,7 +10,7 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
 }));
 
 import makeStore from '@/lib/store';
-import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
+import { initKeycloak, setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import { useAppSession } from '@/src/app/routing/useAppSession';
 
 let store: ReturnType<typeof makeStore>;
@@ -55,6 +55,16 @@ describe('useAppSession', () => {
     expect(result.current.sessionLoadedOnce).toBe(true);
     expect(result.current.hasWorkspaces).toBe(true);
     expect(result.current.canCreateWorkspace).toBe(true);
+    expect(result.current.authUnavailable).toBe(false);
+  });
+
+  // The guard reads this to send a signed-out visitor home instead of to a sign-in that cannot load.
+  it('reports sign-in unavailable when Keycloak failed to start', () => {
+    store.dispatch(setAuthenticated(false));
+    store.dispatch(initKeycloak.rejected(null, 'init', undefined, 'Keycloak is down'));
+    const { result } = renderHook(() => useAppSession(), { wrapper });
+    expect(result.current.authUnavailable).toBe(true);
+    expect(result.current.authenticated).toBe(false);
   });
 
   it('fails the session when the current user read fails', async () => {
