@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { test, expect } from '../fixtures/form_setup';
 import dictionaries from '../../../frontend/dictionaries/en.json';
 import { openAuthenticatedPage } from '../support/open_authenticated_page';
@@ -211,6 +212,7 @@ test('User can validate job status, type and form dropdowns for a workspace', as
   const typeDropdown = page.getByTestId('jobs-type-filter').getByRole('button');
   await typeDropdown.click();
   await expect(typeDropdown).toHaveAttribute('aria-expanded', 'true');
+  await expect(listbox).toBeVisible();
 
   const emailPackage = dictionaries.postSubmission.emailPackage;
   const expectedTypes = [
@@ -254,31 +256,34 @@ test('User can validate job status, type and form dropdowns for a workspace', as
 });
 
 test('User can manage access drawer settings for a workspace', async ({ page }) => {
-  await page.getByTestId('workspace-permissions-tab').click();
-  await expect(page.getByTestId('workspace-permissions-tab')).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
-  const accessDrawer = page.getByTestId('accordion-workspace-access');
-  await expect(
-    accessDrawer.getByRole('button', { name: dictionaries.workspaces.accessTab, exact: true }),
-  ).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.getByRole('textbox', { name: 'Search' })).toBeVisible();
-  await page.getByTestId('search-ws-access-button').click();
-  await page.getByRole('textbox', { name: 'Search' }).fill('nimya');
-  await page.getByTestId('search-ws-access-button').click();
+  const accessTab = page
+    .getByTestId('workspace-permissions-tab')
+    .or(page.getByTestId('workspace-access-tab'));
+  await accessTab.click();
+  await expect(accessTab).toHaveAttribute('aria-selected', 'true');
+
+  const accessContent = page
+    .getByTestId('workspace-access-drawer-content')
+    .or(page.getByTestId('workspace-access-tab-content'));
+  const searchBox = accessContent.getByRole('textbox', { name: /search/i });
+  const searchButton = accessContent.getByTestId('search-ws-access-button');
+  await expect(searchBox).toBeVisible();
+  await searchButton.click();
+  await searchBox.fill('nimya');
+  await searchButton.click();
   await expect(page).toHaveURL((url) => url.searchParams.get('workspaceAccess.q') === 'nimya');
-  const existingMember = page.getByRole('row').filter({
+  const existingMember = accessContent.getByRole('row').filter({
     has: page.getByRole('cell', { name: 'nimya.1.john@gov.bc.ca', exact: true }),
   });
-  await expect(existingMember.or(accessDrawer.getByTestId('datatable-empty'))).toBeVisible();
+  const emptyTable = accessContent.getByTestId('datatable-empty');
+  await expect(existingMember.or(emptyTable)).toBeVisible();
   const alreadyMember = (await existingMember.count()) > 0;
   if (!alreadyMember) {
-    await expect(accessDrawer.getByTestId('datatable-empty')).toHaveText(
+    await expect(emptyTable).toHaveText(
       'No one in a group matches your search. Show all workspace members to search everyone.',
     );
   }
-  const addPersonButton = page.getByTestId('add-ws-member-button');
+  const addPersonButton = accessContent.getByTestId('add-ws-member-button');
   await expect(addPersonButton).toBeVisible();
   await addPersonButton.click();
   const emailDropdown = page.getByRole('button', { name: 'Email' });
@@ -336,12 +341,13 @@ test('User can manage access drawer settings for a workspace', async ({ page }) 
   }
   // The search is still filtered to this person, so the owner is not in these results.
   const memberRow = existingMember;
+  const removeMember = memberRow.getByTestId(/^remove-member-button-/);
   await expect(memberRow).toBeVisible();
-  await expect(memberRow.getByRole('button', { name: 'Remove' })).toBeVisible();
+  await expect(removeMember).toBeVisible();
   await expect(memberRow).toContainText('NIMJOHN');
   await expect(memberRow).toContainText('Viewer');
   if (!alreadyMember) await expect(memberRow).toContainText('Form submitters');
-  await memberRow.getByRole('button', { name: 'Edit' }).click();
+  await memberRow.getByTestId(/^edit-member-button-/).click();
   const editForm = page.getByTestId('workspace-member-edit-form');
   if (await editForm.getByRole('checkbox', { name: 'Form submitters', exact: true }).isChecked()) {
     await editForm.getByText('Form submitters', { exact: true }).click();
@@ -359,8 +365,81 @@ test('User can manage access drawer settings for a workspace', async ({ page }) 
     page.getByText(dictionaries.workspaces.access.updateSuccess, { exact: true }),
   ).toBeVisible();
   await expect(memberRow).toContainText('Form administrators');
-  await memberRow.getByRole('button', { name: 'Remove' }).click();
+  await removeMember.click();
   await page.getByTestId('confirm-modal-confirm').click();
   await expect(memberRow).not.toBeVisible();
-  await expect(accessDrawer.getByTestId('datatable-empty')).toBeVisible();
+  await expect(emptyTable).toBeVisible();
+});
+
+test.describe('Workspace roles', () => {
+  const roleLabels = dictionaries.workspaces.roles;
+
+  test.beforeEach(async ({ page }) => {
+    const permissionsTab = page.getByTestId('workspace-permissions-tab');
+    const rolesTab = permissionsTab.or(page.getByTestId('workspace-roles-tab'));
+    await rolesTab.click();
+    await expect(rolesTab).toHaveAttribute('aria-selected', 'true');
+
+    if (await permissionsTab.isVisible()) {
+      const rolesToggle = page
+        .getByTestId('accordion-workspace-roles')
+        .getByRole('button', { name: dictionaries.workspaces.rolesTab, exact: true });
+      if ((await rolesToggle.getAttribute('aria-expanded')) !== 'true') await rolesToggle.click();
+      await expect(rolesToggle).toHaveAttribute('aria-expanded', 'true');
+    }
+  });
+
+  test('User can view a fixed workspace role', async ({ page }) => {
+    const fixedRole = page.getByRole('row').filter({
+      has: page.getByTestId('role-name-form_admin'),
+    });
+    await expect(fixedRole.getByTestId('role-type-form_admin')).toHaveText(roleLabels.types.fixed);
+    await expect(fixedRole.getByTestId('role-permissions-form_admin')).toHaveText(
+      roleLabels.allPermissions,
+    );
+    await fixedRole.getByTestId('view-role-button-form_admin').click();
+
+    const form = page.getByTestId('workspace-role-edit-form');
+    await expect(form.getByTestId('fixed-role-alert')).toBeVisible();
+    await expect(form.getByRole('textbox', { name: roleLabels.name })).toBeDisabled();
+    await expect(form.getByTestId('role-submit-button')).toHaveCount(0);
+    await form.getByTestId('role-cancel-button').click();
+    await expect(form).toBeHidden();
+  });
+
+  test('User can create and remove a custom workspace role', async ({ page }) => {
+    const roleName = `E2E Role ${randomUUID().slice(0, 8)}`;
+    const rolesContent = page
+      .getByTestId('workspace-roles-drawer-content')
+      .or(page.getByTestId('workspace-roles-tab-content'));
+    await rolesContent.getByRole('textbox', { name: /search/i }).fill(roleName);
+    await rolesContent.getByTestId('search-ws-roles-button').click();
+    await expect(rolesContent.getByTestId('datatable-empty')).toHaveText(roleLabels.empty);
+    await rolesContent.getByTestId('create-ws-role-button').click();
+
+    const form = rolesContent.getByTestId('workspace-role-create-form');
+    await form.getByRole('textbox', { name: roleLabels.name }).fill(roleName);
+    const create = form.getByTestId('role-submit-button');
+    await expect(create).toBeDisabled();
+    await form.getByText(roleLabels.permissionNames.form_read, { exact: true }).click();
+    await expect(create).toBeEnabled();
+
+    const roleRow = rolesContent.getByRole('row').filter({
+      has: page.getByRole('cell', { name: roleName, exact: true }),
+    });
+    try {
+      await create.click();
+      await expect(roleRow).toBeVisible();
+      await expect(roleRow.getByTestId(/^role-type-/)).toHaveText(roleLabels.types.custom);
+      await expect(roleRow.getByTestId(/^role-permissions-/)).toHaveText(
+        roleLabels.permissionCountOne,
+      );
+    } finally {
+      if (await roleRow.isVisible()) {
+        await roleRow.getByTestId(/^delete-role-button-/).click();
+        await page.getByTestId('confirm-modal-confirm').click();
+        await expect(roleRow).toHaveCount(0);
+      }
+    }
+  });
 });
