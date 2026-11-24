@@ -9,6 +9,12 @@
     "description": "Welcome to Common Hosted Forms Service (CHEFS) where you can create and publish forms, receive and review submissions, and integrate with your line of business systems.",
     "notAuthenticated": "You are not authenticated. Please login to access this section.",
     "unknown": "Unknown",
+    "unsavedChanges": {
+      "title": "Leave without saving?",
+      "message": "Your changes have not been saved. If you leave, they will be lost.",
+      "confirm": "Leave without saving",
+      "stay": "Keep editing"
+    },
     "home": "Home",
     "forms": "Forms",
     "myForms": "My Forms",
@@ -807,10 +813,6 @@
       "cancelEdit": "Cancel",
       "editingNotice": "You are changing the submitted answers. The form checks them when you update. Files cannot be changed here.",
       "editInvalid": "Some answers are not valid. Correct the marked fields, then update.",
-      "leaveEditTitle": "Leave without saving?",
-      "leaveEditMessage": "Your changes to the answers have not been saved. They will be lost if you leave this page.",
-      "leaveEditConfirm": "Leave without saving",
-      "leaveEditStay": "Keep editing",
       "submit": "Submit",
       "dataHistoryTitle": "Submitted Data History",
       "dataHistoryIntro": "This is an audit log of who has made changes to this submission after the original submission.",

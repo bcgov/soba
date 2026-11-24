@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { useUserChange } from './useUserChange';
+import { type FormEvent, useCallback, useMemo, useRef, useState } from 'react';
+import { isSelectSearch, useUserChange } from './useUserChange';
 
 // Form.io reports a field's change 100ms after its input.
 const ECHO_MS = 500;
@@ -14,32 +14,46 @@ const ECHO_MS = 500;
 export function useUnsavedEdits({
   canWrite,
   nothingSaved,
-}: Readonly<{ canWrite: boolean; nothingSaved: boolean }>) {
+  carried = false,
+}: Readonly<{
+  canWrite: boolean;
+  nothingSaved: boolean;
+  /** Answers typed on an older version of the form and carried here, so already edited. */
+  carried?: boolean;
+}>) {
   const { touchProps, isUserChange } = useUserChange();
-  const edits = useRef(0);
+  const edits = useRef(carried ? 1 : 0);
   const savedEdits = useRef(0);
   const saved = useRef(!nothingSaved);
   const echoUntil = useRef(0);
   const [unsaved, setUnsaved] = useState(nothingSaved);
+  // Edits not yet held by an applied save; unlike `unsaved`, false on a blank new form.
+  const [edited, setEdited] = useState(canWrite && carried);
 
   const markEdited = useCallback(() => {
     if (!canWrite) return;
     edits.current += 1;
     setUnsaved(true);
+    setEdited(true);
   }, [canWrite]);
 
-  const onInputCapture = useCallback(() => {
-    echoUntil.current = Date.now() + ECHO_MS;
-    markEdited();
-  }, [markEdited]);
+  const onInputCapture = useCallback(
+    (event: FormEvent) => {
+      if (isSelectSearch(event.target)) return;
+      echoUntil.current = Date.now() + ECHO_MS;
+      markEdited();
+    },
+    [markEdited],
+  );
 
   const onFormChange = useCallback(
-    (_value: unknown, _flags: unknown, modified: boolean) => {
+    (value: { data?: unknown } | undefined, flags: unknown, modified: boolean) => {
+      const userChange = isUserChange(value, flags, modified);
       if (Date.now() < echoUntil.current) {
         echoUntil.current = 0;
         return;
       }
-      if (isUserChange(modified)) markEdited();
+      if (userChange) markEdited();
     },
     [isUserChange, markEdited],
   );
@@ -51,6 +65,7 @@ export function useUnsavedEdits({
       saved.current = true;
       savedEdits.current = editsSaved;
       setUnsaved(edits.current > editsSaved);
+      setEdited(edits.current > editsSaved);
     };
   }, []);
 
@@ -66,5 +81,5 @@ export function useUnsavedEdits({
     [touchProps, onInputCapture],
   );
 
-  return { unsaved, isUnsaved, beginSave, onFormChange, formProps };
+  return { unsaved, edited, isUnsaved, beginSave, onFormChange, formProps };
 }

@@ -2,6 +2,13 @@
 
 import { useCallback, useMemo, useRef } from 'react';
 
+// A Select's search box filters the options; the answer changes only when one is picked.
+const SELECT_SEARCH = '.formio-component-select .choices__input';
+
+/** Whether an input comes from a Select's search box rather than an answer. */
+export const isSelectSearch = (target: EventTarget | null) =>
+  target instanceof Element && target.matches(SELECT_SEARCH);
+
 /**
  * Tells the user's changes to a Form.io form from those Form.io makes itself. Form.io changes the
  * answers itself as they load, and leaves `modified` off for some real edits, such as removing a
@@ -10,6 +17,8 @@ import { useCallback, useMemo, useRef } from 'react';
  */
 export function useUserChange() {
   const touched = useRef(false);
+  // The answers at Form.io's last change, so a change that leaves them as they were is not an edit.
+  const lastAnswers = useRef<string | null>(null);
   const markTouched = useCallback(() => {
     touched.current = true;
   }, []);
@@ -18,7 +27,24 @@ export function useUserChange() {
     () => ({ onPointerDownCapture: markTouched, onKeyDownCapture: markTouched }),
     [markTouched],
   );
-  /** Whether a change Form.io reports, with its `modified` flag, is the user's. */
-  const isUserChange = useCallback((modified: boolean) => modified || touched.current, []);
-  return { touchProps, isUserChange };
+  /** Records the loaded answers, for a form that reports no change as they load. */
+  const noteAnswers = useCallback((data: unknown) => {
+    lastAnswers.current = JSON.stringify(data ?? null);
+  }, []);
+  /** Whether a change Form.io reports is the user's. Call it for every change, to track the answers. */
+  const isUserChange = useCallback(
+    (value: { data?: unknown } | undefined, flags: unknown, modified: boolean) => {
+      const answers = JSON.stringify(value?.data ?? null);
+      const unchanged = answers === lastAnswers.current;
+      lastAnswers.current = answers;
+      if (modified) return true;
+      // The answers loading, which a click while the form loads would otherwise count.
+      if ((flags as { fromSubmission?: boolean } | undefined)?.fromSubmission) return false;
+      // Form.io's own change on blur, such as Validate On: Blur, leaves the answers as they were.
+      if (unchanged) return false;
+      return touched.current;
+    },
+    [],
+  );
+  return { touchProps, isUserChange, noteAnswers };
 }
