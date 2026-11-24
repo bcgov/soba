@@ -99,6 +99,9 @@ gatewayNetworkPolicy:
   environment: prod
 
 frontend:
+  # PR apps share the dev host (by path), so the dev gateway host serves them too.
+  externalHosts:
+    - submit-dev.api.gov.bc.ca
   replicas: 1
   readinessProbe:
     initialDelaySeconds: 25

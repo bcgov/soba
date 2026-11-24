@@ -121,7 +121,8 @@ backend:
     # half of it; per-plugin TIMEOUT_MS overrides both.
     httpRouteTimeoutMs: ""
     httpOutboundTimeoutMs: ""
-    # Allowed origin(s) for CORS (comma-separated). Defaults to frontend URL when unset.
+    # Allowed origin(s) for CORS (comma-separated). Defaults to the frontend host plus
+    # frontend.externalHosts when unset.
     corsOrigin: ""
     # Base URL for this API (returned in /api/v1/meta/frontend-config). Defaults to backend public URL when unset.
     sobaApiBaseUrl: ""
@@ -374,6 +375,11 @@ frontend:
   # Host shared by every app; they are told apart by routePath. Blank = <host base>.<domain>
   # (see global.hostPrefix).
   host: ""
+  # Other hosts that serve these apps through something outside this chart, such as the API
+  # gateway (submit-test.api.gov.bc.ca) or a vanity domain. The chart creates no Route for them.
+  # Pages loaded there still call the backend's own Route, so each joins the backend CORS
+  # allowlist. Hostnames only, without scheme or path.
+  externalHosts: []
   replicas: 1
   livenessProbe:
     initialDelaySeconds: 15
