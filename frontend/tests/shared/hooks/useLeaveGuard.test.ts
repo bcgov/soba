@@ -237,5 +237,23 @@ describe('useLeaveGuard', () => {
 
       expect(traverse()).toBe(false);
     });
+
+    // A link or requestLeave is asked about before its router push or replace, which must go through.
+    it('lets a push or a replace through', () => {
+      Object.assign(window, { navigation });
+      const onLeave = vi.fn();
+      renderHook(() => useLeaveGuard(true, onLeave));
+
+      for (const navigationType of ['push', 'replace']) {
+        const event = Object.assign(new Event('navigate', { cancelable: true }), {
+          navigationType,
+          userInitiated: false,
+          destination: { key: '', url: 'http://localhost/en/forms', sameDocument: true },
+        });
+        navigation.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(false);
+      }
+      expect(onLeave).not.toHaveBeenCalled();
+    });
   });
 });

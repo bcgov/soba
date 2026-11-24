@@ -770,6 +770,15 @@ describe('FormioV5SubmissionFillClient', () => {
       const asked = () => screen.queryByText('Leave without saving?') !== null;
       const edit = () => act(() => h.onChange?.({ data: { a: 2 } }, {}, true));
       const savedDraft = () => bundle({ content: { data: { a: 1 } } });
+      // Types into a Choices.js text box, as Form.io draws one in a Select or a Tags field.
+      const typeInChoices = (componentType: string) => {
+        const component = document.createElement('div');
+        component.className = `formio-component formio-component-${componentType}`;
+        const input = component.appendChild(document.createElement('input'));
+        input.className = 'choices__input choices__input--cloned';
+        screen.getByTestId('submission-fill').appendChild(component);
+        fireEvent.input(input, { target: { value: 'ab' } });
+      };
 
       it('lets the filler leave a blank new form', async () => {
         await renderLoaded();
@@ -797,12 +806,17 @@ describe('FormioV5SubmissionFillClient', () => {
 
       it("does not count typing in a Select's search box", async () => {
         await renderLoaded();
-        const search = document.createElement('input');
-        search.className = 'choices__input';
-        screen.getByTestId('submission-fill').appendChild(search);
-        fireEvent.input(search, { target: { value: 'ab' } });
+        typeInChoices('select');
         await clickNav();
         expect(asked()).toBe(false);
+      });
+
+      // Tags adds the typed text as a tag on blur, after a link click has already gone through.
+      it('counts typing in a Tags field', async () => {
+        await renderLoaded();
+        typeInChoices('tags');
+        await clickNav();
+        expect(asked()).toBe(true);
       });
 
       // Validate On: Blur reports a change, without `modified`, when a field the filler entered is left.

@@ -6,6 +6,9 @@ import { useUserChange } from './useUserChange';
 // Form.io reports a field's change 100ms after its input.
 const ECHO_MS = 500;
 
+// A Select's search box filters the options; the answer changes only when one is picked.
+const SELECT_SEARCH = '.formio-component-select .choices__input';
+
 /**
  * The user's edits to a fill form against its last applied save. Typing counts from its input
  * event, so a Print right after it sees the edit; the change Form.io reports for that input a moment
@@ -39,8 +42,7 @@ export function useUnsavedEdits({
 
   const onInputCapture = useCallback(
     (event: FormEvent) => {
-      // A Select's search box filters the options; the answer changes only when one is picked.
-      if (event.target instanceof Element && event.target.matches('.choices__input')) return;
+      if (event.target instanceof Element && event.target.matches(SELECT_SEARCH)) return;
       echoUntil.current = Date.now() + ECHO_MS;
       markEdited();
     },

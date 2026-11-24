@@ -9,7 +9,14 @@ import { ApiErrorCodes } from '@soba/lib';
 import { navLink } from '@/src/shared/list/listQueryMemory';
 import { SubmissionReviewStatuses } from '@/src/types/submissionReview';
 
-const { mockPush } = vi.hoisted(() => ({ mockPush: vi.fn() }));
+const { mockPush, leaveWarning } = vi.hoisted(() => {
+  // The leave guard calls it once the person agrees, and re-registers whenever it changes, so it
+  // keeps one identity, as the real one does.
+  const release = () => undefined;
+  return { mockPush: vi.fn(), leaveWarning: vi.fn(() => release) };
+});
+
+vi.mock('@/src/shared/hooks/useLeaveWarning', () => ({ useLeaveWarning: leaveWarning }));
 
 vi.mock('@/app/[lang]/Providers', async () => {
   const dict = { ...(await import('@/dictionaries/en.json')).default, locale: 'en' };
@@ -901,6 +908,7 @@ describe('DesignSubmissionView staff edits', () => {
 
       expect(screen.queryByTestId('confirm-modal-confirm')).toBeNull();
       expect(mockPush).toHaveBeenCalledWith(navLink('/en/build/f1?tab=submissions'));
+      expect(leaveWarning).toHaveBeenLastCalledWith(false);
     });
 
     it('asks before Back or a refresh loses changed answers, and keeps them on staying', async () => {
@@ -909,6 +917,7 @@ describe('DesignSubmissionView staff edits', () => {
 
       await user.click(await screen.findByTestId('submission-edit'));
       await user.click(screen.getByTestId('submission-edit-form'));
+      expect(leaveWarning).toHaveBeenLastCalledWith(true);
 
       await user.click(screen.getByTestId('design-submission-back'));
       expect(mockPush).not.toHaveBeenCalled();
@@ -958,6 +967,7 @@ describe('DesignSubmissionView staff edits', () => {
       await user.click(screen.getByTestId('submission-edit-form'));
       await user.click(screen.getByTestId('submission-edit-cancel'));
 
+      expect(leaveWarning).toHaveBeenLastCalledWith(false);
       await user.click(screen.getByTestId('design-submission-back'));
       expect(screen.queryByTestId('confirm-modal-confirm')).toBeNull();
       expect(mockPush).toHaveBeenCalled();
