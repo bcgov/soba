@@ -7,6 +7,7 @@ import type { AppSessionSnapshot } from '@/src/app/routing/appRoutePolicy';
 // Mutable test doubles shared with the hoisted vi.mock factories below.
 const h = vi.hoisted(() => ({
   refresh: vi.fn(),
+  signInAfterRefusal: vi.fn(),
   replace: vi.fn(),
   refreshCurrentUser: vi.fn(),
   session: {} as AppSessionSnapshot,
@@ -14,7 +15,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/useKeycloak', () => ({
-  useKeycloak: () => ({ refresh: h.refresh }),
+  useKeycloak: () => ({ refresh: h.refresh, signInAfterRefusal: h.signInAfterRefusal }),
 }));
 
 vi.mock('@/src/shared/api/useCurrentUser', () => ({
@@ -54,9 +55,16 @@ const READY: AppSessionSnapshot = {
   sessionReady: true,
   sessionLoadedOnce: true,
   sessionFailed: false,
+  authUnavailable: false,
   needsOnboarding: false,
   canCreateWorkspace: true,
   hasWorkspaces: true,
+};
+
+const SIGNED_OUT: AppSessionSnapshot = {
+  ...READY,
+  authenticated: false,
+  sessionLoadedOnce: false,
 };
 
 function renderGuard(designMode = true) {
@@ -134,6 +142,54 @@ describe('AppAccessGuard', () => {
 
     expect(h.replace).toHaveBeenCalledWith('/en/onboarding');
     expect(screen.queryByText('visible child')).not.toBeInTheDocument();
+  });
+
+  // An emailed deep link to a guarded page has to come back to that page after sign-in.
+  it('starts sign-in back to this address for a signed-out visitor on a guarded page', async () => {
+    h.session = { ...SIGNED_OUT };
+    h.pathname = '/en/build/form-1';
+
+    const view = await act(async () => renderGuard());
+    // A new session object with the same answer must not start a second sign-in.
+    h.session = { ...SIGNED_OUT };
+    await act(async () => {
+      view.rerender(
+        <AppAccessGuard locale="en" designMode={true}>
+          visible child
+        </AppAccessGuard>,
+      );
+    });
+
+    expect(h.signInAfterRefusal).toHaveBeenCalledTimes(1);
+    expect(h.signInAfterRefusal).toHaveBeenCalledWith(globalThis.location.href);
+    expect(h.replace).not.toHaveBeenCalled();
+    expect(screen.getByTestId('loading-indicator')).toBeInTheDocument();
+    expect(screen.queryByText('visible child')).not.toBeInTheDocument();
+  });
+
+  it('sends a signed-out visitor home when Keycloak failed to start', async () => {
+    h.session = { ...SIGNED_OUT, authUnavailable: true };
+    h.pathname = '/en/build/form-1';
+
+    await act(async () => {
+      renderGuard();
+    });
+
+    expect(h.replace).toHaveBeenCalledWith('/en');
+    expect(h.signInAfterRefusal).not.toHaveBeenCalled();
+  });
+
+  it('renders a public page for a signed-out visitor without starting sign-in', async () => {
+    h.session = { ...SIGNED_OUT };
+    h.pathname = '/en/form/form-1';
+
+    await act(async () => {
+      renderGuard();
+    });
+
+    expect(screen.getByText('visible child')).toBeInTheDocument();
+    expect(h.signInAfterRefusal).not.toHaveBeenCalled();
+    expect(h.replace).not.toHaveBeenCalled();
   });
 
   it('renders my forms for a user without workspaces when design mode is off', async () => {

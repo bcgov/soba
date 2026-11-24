@@ -7,7 +7,7 @@ import { needsWorkspaceOnboarding } from '@/src/features/onboarding/workspaceOnb
 import type { AppSessionSnapshot } from './appRoutePolicy';
 
 export function useAppSession(): AppSessionSnapshot {
-  const { authenticated, initializing, initStarted } = useKeycloak();
+  const { authenticated, initializing, initStarted, error: keycloakError } = useKeycloak();
 
   const {
     data: currentUser,
@@ -38,9 +38,18 @@ export function useAppSession(): AppSessionSnapshot {
       // it, and it goes false when the key goes empty, which is what the sign-out cache clear does.
       sessionLoadedOnce: currentUserLoaded,
       sessionFailed,
+      authUnavailable: !!keycloakError,
       needsOnboarding,
       canCreateWorkspace: currentUser?.capabilities?.canCreateWorkspace === true,
       hasWorkspaces: currentUser?.capabilities?.hasWorkspaces === true,
     };
-  }, [authenticated, initializing, initStarted, currentUserLoaded, currentUserError, currentUser]);
+  }, [
+    authenticated,
+    initializing,
+    initStarted,
+    keycloakError,
+    currentUserLoaded,
+    currentUserError,
+    currentUser,
+  ]);
 }

@@ -13,10 +13,18 @@ export type AppSessionSnapshot = {
   sessionLoadedOnce: boolean;
   /** A required bootstrap fetch (current user or workspaces) rejected. */
   sessionFailed: boolean;
+  /** Keycloak failed to start, so there is no sign-in to send anyone to. */
+  authUnavailable: boolean;
   needsOnboarding: boolean;
   canCreateWorkspace: boolean;
   hasWorkspaces: boolean;
 };
+
+/** Where the guard sends the visitor: another app path, or sign-in and back to this page. */
+export type RouteRedirect = { kind: 'path'; to: string } | { kind: 'sign-in' };
+
+const toPath = (to: string): RouteRedirect => ({ kind: 'path', to });
+const SIGN_IN: RouteRedirect = { kind: 'sign-in' };
 
 /** Classify the localized route (pathname includes `/{locale}/...`). */
 export function classifyRoute(pathname: string): RouteKind {
@@ -49,7 +57,8 @@ function resolveLanding(
 }
 
 /**
- * Returns a path to `router.replace`, or null when the current route may render.
+ * Returns where to send the visitor, or null when the current route may render. A signed-out
+ * visitor on a guarded route signs in and comes back to it, unless Keycloak failed to start.
  * Caller should wait until `sessionReady` before redirecting authenticated users.
  *
  * `designMode` is this deployment's DESIGN_MODE gate. When off, users land on My Forms and
@@ -60,9 +69,9 @@ export function resolveRedirect(
   locale: string,
   session: AppSessionSnapshot,
   designMode: boolean,
-): string | null {
-  // Routing an unauthenticated user off a guarded route before Keycloak has run sends a deep link
-  // to the landing page and drops its query string.
+): RouteRedirect | null {
+  // Before Keycloak has answered, `authenticated: false` is only a default, so acting on it would
+  // send a signed-in visitor to sign in.
   if (session.initializing || !session.initStarted) {
     return null;
   }
@@ -75,7 +84,7 @@ export function resolveRedirect(
     if (kind === 'home' || kind === 'public') {
       return null;
     }
-    return home;
+    return session.authUnavailable ? toPath(home) : SIGN_IN;
   }
 
   if (!session.sessionReady) {
@@ -86,15 +95,15 @@ export function resolveRedirect(
   const landing = resolveLanding(locale, onboarding, session, designMode);
 
   if (kind === 'home') {
-    return landing;
+    return toPath(landing);
   }
 
   if (kind === 'onboarding') {
-    return needsOnboarding ? null : landing;
+    return needsOnboarding ? null : toPath(landing);
   }
 
   if (needsOnboarding && kind !== 'public') {
-    return onboarding;
+    return toPath(onboarding);
   }
 
   return null;

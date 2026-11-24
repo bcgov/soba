@@ -187,7 +187,10 @@ export const login = (redirectUri?: string) => async (dispatch: AppDispatch) => 
   }
 };
 
-/** Sign-in nobody asked for, after a refused read; skipped once a logout redirect starts. */
+/**
+ * Sign-in nobody asked for, after a refused read or on a guarded page while signed out; skipped
+ * once a logout redirect starts.
+ */
 export const signInAfterRefusal = (redirectUri: string) => async (dispatch: AppDispatch) => {
   if (loggingOut) return;
   await dispatch(login(redirectUri));
