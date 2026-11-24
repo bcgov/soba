@@ -164,6 +164,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
+      actions: read
       contents: read
       packages: write
     environment:
@@ -208,9 +209,17 @@ jobs:
             echo '::error::main and the tested release source have different application versions.'
             exit 1
           fi
-          TEST_RUNS=$(gh api "repos/$REPOSITORY/actions/workflows/release-to-test.yaml/runs?head_sha=$SOURCE_SHA&branch=$BRANCH&status=success&per_page=100" --jq '.total_count')
-          if [ "$TEST_RUNS" -lt 1 ]; then
-            echo "::error::No successful Test workflow run exists for $SOURCE_SHA."
+          # Test runs that only open a version PR also succeed, so require an actual Test deployment.
+          DEPLOYED=false
+          for run_id in $(gh api "repos/$REPOSITORY/actions/workflows/release-to-test.yaml/runs?head_sha=$SOURCE_SHA&branch=$BRANCH&status=success&per_page=100" --jq '.workflow_runs[].id'); do
+            if gh api "repos/$REPOSITORY/actions/runs/$run_id/jobs?per_page=100" \
+                 --jq '.jobs[] | select(.name == "Deploy SOBA to Test" and .conclusion == "success") | .id' | grep -q .; then
+              DEPLOYED=true
+              break
+            fi
+          done
+          if [ "$DEPLOYED" != true ]; then
+            echo "::error::No successful Test deployment exists for $SOURCE_SHA. Merge its version PR and let Test deploy first."
             exit 1
           fi
           REPOSITORY_LOWER="${REPOSITORY,,}"

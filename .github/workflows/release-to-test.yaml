@@ -68,8 +68,10 @@ jobs:
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           echo "ref=refs/heads/$BRANCH" >> "$GITHUB_OUTPUT"
 
+  # Test deploys only from a release head produced by merging this release's
+  # version PR. Any other push opens or refreshes that PR and ends without deploying.
   version:
-    name: Prepare application version
+    name: Prepare version or confirm its merged PR
     needs: [set-vars]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -77,9 +79,9 @@ jobs:
       contents: write
       pull-requests: write
     outputs:
-      ready: ${{ steps.prepare.outputs.ready }}
-      source_sha: ${{ steps.prepare.outputs.source_sha }}
-      image_version: ${{ steps.prepare.outputs.image_version }}
+      ready: ${{ steps.gate.outputs.ready }}
+      source_sha: ${{ steps.gate.outputs.source_sha }}
+      image_version: ${{ steps.gate.outputs.image_version }}
     steps:
       - name: Checkout release branch and history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -87,20 +89,8 @@ jobs:
           ref: ${{ needs.set-vars.outputs.ref }}
           fetch-depth: 0
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: frontend/.nvmrc
-          cache: pnpm
-
-      - name: Install existing release tools
-        run: pnpm install --frozen-lockfile
-
-      - name: Calculate version or wait for its PR
-        id: prepare
+      - name: Find merged version PR for the release head
+        id: gate
         env:
           BRANCH: ${{ needs.set-vars.outputs.branch }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -108,6 +98,110 @@ jobs:
         run: |
           set -euo pipefail
           SOURCE_SHA=$(git rev-parse HEAD)
+          PREFIX="version/${BRANCH#release/}-"
+          CURRENT=$(jq -r .version package.json)
+          PREVIOUS=$(git show HEAD^1:package.json 2>/dev/null | jq -r .version || echo '')
+
+          if [ "$CURRENT" = "$PREVIOUS" ]; then
+            echo "::notice::$SOURCE_SHA does not change the version; a version PR is required before Test deploys."
+            exit 0
+          fi
+
+          MATCH=''
+          # The commit-to-PR association can lag slightly behind the merge push.
+          for attempt in 1 2 3 4 5; do
+            MATCH=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/pulls?per_page=100" |
+              jq -c --arg base "$BRANCH" --arg sha "$SOURCE_SHA" --arg repo "$GITHUB_REPOSITORY" --arg prefix "$PREFIX" \
+                '[.[] | select(.merged_at != null and .base.ref == $base and .merge_commit_sha == $sha and .head.repo.full_name == $repo and (.head.ref | startswith($prefix)))] | first // empty')
+            [ -n "$MATCH" ] || [ "$attempt" -eq 5 ] && break
+            sleep 5
+          done
+          if [ -z "$MATCH" ]; then
+            echo "::notice::The version change at $SOURCE_SHA did not come from a merged $PREFIX* PR."
+            exit 0
+          fi
+
+          PR_NUMBER=$(jq -r .number <<< "$MATCH")
+          PR_HEAD_SHA=$(jq -r .head.sha <<< "$MATCH")
+          PR_TITLE=$(jq -r .title <<< "$MATCH")
+
+          # The merged tree must be exactly what the version PR proposed, so no
+          # unversioned commit reached the release branch while the PR was open.
+          git fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
+          git diff --quiet "$PR_HEAD_SHA" "$SOURCE_SHA" || {
+            echo "::error::$BRANCH changed after version PR #$PR_NUMBER was opened. Push a new commit to $BRANCH (for example an empty 'chore: re-version' commit) to open a new version PR."
+            exit 1
+          }
+          [ "$PR_TITLE" = "chore(release): version $CURRENT" ] || {
+            echo "::error::Version PR #$PR_NUMBER title does not match package.json version $CURRENT."
+            exit 1
+          }
+          [[ "$CURRENT" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::Release version $CURRENT is not a stable X.Y.Z version."
+            exit 1
+          }
+          for file in backend/package.json frontend/package.json lib/package.json; do
+            [ "$(jq -r .version "$file")" = "$CURRENT" ] || { echo "::error::$file is not at $CURRENT."; exit 1; }
+          done
+          jq -e --arg v "$CURRENT" '.version == $v and .packages[""].version == $v' backend/package-lock.json >/dev/null || {
+            echo "::error::backend/package-lock.json is not at $CURRENT."; exit 1;
+          }
+          grep -Eq "^appVersion:[[:space:]]*\"?${CURRENT//./\\.}\"?[[:space:]]*$" deployments/helm/soba/Chart.yaml || {
+            echo "::error::Helm appVersion is not at $CURRENT."; exit 1;
+          }
+          if git merge-base --is-ancestor "v$CURRENT" origin/main 2>/dev/null; then
+            echo "::error::Version $CURRENT is already accepted on main."
+            exit 1
+          fi
+
+          {
+            echo "ready=true"
+            echo "source_sha=$SOURCE_SHA"
+            echo "image_version=release-v${CURRENT}-${BRANCH#release/}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Deploying version \`$CURRENT\` to Test from merged version PR #$PR_NUMBER (\`$SOURCE_SHA\`)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install pnpm
+        if: steps.gate.outputs.ready != 'true'
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up Node.js
+        if: steps.gate.outputs.ready != 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+
+      - name: Install existing release tools
+        if: steps.gate.outputs.ready != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Open version PR for this release head
+        if: steps.gate.outputs.ready != 'true'
+        env:
+          BRANCH: ${{ needs.set-vars.outputs.branch }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA=$(git rev-parse HEAD)
+          PREFIX="version/${BRANCH#release/}-"
+          VERSION_BRANCH="${PREFIX}$(git rev-parse --short=12 "$SOURCE_SHA")"
+
+          # Keep exactly one open version PR, and only for the current release head.
+          OPEN=$(gh pr list --base "$BRANCH" --state open --limit 100 --json number,headRefName |
+            jq -r --arg prefix "$PREFIX" '.[] | select(.headRefName | startswith($prefix)) | "\(.number) \(.headRefName)"')
+          while read -r number head; do
+            [ -n "$number" ] || continue
+            if [ "$head" = "$VERSION_BRANCH" ]; then
+              echo "::notice::Version PR #$number for $SOURCE_SHA is awaiting review. Merging it deploys to Test."
+              echo "Version PR #$number is awaiting review; Test deploys after it merges." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            gh pr close "$number" --delete-branch \
+              --comment "Superseded: $BRANCH moved to $SOURCE_SHA, so a new version PR was opened."
+          done <<< "$OPEN"
+
           CURRENT=$(jq -r .version package.json)
           ACCEPTED=$(git show origin/main:package.json | jq -r .version)
           FROM=""
@@ -123,35 +217,31 @@ jobs:
               exit 1
             fi
             FROM=$(git log --first-parent -1 -G '^[[:space:]]*"version"[[:space:]]*:' --format=%H -- package.json)
+            [ -n "$FROM" ] || { echo '::error::Could not find the last version change in package.json.'; exit 1; }
             RELEASE_ARGS+=("--plugins.@release-it/conventional-changelog.commitsOpts.from=$FROM")
           fi
 
-          VERSION_BRANCH="version/${BRANCH#release/}-$(git rev-parse --short "$SOURCE_SHA")"
           git switch -c "$VERSION_BRANCH"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           pnpm exec release-it "${RELEASE_ARGS[@]}"
 
           if [ "$(git rev-parse HEAD)" = "$SOURCE_SHA" ]; then
-            if [ "$FROM" = "$SOURCE_SHA" ]; then
-              echo "ready=true" >> "$GITHUB_OUTPUT"
-              echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
-              echo "image_version=release-v${CURRENT}-${BRANCH#release/}" >> "$GITHUB_OUTPUT"
-            fi
-            exit 0
+            echo "::error::No version change was calculated for $SOURCE_SHA, so Test cannot deploy it."
+            exit 1
           fi
 
           NEXT=$(jq -r .version package.json)
-          if gh pr list --base "$BRANCH" --state open --limit 100 --json headRefName --jq '.[].headRefName' |
-             grep -E "^version/${BRANCH#release/}-" >/dev/null; then
-            echo '::notice::An existing version-update PR must be merged or closed before another is opened.'
-            exit 0
-          fi
-          git push origin "HEAD:refs/heads/$VERSION_BRANCH"
+          # A previous attempt may have pushed this branch before PR creation failed.
+          git push --force origin "HEAD:refs/heads/$VERSION_BRANCH"
           gh pr create --base "$BRANCH" --head "$VERSION_BRANCH" \
             --title "chore(release): version $NEXT" \
-            --body "Merge this version update before the Test image build."
-          echo "::notice::Merge the version-update PR to start the Test image build."
+            --body "Version \`$NEXT\` for \`$BRANCH\` at \`$SOURCE_SHA\`. Merging this PR builds and deploys this version to Test. Do not push other commits to \`$BRANCH\` while it is open." || {
+              echo "::error::Could not open the version PR. Enable Settings > Actions > General > 'Allow GitHub Actions to create and approve pull requests'."
+              exit 1
+            }
+          echo "::notice::Opened the version $NEXT PR. Merging it deploys to Test."
+          echo "Opened the version \`$NEXT\` PR; Test deploys after it merges." >> "$GITHUB_STEP_SUMMARY"
 
   build:
     name: Build & Push
