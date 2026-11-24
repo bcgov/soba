@@ -107,7 +107,8 @@ jobs:
   prepare:
     runs-on: ubuntu-24.04
     outputs:
-      ref: ${{ steps.vars.outputs.ref }}
+      sha: ${{ steps.commit.outputs.sha }}
+      short_sha: ${{ steps.commit.outputs.short_sha }}
       platforms: ${{ steps.vars.outputs.platforms }}
       image_version: ${{ steps.vars.outputs.image_version }}
       matrix: ${{ steps.vars.outputs.matrix }}
@@ -179,6 +180,19 @@ jobs:
             echo "image_version=local" >> $GITHUB_OUTPUT
           fi
 
+      # The ref is resolved to a commit once, here. Every build checks out that commit and the
+      # merge job tags it, so a branch that moves during the run cannot change what is built.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.vars.outputs.ref }}
+
+      - name: Resolve commit
+        id: commit
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
   build:
     needs: prepare
     permissions:
@@ -192,7 +206,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.prepare.outputs.ref }}
+          ref: ${{ needs.prepare.outputs.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -213,7 +227,7 @@ jobs:
           file: ${{ matrix.dockerfile_dir }}/${{ matrix.dockerfile || 'Dockerfile' }}
           platforms: ${{ matrix.platform }}
           labels: |
-            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.revision=${{ needs.prepare.outputs.sha }}
             org.opencontainers.image.version=${{ needs.prepare.outputs.image_version }}
           build-args: ${{ matrix.base_path != '' && format('BASE_PATH={0}', matrix.base_path) || '' }}
           outputs: type=image,name=${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
@@ -240,20 +254,11 @@ jobs:
       packages: write
     runs-on: ubuntu-24.04
     outputs:
-      short_sha: ${{ steps.vars.outputs.short_sha }}
+      short_sha: ${{ needs.prepare.outputs.short_sha }}
       image_version: ${{ needs.prepare.outputs.image_version }}
+    env:
+      SHORT_SHA: ${{ needs.prepare.outputs.short_sha }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.prepare.outputs.ref }}
-
-      - name: Set variables
-        id: vars
-        run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
-
       - name: Download digests
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -273,7 +278,6 @@ jobs:
 
       - name: Merge backend
         run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
           IMAGE="ghcr.io/${{ github.repository }}/backend"
           IMAGE_VERSION="${{ needs.prepare.outputs.image_version }}"
           DIGESTS=""
@@ -293,7 +297,6 @@ jobs:
       # One tag per variant: the chart appends the app name to frontend.image.tag.
       - name: Merge frontend variants
         run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
           IMAGE="ghcr.io/${{ github.repository }}/frontend"
           IMAGE_VERSION="${{ needs.prepare.outputs.image_version }}"
           DESCRIPTION="index:org.opencontainers.image.description=SOBA Next.js frontend for web form builder"
@@ -315,7 +318,6 @@ jobs:
 
       - name: Merge temporal-worker
         run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
           IMAGE="ghcr.io/${{ github.repository }}/temporal-worker"
           IMAGE_VERSION="${{ needs.prepare.outputs.image_version }}"
           DIGESTS=""
