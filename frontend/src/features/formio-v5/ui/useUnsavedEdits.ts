@@ -1,13 +1,10 @@
 'use client';
 
 import { type FormEvent, useCallback, useMemo, useRef, useState } from 'react';
-import { useUserChange } from './useUserChange';
+import { isSelectSearch, useUserChange } from './useUserChange';
 
 // Form.io reports a field's change 100ms after its input.
 const ECHO_MS = 500;
-
-// A Select's search box filters the options; the answer changes only when one is picked.
-const SELECT_SEARCH = '.formio-component-select .choices__input';
 
 /**
  * The user's edits to a fill form against its last applied save. Typing counts from its input
@@ -42,7 +39,7 @@ export function useUnsavedEdits({
 
   const onInputCapture = useCallback(
     (event: FormEvent) => {
-      if (event.target instanceof Element && event.target.matches(SELECT_SEARCH)) return;
+      if (isSelectSearch(event.target)) return;
       echoUntil.current = Date.now() + ECHO_MS;
       markEdited();
     },

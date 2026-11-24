@@ -2,6 +2,13 @@
 
 import { useCallback, useMemo, useRef } from 'react';
 
+// A Select's search box filters the options; the answer changes only when one is picked.
+const SELECT_SEARCH = '.formio-component-select .choices__input';
+
+/** Whether an input comes from a Select's search box rather than an answer. */
+export const isSelectSearch = (target: EventTarget | null) =>
+  target instanceof Element && target.matches(SELECT_SEARCH);
+
 /**
  * Tells the user's changes to a Form.io form from those Form.io makes itself. Form.io changes the
  * answers itself as they load, and leaves `modified` off for some real edits, such as removing a

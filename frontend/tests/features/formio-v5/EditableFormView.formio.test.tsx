@@ -41,6 +41,23 @@ const SCHEMA = {
   ],
 } as unknown as FormType;
 
+// Both draw a Choices.js text box: Tags to type a tag, Select to search its options.
+const CHOICES_SCHEMA = {
+  display: 'form',
+  components: [
+    { type: 'tags', key: 'tags', label: 'Tags', input: true, storeas: 'array' },
+    {
+      type: 'select',
+      key: 'colour',
+      label: 'Colour',
+      input: true,
+      widget: 'choicesjs',
+      dataSrc: 'values',
+      data: { values: [{ label: 'Red', value: 'red' }] },
+    },
+  ],
+} as unknown as FormType;
+
 type Webform = EditableFormInstance & {
   getComponent: (key: string) => {
     disabled: boolean;
@@ -53,7 +70,7 @@ type Webform = EditableFormInstance & {
 
 const settle = (ms = 800) => act(() => new Promise((resolve) => setTimeout(resolve, ms)));
 
-const renderEditor = async (data: Record<string, unknown>) => {
+const renderEditor = async (data: Record<string, unknown>, schema: FormType = SCHEMA) => {
   let webform: Webform | undefined;
   const onDataChange = vi.fn();
   const onFormReady = vi.fn((instance: EditableFormInstance) => {
@@ -62,7 +79,7 @@ const renderEditor = async (data: Record<string, unknown>) => {
   const submission = { data } as Submission;
   const editor = () => (
     <EditableFormView
-      schema={SCHEMA}
+      schema={schema}
       submission={submission}
       onDataChange={onDataChange}
       onFormReady={onFormReady}
@@ -81,6 +98,15 @@ const typeIntoName = async (value: string) => {
   input.value = value;
   input.dispatchEvent(new Event('input', { bubbles: true }));
   await settle();
+};
+
+const typeIntoChoices = (componentType: string, value: string) => {
+  const input = screen
+    .getByTestId('editor')
+    .querySelector(`.formio-component-${componentType} .choices__input--cloned`);
+  if (!(input instanceof HTMLInputElement)) throw new Error(`No ${componentType} text box`);
+  input.value = value;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
 describe('EditableFormView on the real Form.io', () => {
@@ -134,6 +160,29 @@ describe('EditableFormView on the real Form.io', () => {
 
     expect(onDataChange).not.toHaveBeenCalled();
     view.unmount();
+  });
+
+  // Tags adds the typed text as a tag only once the field is left, after a link click has gone through.
+  it('reports typing in a Tags field before it is left', async () => {
+    const { onDataChange, view } = await renderEditor({}, CHOICES_SCHEMA);
+
+    typeIntoChoices('tags', 'foo');
+
+    expect(onDataChange).toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("does not take typing in a Select's search box for an edit", async () => {
+    // Choices.js opens the options as it searches, and reads matchMedia, which jsdom lacks.
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    const { onDataChange, view } = await renderEditor({}, CHOICES_SCHEMA);
+
+    typeIntoChoices('select', 're');
+    await settle();
+
+    expect(onDataChange).not.toHaveBeenCalled();
+    view.unmount();
+    vi.unstubAllGlobals();
   });
 
   // Form.io emits this change with `modified` false.

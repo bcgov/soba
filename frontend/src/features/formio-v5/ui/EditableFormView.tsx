@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { type FormEvent, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { FormType, Submission } from '@formio/react';
 import { withFilesReadOnly } from '@/src/features/formio-v5/filesReadOnly';
 import { DynamicForm } from './DynamicForm';
 import styles from './EditableFormView.module.css';
-import { useUserChange } from './useUserChange';
+import { isSelectSearch, useUserChange } from './useUserChange';
 
 const noop = () => undefined;
 
@@ -62,12 +62,18 @@ export function EditableFormView({
     [onFormReady, noteAnswers],
   );
 
+  // Typing counts as it happens: Form.io reports it a moment later, and a Tags field only once left.
+  const onInputCapture = (event: FormEvent) => {
+    if (!isSelectSearch(event.target) && instance.current) onDataChange(instance.current.data);
+  };
+
   return (
     <div
       className={`formio-v5-chrome ${styles.editing}`}
       data-soba-formio-chrome
       data-testid={testId}
       {...touchProps}
+      onInputCapture={onInputCapture}
     >
       <DynamicForm
         className="formio-v5-form-root"
