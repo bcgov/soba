@@ -73,11 +73,46 @@ jobs:
       cancel-in-progress: false
     env:
       RELEASE: ${{ needs.set-vars.outputs.RELEASE }}
-      GATEWAY_ID: ${{ vars.APS_GATEWAY_ID }}
+      OPENSHIFT_NAMESPACE: ${{ vars.OC_NAMESPACE }}
       APS_HOST: ${{ vars.APS_HOST }}
       GWA_SHA256: ${{ vars.GWA_LINUX_AMD64_SHA256 }}
     steps:
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
+        with:
+          oc: "4.14"
+
+      - name: Login to OpenShift
+        uses: redhat-actions/oc-login@2a1614bc977c054c8786c8e35fc9534bd0ddc156 # v2.0.1
+        with:
+          openshift_server_url: ${{ vars.OC_SERVER }}
+          openshift_token: ${{ secrets.OC_TOKEN }}
+          namespace: ${{ vars.OC_NAMESPACE }}
+
+      - name: Resolve the deployed PR gateway
+        id: gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE" =~ ^soba-pr-[1-9][0-9]*$ ]]
+          deployment=$(oc get deployment "${RELEASE}-backend" -n "$OPENSHIFT_NAMESPACE" --ignore-not-found -o name)
+          if [[ -z "$deployment" ]]; then
+            echo 'PR backend was not deployed. Skipping gateway cleanup.'
+            exit 0
+          fi
+          GATEWAY_ID=$(oc exec -n "$OPENSHIFT_NAMESPACE" "$deployment" -c backend -- sh -ec '
+            . /vault/secrets/soba-aps-credential-issuer
+            printf "%s\n" "$PLUGIN_APS_CREDENTIAL_ISSUER_V3_GATEWAY_ID"
+          ')
+          [[ "$GATEWAY_ID" =~ ^gw-[a-z0-9-]+$ ]] || {
+            echo '::error::Missing or invalid gateway ID in the PR Vault secret'
+            exit 1
+          }
+          printf 'GATEWAY_ID=%s\n' "$GATEWAY_ID" >> "$GITHUB_ENV"
+          echo 'deployed=true' >> "$GITHUB_OUTPUT"
+
       - name: Validate settings and install pinned GWA
+        if: steps.gateway.outputs.deployed == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -94,6 +129,7 @@ jobs:
           echo "$RUNNER_TEMP/gwa-bin" >> "$GITHUB_PATH"
 
       - name: Remove only this PR configuration
+        if: steps.gateway.outputs.deployed == 'true'
         shell: bash
         env:
           GWA_CLIENT_ID: ${{ secrets.GWA_CLIENT_ID }}
@@ -137,7 +173,8 @@ jobs:
 
   soba-cleanup:
     name: Uninstall SOBA and remove secrets/PVCs
-    needs: [set-vars]
+    needs: [set-vars, gateway-cleanup]
+    if: ${{ !cancelled() && needs.set-vars.result == 'success' && (needs.gateway-cleanup.result == 'success' || needs.gateway-cleanup.result == 'skipped') }}
     runs-on: ubuntu-24.04
     environment: pr
     steps:

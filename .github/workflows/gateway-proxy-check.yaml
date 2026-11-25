@@ -82,53 +82,6 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha }}
 
-      - name: Validate settings and render gateway
-        shell: bash
-        run: |
-          set -euo pipefail
-          # 49 leaves room for the -api-gov-bc-ca suffix in a 63-character DNS label.
-          [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#RELEASE} -le 49 ]]
-          [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] \
-            || { echo '::error::Set OC_NAMESPACE on the selected environment'; exit 1; }
-          case "$APP_ENVIRONMENT" in
-            pr|dev|test|uat|prod)
-              : "${APS_HOST:?Set APS_HOST repository variable.}"
-              ;;
-            *)
-              echo "::error::Unsupported application environment: $APP_ENVIRONMENT"
-              exit 1
-              ;;
-          esac
-          if [[ ! "$GWA_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]; then
-            echo '::error::Set Actions variable GWA_LINUX_AMD64_SHA256 to the reviewed 64-character SHA256 of the pinned GWA release archive'
-            exit 1
-          fi
-          if [[ ! "$GATEWAY_ID" =~ ^gw-[a-z0-9-]+$ ]]; then
-            echo '::error::Set the Gold gateway ID for the selected environment (gw-...)'
-            exit 1
-          fi
-          if [[ -z "$GATEWAY_HOSTNAME" ]]; then
-            if [[ "$APP_ENVIRONMENT" == pr ]]; then
-              export GATEWAY_HOSTNAME="${APS_GATEWAY_HOST_PREFIX:?Set APS_GATEWAY_HOST_PREFIX in the pr environment.}.${APS_HOST}"
-            elif [[ "$APP_ENVIRONMENT" == dev ]]; then
-              export GATEWAY_HOSTNAME="${APS_GATEWAY_HOST_PREFIX:?Set APS_GATEWAY_HOST_PREFIX in the dev environment.}.${APS_HOST}"
-            else
-              export GATEWAY_HOSTNAME="${RELEASE}.api.gov.bc.ca"
-            fi
-          fi
-          export GATEWAY_ROUTE_PATH=/
-          if [[ "$APP_ENVIRONMENT" == pr ]]; then
-            [[ "$RELEASE" =~ ^soba-pr-([1-9][0-9]*)$ ]] || exit 1
-            export GATEWAY_ROUTE_PATH="/pr/${BASH_REMATCH[1]}/"
-          fi
-          echo "GATEWAY_ROUTE_PATH=$GATEWAY_ROUTE_PATH" >> "$GITHUB_ENV"
-          echo "GATEWAY_HOSTNAME=$GATEWAY_HOSTNAME" >> "$GITHUB_ENV"
-          export GATEWAY_SERVICE_NAME="soba-${GATEWAY_QUALIFIER}"
-          export BACKEND_HOST="${RELEASE}-backend.${OPENSHIFT_NAMESPACE}.svc"
-          node deployments/gateway/scripts/generate-gateway-config.mjs \
-            --output "$RUNNER_TEMP/gateway-kong.yaml"
-          cat "$RUNNER_TEMP/gateway-kong.yaml"
-
       - name: Install OpenShift CLI
         uses: redhat-actions/openshift-tools-installer@e3b32c2ab7b064b2ce189121c4a49f509a99a7b4 # v3.0
         with:
@@ -169,14 +122,79 @@ jobs:
                 and (.data.INTEGRATION_GATEWAY_JWKS_URI | type == "string" and length > 0)'
           fi
 
+      - name: Read PR gateway settings from the deployed issuer
+        if: ${{ inputs.environment == 'pr' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SETTINGS=$(oc exec -n "$OPENSHIFT_NAMESPACE" "deployment/${RELEASE}-backend" -c backend -- sh -ec '
+            . /vault/secrets/soba-aps-credential-issuer
+            printf "%s %s\n" "$PLUGIN_APS_CREDENTIAL_ISSUER_V3_GATEWAY_ID" "$PLUGIN_APS_CREDENTIAL_ISSUER_V3_ENVIRONMENT_APP_ID"
+          ')
+          [[ "$SETTINGS" =~ ^(gw-[a-z0-9-]+)\ ([a-zA-Z0-9_-]+)$ ]] || {
+            echo '::error::Invalid gateway ID or product environment app ID in the PR Vault secret'
+            exit 1
+          }
+          {
+            printf 'GATEWAY_ID=%s\n' "${BASH_REMATCH[1]}"
+            printf 'GATEWAY_ENVIRONMENT_APP_ID=%s\n' "${BASH_REMATCH[2]}"
+          } >> "$GITHUB_ENV"
+
+      - name: Validate settings and render gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 49 leaves room for the -api-gov-bc-ca suffix in a 63-character DNS label.
+          [[ "$RELEASE" =~ ^soba-[a-z0-9-]+$ && ${#RELEASE} -le 49 ]]
+          [[ "$OPENSHIFT_NAMESPACE" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] \
+            || { echo '::error::Set OC_NAMESPACE on the selected environment'; exit 1; }
+          case "$APP_ENVIRONMENT" in
+            pr|dev|test|uat|prod)
+              : "${APS_HOST:?Set APS_HOST repository variable.}"
+              ;;
+            *)
+              echo "::error::Unsupported application environment: $APP_ENVIRONMENT"
+              exit 1
+              ;;
+          esac
+          if [[ ! "$GWA_SHA256" =~ ^[a-fA-F0-9]{64}$ ]]; then
+            echo '::error::Set Actions variable GWA_LINUX_AMD64_SHA256 to the reviewed 64-character SHA256 of the pinned GWA release archive'
+            exit 1
+          fi
+          if [[ ! "$GATEWAY_ID" =~ ^gw-[a-z0-9-]+$ ]]; then
+            echo '::error::Missing or invalid gateway ID for the selected environment (gw-...)'
+            exit 1
+          fi
+          if [[ -z "$GATEWAY_HOSTNAME" ]]; then
+            if [[ "$APP_ENVIRONMENT" == pr ]]; then
+              export GATEWAY_HOSTNAME="${APS_GATEWAY_HOST_PREFIX:?Set APS_GATEWAY_HOST_PREFIX in the pr environment.}.${APS_HOST}"
+            elif [[ "$APP_ENVIRONMENT" == dev ]]; then
+              export GATEWAY_HOSTNAME="${APS_GATEWAY_HOST_PREFIX:?Set APS_GATEWAY_HOST_PREFIX in the dev environment.}.${APS_HOST}"
+            else
+              export GATEWAY_HOSTNAME="${RELEASE}.api.gov.bc.ca"
+            fi
+          fi
+          export GATEWAY_ROUTE_PATH=/
+          if [[ "$APP_ENVIRONMENT" == pr ]]; then
+            [[ "$RELEASE" =~ ^soba-pr-([1-9][0-9]*)$ ]] || exit 1
+            export GATEWAY_ROUTE_PATH="/pr/${BASH_REMATCH[1]}/"
+          fi
+          echo "GATEWAY_ROUTE_PATH=$GATEWAY_ROUTE_PATH" >> "$GITHUB_ENV"
+          echo "GATEWAY_HOSTNAME=$GATEWAY_HOSTNAME" >> "$GITHUB_ENV"
+          export GATEWAY_SERVICE_NAME="soba-${GATEWAY_QUALIFIER}"
+          export BACKEND_HOST="${RELEASE}-backend.${OPENSHIFT_NAMESPACE}.svc"
+          node deployments/gateway/scripts/generate-gateway-config.mjs \
+            --output "$RUNNER_TEMP/gateway-kong.yaml"
+          cat "$RUNNER_TEMP/gateway-kong.yaml"
+
       - name: Render integration gateway
         if: ${{ inputs.integration_enabled }}
         shell: bash
         run: |
           set -euo pipefail
-          : "${GATEWAY_ENVIRONMENT_APP_ID:?Set APS_ENVIRONMENT_APP_ID in the selected GitHub environment}"
+          : "${GATEWAY_ENVIRONMENT_APP_ID:?Missing integration product environment app ID}"
           [[ "$GATEWAY_ENVIRONMENT_APP_ID" =~ ^[a-zA-Z0-9_-]+$ ]] \
-            || { echo '::error::Invalid APS_ENVIRONMENT_APP_ID in the selected GitHub environment'; exit 1; }
+            || { echo '::error::Invalid integration product environment app ID'; exit 1; }
           export BACKEND_HOST="${RELEASE}-backend.${OPENSHIFT_NAMESPACE}.svc"
           INTEGRATION_ROUTE_PATH="${GATEWAY_ROUTE_PATH}integrations/v2/"
           echo "INTEGRATION_ROUTE_PATH=$INTEGRATION_ROUTE_PATH" >> "$GITHUB_ENV"

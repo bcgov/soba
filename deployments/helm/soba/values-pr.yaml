@@ -49,8 +49,6 @@ backend:
   credentialIssuer:
     apsCredentialIssuerV3:
       apiBaseUrl: https://api.gov.bc.ca/ds/api/v3
-      # Match the PR route gateway. Vault must supply this gateway's issuer account and product environment.
-      gatewayId: "gw-d3969"
       tokenUrl: https://authz.apps.gov.bc.ca/auth/realms/aps/protocol/openid-connect/token
   documentGeneration:
     cdogsV2:
@@ -149,3 +147,4 @@ temporalWorkers:
 
 vault:
   enabled: true
+  apsGatewayIdFromVault: true

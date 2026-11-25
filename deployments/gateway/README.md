@@ -54,20 +54,22 @@ integration service after deploying the backend. For PR 123 the integration serv
 both qualifiers under the same per-release gateway lock. The gateway job checks out the PR source
 ref so the rendered configuration matches the deployed feature code.
 
-The gateway job reads the integration ACL's product environment appId from the GitHub variable
-`APS_ENVIRONMENT_APP_ID`. It must belong to `APS_GATEWAY_ID` and match the appId used by the
-backend's APS credential issuer. The backend still reads its issuer settings from Vault.
+For PRs, the issuer and gateway publisher use the gateway ID and product environment appId from
+the PR Vault secret. The gateway job reads those two IDs from the deployed backend pod through
+OpenShift. Add `PLUGIN_APS_CREDENTIAL_ISSUER_V3_GATEWAY_ID` to the PR Vault secret before rolling
+out this change. The OpenShift workflow token needs `pods/exec` access in the PR namespace.
+PR Close resolves the gateway from the backend before uninstalling the release. If gateway cleanup
+fails, the release remains available for a retry.
 
 Configure the `pr` GitHub environment (or inherited repository settings):
 
 | Kind | Name | Purpose |
 | --- | --- | --- |
-| Variable | `APS_ENVIRONMENT_APP_ID` | Product environment appId for the integration ACL on the configured gateway |
 | Secret, when automated health checks are enabled | `APS_INTEGRATION_HEALTH_API_KEY` | Dedicated CI API key approved for that Product Environment; never a GWA management client secret |
 | Variable, optional | `APS_UPSTREAM_JWT_ISSUER` | Defaults to `https://aps-jwks-upstream-jwt.api.gov.bc.ca` |
 | Variable, optional | `APS_UPSTREAM_JWKS_URI` | Defaults to `https://aps-jwks-upstream-jwt.api.gov.bc.ca/certs` |
 
-Existing `APS_GATEWAY_ID`, `APS_HOST`, `APS_GATEWAY_HOST_PREFIX`, GWA credentials and OpenShift settings
+Existing `APS_HOST`, `APS_GATEWAY_HOST_PREFIX`, GWA credentials and OpenShift settings
 are still required. The optional issuer/JWKS overrides must both refer to the APS instance actually
 serving the gateway. The CI key is approved through APS once; the workflow does not issue or rotate it.
 It need not exist in the PR database because health verifies the gateway JWT without a credential lookup.
@@ -177,12 +179,12 @@ the selected GitHub environment.
 | Variable | `OC_SERVER` | OpenShift API URL |
 | Variable | `APS_HOST` | APS host, `api.gov.bc.ca` for Gold |
 | Variable | `APS_GATEWAY_HOST_PREFIX` | PR or Dev host prefix (`soba-pr` or `soba-dev`) |
-| Variable | `APS_GATEWAY_ID` | Gateway ID on the selected Gold APS instance |
+| Variable | `APS_GATEWAY_ID` | Gateway ID for non-PR environments |
 | Variable | `GWA_LINUX_AMD64_SHA256` | SHA256 of `gwa_Linux_x86_64.tgz` from the [gwa-cli v3.2.0](https://github.com/bcgov/gwa-cli/releases/tag/v3.2.0) `checksums.txt` |
 
 | Environment | Gateway | APS instance |
 | --- | --- | --- |
-| `pr` | `gw-d3969` | Gold |
+| `pr` | Set in the PR Vault secret | Gold |
 | `dev` | `gw-93f93` | Gold |
 | `test` | `gw-7f49d` | Gold |
 | `prod` | not configured | Not configured |
