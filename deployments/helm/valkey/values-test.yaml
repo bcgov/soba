@@ -1,1 +1,8 @@
-# Test uses chart defaults: 1 replica, NetworkPolicy on. No overrides needed.
+# b82f30-test hosts both soba-test and soba-uat, each on cache-redis, messagebus-redis and
+# eventstream-redis like prod, so it keeps streams durable the same way (AOF on a PVC,
+# volatile-lru). Chart-default memory and resources.
+valkey:
+  maxmemoryPolicy: volatile-lru
+  persistence:
+    enabled: true
+    size: 1Gi

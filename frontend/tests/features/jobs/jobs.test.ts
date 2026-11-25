@@ -1,24 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import en from '@/dictionaries/en.json';
 import fr from '@/dictionaries/fr.json';
-import { jobTypeLabel, queuedItsActions, submissionJobTypes } from '@/src/features/jobs/jobs';
+import { jobTypeLabel, queuedItsChildren, submissionJobTypes } from '@/src/features/jobs/jobs';
 import type { Dictionary } from '@/src/types/dictionary';
 
-describe('queuedItsActions', () => {
-  const job = (type: string, childrenQueuedAt: string | null, children: unknown[] = []) =>
-    ({ type, childrenQueuedAt, children }) as Parameters<typeof queuedItsActions>[0];
+describe('queuedItsChildren', () => {
+  const job = (childrenQueuedAt: string | null, children: unknown[] = []) =>
+    ({ childrenQueuedAt, children }) as Parameters<typeof queuedItsChildren>[0];
 
-  it.each(['submission.submitted', 'submission.status-changed'])(
-    'marks a %s job that queued its jobs, even once retention deleted them',
-    (type) => {
-      expect(queuedItsActions(job(type, null, [{ id: 'child-1' }]))).toBe(true);
-      expect(queuedItsActions(job(type, '2026-11-08T00:00:00Z'))).toBe(true);
-      expect(queuedItsActions(job(type, null))).toBe(false);
-    },
-  );
+  it('marks a job that queued jobs, even once retention deleted them', () => {
+    expect(queuedItsChildren(job(null, [{ id: 'child-1' }]))).toBe(true);
+    expect(queuedItsChildren(job('2026-11-08T00:00:00Z'))).toBe(true);
+  });
 
-  it('never marks a job that queues no jobs of its own', () => {
-    expect(queuedItsActions(job('submission.status-email', '2026-11-08T00:00:00Z'))).toBe(false);
+  it('never marks a job that queued none', () => {
+    expect(queuedItsChildren(job(null))).toBe(false);
   });
 });
 
@@ -40,6 +36,31 @@ describe('job types', () => {
 
   it("lists submitter email copies among a submission's job types", () => {
     expect(submissionJobTypes()).toContain('submission.email-copy');
+  });
+
+  it.each([
+    ['en', en as Dictionary, 'Submit to Email', 'Submit to Email: emails'],
+    ['fr', fr as Dictionary, 'Soumettre par courriel', 'Soumettre par courriel : courriels'],
+  ])('names a Submit to Email job and its email step in %s', (_language, dict, build, email) => {
+    expect(jobTypeLabel('post-submission-email-package', dict)).toEqual({ text: build });
+    expect(jobTypeLabel('post-submission-email-package:email', dict)).toEqual({ text: email });
+  });
+
+  it("names a step this build does not know by the server's name, else its type, in English", () => {
+    const type = 'post-submission-email-package:other';
+    const types = [{ type, name: 'Submit to Email (other)' }];
+    expect(jobTypeLabel(type, en as Dictionary, types)).toEqual({
+      text: 'Submit to Email (other)',
+      lang: 'en',
+    });
+    expect(jobTypeLabel(type, en as Dictionary)).toEqual({ text: type, lang: 'en' });
+  });
+
+  it("lists an action's later steps after the action among a submission's job types", () => {
+    const types = submissionJobTypes();
+    const build = types.indexOf('post-submission-email-package');
+    expect(build).toBeGreaterThan(-1);
+    expect(types[build + 1]).toBe('post-submission-email-package:email');
   });
 
   it("lists status changes and their emails among a submission's job types", () => {

@@ -59,6 +59,14 @@ services without changing the chart structure.
 - Kubernetes 1.24+
 - **PostgreSQL** — the database is **not** included in this chart and must be
   provisioned separately (managed service, Bitnami sub-chart, CrunchyDB operator, etc.)
+- **Valkey** and **ClamAV** — one of each per namespace, installed by hand from
+  `deployments/helm/valkey` and `deployments/helm/clamav` as releases named `valkey` and `clamav`
+  (see each chart's README). No pipeline installs them. This chart only adds the
+  `<release>-valkey` and `<release>-clamav` aliases that point at them. Every deployment runs the
+  cache, message bus and event streams on Valkey (`cache-redis`, `messagebus-redis`,
+  `eventstream-redis`), and the chart refuses the per-pod `*-memory` plugins. Releases that share a
+  namespace (test and UAT in `b82f30-test`, PR slots in `b82f30-dev`) share its Valkey under
+  per-release prefixes.
 
 ## Chart Structure
 
@@ -210,11 +218,25 @@ starts nothing. ConfigMap `<fullname>-backend-workflow-engine`:
 Notification sends email. `notification-noop` (the default) sends nothing; `notify-v1` calls BC Gov
 Notify with an API key. ConfigMap `<fullname>-backend-notification`:
 
-| Helm value                                | Env var                       | Used by                       |
-| ----------------------------------------- | ----------------------------- | ----------------------------- |
-| `backend.config.notificationDefaultCode`  | `NOTIFICATION_DEFAULT_CODE`   | default notification resolver |
-| `backend.notification.notifyV1.endpoint`  | `PLUGIN_NOTIFY_V1_ENDPOINT`   | notify-v1 adapter             |
-| `backend.notification.notifyV1.timeoutMs` | `PLUGIN_NOTIFY_V1_TIMEOUT_MS` | notify-v1 adapter             |
+| Helm value                                | Env var                              | Used by                       |
+| ----------------------------------------- | ------------------------------------ | ----------------------------- |
+| `backend.config.notificationDefaultCode`  | `NOTIFICATION_DEFAULT_CODE`          | default notification resolver |
+| `backend.notification.dailyLimit`         | `NOTIFICATION_DAILY_LIMIT`           | every email job               |
+| `backend.notification.dailyResetTimeZone` | `NOTIFICATION_DAILY_RESET_TIME_ZONE` | every email job               |
+| `backend.notification.notifyV1.endpoint`  | `PLUGIN_NOTIFY_V1_ENDPOINT`          | notify-v1 adapter             |
+| `backend.notification.notifyV1.timeoutMs` | `PLUGIN_NOTIFY_V1_TIMEOUT_MS`        | notify-v1 adapter             |
+
+The environment sends up to `NOTIFICATION_DAILY_LIMIT` emails a day (3000 when unset, under
+Notify's 100,000 a month over 31 days; 100 in PR environments), counting from midnight in
+`NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset). An email job past it waits
+until the next midnight. When Notify answers 429, every email job waits a minute, doubling with
+each 429 in a row, up to an hour. Each environment counts only its own sends, so environments that
+share a Notify key share its quota, and their limits together should stay under it. Every backend
+pod reads the same count, but sends in flight together can pass the limit by up to the backend's
+pods times `JOB_LIGHT_CONCURRENCY` on a day that reaches it, so keep `dailyLimit` that far under
+3225 (100,000 / 31). Prod sets 3200: 6 pods at most, 4 light workers each, so at most 3224 a day.
+Lower it when either grows. A `dailyLimit` outside 1 to 100000 fails the render; an invalid zone
+stops startup.
 
 ### Secret values (Vault template in backend Deployment)
 
@@ -251,28 +273,65 @@ either key is missing.
 
 Actions that run after a submit are plugins, run as jobs while `backend.features.post-submission`
 is on; the After Submission tab shows on every workspace and form then. The list names the action
-codes this environment runs, comma-separated; with none listed, a submit queues no actions. Set in
-ConfigMap `<fullname>-backend-app` only when non-empty:
+codes this environment runs, comma-separated; with none listed, a submit queues no actions. A listed
+code with no installed plugin, or one whose settings keep it from loading, stops the backend from
+starting. Set in ConfigMap `<fullname>-backend-app` only when non-empty:
 
-| Helm value                                                 | Env var                                                           | Used by                         |
-| ---------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------- |
-| `backend.config.postSubmissionActionPlugins`               | `POST_SUBMISSION_ACTION_PLUGINS`                                  | post-submission actions         |
-| `backend.config.postSubmissionEmailFormHourlyLimit`        | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_FORM_HOURLY_LIMIT`        | post-submission-email-addresses |
-| `backend.config.postSubmissionEmailWorkspaceHourlyLimit`   | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_WORKSPACE_HOURLY_LIMIT`   | post-submission-email-addresses |
-| `backend.config.postSubmissionEmailEnvironmentHourlyLimit` | `PLUGIN_POST_SUBMISSION_EMAIL_ADDRESSES_ENVIRONMENT_HOURLY_LIMIT` | post-submission-email-addresses |
+| Helm value                                               | Env var                                               | Used by                       |
+| -------------------------------------------------------- | ----------------------------------------------------- | ----------------------------- |
+| `backend.config.postSubmissionActionPlugins`             | `POST_SUBMISSION_ACTION_PLUGINS`                      | post-submission actions       |
+| `backend.config.postSubmissionEmailPackageMaxFileMb`     | `PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_MAX_FILE_MB`    | post-submission-email-package |
+| `backend.config.postSubmissionEmailPackageMaxPackageMb`  | `PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_MAX_PACKAGE_MB` | post-submission-email-package |
+| `backend.config.postSubmissionEmailPackageRetentionDays` | `PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_RETENTION_DAYS` | post-submission-email-package |
 
 `post-submission-log` only logs that it ran. No environment lists it; a local run can.
 
 `post-submission-email-addresses` emails a notice to a list of up to 100 addresses through the
-active notification plugin. The hourly limits (defaults 500 per form, 2000 per workspace, 5000 for
-the environment) are checked before a list starts; a list that would pass one is not sent and its
-job ends cancelled with the counts. Its feature, `backend.features.post-submission-email`, applies
-to every workspace and form while its status is `enabled`. Every environment lists the plugin and
-enables both features. Dev, PR and test send through Notify test, which delivers only to its
-safelist. UAT and prod keep `backend.features.notifications` disabled, so email jobs there end
-cancelled; sending needs that feature enabled, `notificationDefaultCode: notify-v1`,
-`notification.notifyV1.endpoint`, and `PLUGIN_NOTIFY_V1_API_KEY` in the Vault secret.
-A limit outside 100 to 1000000 fails the render.
+active notification plugin, within the daily email limit (see Notification Configuration); past
+it, the rest of a list waits for the next day. Its feature,
+`backend.features.post-submission-email`, applies to every workspace and form while its status is
+`enabled`. Every environment lists the plugin and enables both features. Dev, PR, test and UAT send
+through Notify test, which delivers only to its safelist; prod sends through Notify. Sending needs
+`backend.features.notifications` enabled, `notificationDefaultCode: notify-v1`,
+`notification.notifyV1.endpoint`, and `PLUGIN_NOTIFY_V1_API_KEY` in the Vault secret; without them,
+email jobs end cancelled.
+
+`post-submission-email-package` (Submit to Email) emails each address on a list of up to 100 a link
+to a package of a submission when it is first submitted: a zip of a PDF rendered with the form
+version's CDOGS template and the files uploaded with the submission. The package is built in temp
+storage, stored as the job's result in the job results storage, and downloaded only by signed-in
+users who can read the submission, while the feature is on for its form. Its emails count toward
+the daily email limit. A package is kept `postSubmissionEmailPackageRetentionDays` (default 7),
+counted again each time its email step starts. While that step has not succeeded, the package is
+kept until the step's job is deleted under `backend.jobs.deadRetentionDays` (default 90), so a
+re-run can still send it; deleting the submission frees it at the next sweep.
+
+Its feature, `backend.features.post-submission-email-package`, is scoped: while its status is
+`enabled`, it applies only to the workspaces and forms granted it on the Administration "Feature
+access" page (`/admin/feature-scopes`). Every environment lists the plugin and enables the feature,
+so it is off for each workspace and form until granted. PR keeps packages one day, with its other
+job results. Without notifications enabled, package jobs end cancelled before they build anything.
+To use it in a workspace or form:
+
+1. Grant the workspace or form on the Feature access page.
+2. Check that the job results storage works in that environment; UAT and prod have not stored a job
+   result yet.
+3. Give each form version that should send packages a CDOGS template. A submission to a version
+   without one sends nothing.
+4. On the granted workspace's or form's After Submission tab, turn Submit to Email on and add its
+   addresses.
+5. Optionally, set the size and retention settings in the table above. Empty keeps 25 MB per
+   upload, 100 MB per package and 7 days, and a value out of range fails the render.
+
+To turn it off:
+
+- At once, for some workspaces or forms: on the Feature access page, set their grants inactive or
+  delete them. Submits stop queuing packages, queued package jobs end cancelled when they start,
+  and links already emailed stop downloading.
+- Everywhere: set the status to `"disabled"` in the values file and deploy.
+
+Taking the code off `postSubmissionActionPlugins`, or turning `post-submission` off, stops new
+packages but leaves links already emailed working.
 
 To retire an action, take its code off the list first and remove its plugin in a later release.
 Jobs already queued for a plugin that no pod has stay queued.
@@ -280,11 +339,11 @@ Jobs already queued for a plugin that no pod has stay queued.
 The confirmation screen settings are gated by `backend.features.confirmation-screen`, and each
 setting by a feature of its own: `confirmation-email-copy` lets submitters email themselves a copy
 of their confirmation, and `confirmation-id-visibility` lets a form hide the Confirmation ID on its
-success page. All three are on in dev, PR and test and off in UAT and prod. Both settings default
+success page. All three are on in every environment. Both settings default
 on. Copies send only while `backend.features.notifications` is enabled.
 
 Copy requests are checked against hourly limits of their own; a request past one is refused with
-429 `email_copy_limit_reached`. Sent copies also count toward the action emails' limits above. Set
+429 `email_copy_limit_reached`. Sent copies also count toward the daily email limit. Set
 in ConfigMap `<fullname>-backend-app` only when non-empty; a value outside 1 to 1000000 fails the
 render:
 
@@ -300,10 +359,12 @@ render:
 
 A background job can keep one file it produced, such as a submission export. Result files are not
 virus-scanned: no one uploads them. They are kept for `backend.jobs.resultRetentionDays` (default 7)
-and removed by the job sweeper, as are the files of jobs that failed or were stopped. A job whose file
+and removed by the job sweeper, as are the files of jobs that failed or were stopped. Submit to
+Email packages are kept by rules of their own (see Post-Submission Action Configuration). A job whose file
 would pass `backend.jobs.resultMaxBytes` (default 200 MiB) fails. PR slots use 50 MiB and 1 day, as
 their file store volume is 1 Gi. A running CSV export stages its result and a spool of its ticked
-cells, which can be several times larger, in temp storage. With tempstorage-os that is the
+cells, which can be several times larger, in temp storage, and a package build stages its zip there,
+with a copy of any upload whose size is not known. With tempstorage-os that is the
 backend's `/tmp`, an emptyDir of `backend.tempStorage.tmpSizeLimit` (default 2Gi); past it the
 kubelet evicts the pod.
 
@@ -322,8 +383,8 @@ to start with a results profile that is not configured, and the chart fails on o
 recording it leaves the object behind, as can an interrupted multipart upload; a bucket lifecycle
 rule that aborts incomplete uploads and expires `jobs/` objects after the retention cleans those up.
 
-Submission export (`backend.features.submission-export`) is on in dev, PR and test and off in UAT and
-prod; the designer app's `featuresAllowed` lists it.
+Submission export (`backend.features.submission-export`) is on in every environment; the designer
+app's `featuresAllowed` lists it.
 
 ## Database Migration
 
@@ -411,18 +472,24 @@ The chart supports both **OpenShift Routes** (default) and **Kubernetes Ingress*
 Both backend and frontend have independent `route` and `ingress` settings — set
 them in pairs.
 
-Hostnames are derived from the release name and `global.domain`:
+Hostnames are derived from the release name, `global.hostPrefix` and `global.domain`. The
+release name's leading `soba` is swapped for `global.hostPrefix` (default `submit`), so release
+`soba-dev` serves at `submit-dev`; object names keep the release name. `global.hostBase` sets the
+first label outright instead: prod uses `submit`, for `submit.<domain>` and `submit-api.<domain>`.
 
-- **Frontend:** one host for every `frontend.apps` entry, `<fullname>.<domain>`
-  (e.g. `soba-dev.apps.gov.bc.ca`), with each app at its own `routePath`
+- **Frontend:** one host for every `frontend.apps` entry, `<host base>.<domain>`
+  (e.g. `submit-dev.apps.gov.bc.ca`), with each app at its own `routePath`
   (`/designer`, `/forms`). Pin it with `frontend.host` (PR deployments point at the dev host).
-- **Backend API:** `<fullname>-api.<domain>` (e.g. `soba-pr-42-api.apps.gov.bc.ca`),
+- **Backend API:** `<host base>-api.<domain>` (e.g. `submit-pr-42-api.apps.gov.bc.ca`),
   served under `backend.basePath` (e.g. `/chefs`).
 
 Each `frontend.apps` entry renders its own Deployment/Service/Route/ConfigMap, differing by
 `featuresAllowed` (the mode) and `routePath` (the URL). They share an image repository, but
 the tag carries the app name: Next bakes `basePath` at build time, so each path needs its own
-image. The backend `CORS_ORIGIN` defaults to the shared frontend origin; set
+image. The backend `CORS_ORIGIN` defaults to the shared frontend origin plus `https://<host>` for
+each `frontend.externalHosts` entry: hosts that serve the apps from outside the chart, such as the
+API gateway or a vanity domain (each environment's values file lists them; PRs use dev's). Pages
+loaded there still call the backend's Route, so they need that origin. Set
 `backend.config.corsOrigin` to override.
 
 ### Route annotations
@@ -462,10 +529,6 @@ backend:
     annotations:
       haproxy.router.openshift.io/timeout: "60s"
     extraPaths:
-      - name: files
-        path: /api/v1/submit/files
-        annotations:
-          haproxy.router.openshift.io/timeout: "300s"
       - name: files-api
         path: /api/v1/files
         annotations:
@@ -482,8 +545,8 @@ backend:
 
 That is what the chart ships: uploads at 300s on the file, template and print-upload paths, everything else at 60s. An upload writes nothing back until clamd finishes scanning (`clamav.timeoutMs`, 60s), so the router's 30s default would 504 a clean upload.
 
-Matching is by whole segment and prefix only — `/api/v1/submit/files` does not capture
-`/api/v1/submit/filestore`, and there is no suffix match. Document generation cannot be scoped this way: it sits at `/api/v1/{submit,design}/submissions/:id/print`, and the only prefix reaching it would swallow ordinary submission reads and writes. It is a synchronous call to CDOGS, so the base timeout has to cover it. Print with an uploaded template scans the upload before that call, so it has its own prefix, `/api/v1/design/print-upload`.
+Matching is by whole segment and prefix only — `/api/v1/files` does not capture
+`/api/v1/filestore`, and there is no suffix match. Document generation cannot be scoped this way: it sits at `/api/v1/{submit,design}/submissions/:id/print`, and the only prefix reaching it would swallow ordinary submission reads and writes. It is a synchronous call to CDOGS, so the base timeout has to cover it. Print with an uploaded template scans the upload before that call, so it has its own prefix, `/api/v1/design/print-upload`.
 
 `name` and `path` are required. `name` becomes the Route name and the `app.kubernetes.io/component` label, so it must be lowercase DNS-1123 and short enough to keep that label under 63 characters; duplicates are refused. `path` must start with `/` and needs `edge` or `reencrypt` termination, as `passthrough` cannot match on path. Host, Service and TLS come from the base Route. Each rule fails the render naming the entry.
 
@@ -619,18 +682,18 @@ product environment's appId) from Vault. A missing key keeps the backend pod fro
 [credential issuer](../../../docs/credential-issuer.md)
 for permissions, readiness limitations, and lifecycle behavior.
 
-The dev, PR, test and prod values files each declare their own issuer configuration. They use
+The dev, PR, test, UAT and prod values files each declare their own issuer configuration. They use
 `https://api.gov.bc.ca/ds/api/v3` for the Directory API and
 `https://authz.apps.gov.bc.ca/auth/realms/aps/protocol/openid-connect/token` for service-account tokens.
 The gateway service's public route is the URL consumers call; it is not the Directory API URL.
 
-Dev, PR and test run `aps-credential-issuer-v3` with `backend.features.api-keys` on; the others run
-`credential-issuer-noop` with the feature off. PRs use gateway `gw-d3969`, matching their published
-routes. Configure the PR deployment's Vault secret with an issuer account authorized for this gateway
-and its product environment appId. Set the GitHub `pr` environment's `APS_ENVIRONMENT_APP_ID`
-to that same product environment appId and `APS_GATEWAY_ID` to `gw-d3969`. The gateway check reads
-its ACL appId from GitHub; the backend issuer reads its settings from Vault. Closing a PR removes its
-routes, not its APS consumers. Follow
+Dev, PR, test, UAT and prod run `aps-credential-issuer-v3` with `backend.features.api-keys` on.
+PRs use gateway `gw-d3969`, matching their published routes. Configure the PR deployment's Vault
+secret with an issuer account authorized for this gateway and its product environment appId. Set
+the GitHub `pr` environment's `APS_ENVIRONMENT_APP_ID` to the same product environment appId and
+`APS_GATEWAY_ID` to `gw-d3969`. The gateway check reads its ACL appId from GitHub, and the backend
+issuer reads its credentials and product environment appId from Vault. Closing a PR removes its
+routes. Its APS consumers remain. Follow
 [Obtain the product environment appId](../../../docs/credential-issuer.md#obtain-the-product-environment-appid)
 to log in to the Portal, query products for the deployment's gateway in the API console, and copy
 the appropriate service's `environments[].appId` into its Vault secret.

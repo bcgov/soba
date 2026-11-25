@@ -53,6 +53,8 @@ const eslintConfig = defineConfig([
       ...sonarjs.configs.recommended.rules,
       ...sonarParityRules,
       'react/no-unused-prop-types': 'error',
+      // S6479: a list item's key is not its index.
+      'react/no-array-index-key': 'error',
     },
   },
   { files: TEST_FILES, languageOptions: typeInformation, rules: sonarParityTestRules },

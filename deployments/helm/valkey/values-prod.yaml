@@ -1,13 +1,20 @@
-# Prod: give the shared cache a bit more headroom. Still a single instance (best-effort cache).
-# Prod soba currently runs in-memory adapters (no cache/bus/stream redis), so this stays cache-tuned;
-# when prod adopts redis for durable streams, enable volatile-lru + persistence here to match.
+# Prod hosts the soba cache, message bus and event streams (cache-redis, messagebus-redis,
+# eventstream-redis), so it runs as a durable stream store: AOF on a PVC so a restart keeps streams
+# and consumer groups, and volatile-lru so only TTL'd cache entries are evicted, never stream keys.
 valkey:
   maxmemory: "512mb"
+  maxmemoryPolicy: volatile-lru
+  persistence:
+    enabled: true
+    # The AOF base plus a rewrite in progress can each approach the dataset size, so keep the
+    # volume well above maxmemory.
+    size: 2Gi
+    # Block storage, like the prod Postgres and MongoDB volumes.
+    storageClassName: netapp-block-standard
   resources:
     requests:
       cpu: 100m
       memory: 128Mi
     limits:
       cpu: 500m
-      # Headroom over maxmemory (512mb) for fragmentation/buffers — see values.yaml.
       memory: 896Mi

@@ -32,12 +32,12 @@ Notify's test service delivers only to the addresses on its safelist.
 `backend/src/core/integrations/notification/email/` builds every email. It has two layers: the
 layout frames any email, and a block for each kind of email fills it.
 
-| file                 | role                                                                                                                                                                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `html.ts`            | `markup`, a template tag that escapes every value unless it is markup the tag built, and `SafeHtml`, which nothing else can make. A look-alike object or `true` throws                                   |
-| `language.ts`        | `EmailLanguage` (`en`, `fr`), `EmailLanguages` (adds `both`) and `DEFAULT_EMAIL_LANGUAGE`                                                                                                                |
-| `layout.ts`          | `renderEmail(parts, languages)`: the container, the order of `both`, "(Le français suit)", the divider, the footer and a one-line subject. Also `paragraph`, `link`, `languageSection`, `withLineBreaks` |
-| `submissionEmail.ts` | the block for an email about a submission: `defineSubmissionEmail` and `renderSubmissionEmail`                                                                                                           |
+| file                 | role                                                                                                                                                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `html.ts`            | `markup`, a template tag that escapes every value unless it is markup the tag built, and `SafeHtml`, which nothing else can make. A look-alike object or `true` throws                                              |
+| `language.ts`        | `EmailLanguage` (`en`, `fr`), `EmailLanguages` (adds `both`) and `DEFAULT_EMAIL_LANGUAGE`                                                                                                                           |
+| `layout.ts`          | `renderEmail(parts, languages)`: the container, the order of `both`, "(Le français suit)", the divider, the footer and a one-line subject. Also `heading`, `paragraph`, `link`, `languageSection`, `withLineBreaks` |
+| `submissionEmail.ts` | the block for an email about a submission: `defineSubmissionEmail` and `renderSubmissionEmail`                                                                                                                      |
 
 The tag is named `markup`, not `html`: Prettier reformats the contents of any template tagged
 `html`, which would change the emails.
@@ -54,7 +54,9 @@ block or fake a Confirmation ID.
 
 A template holds words only, in English and French; the type requires both. It never writes markup.
 An email about a submission supplies, for each language, a subject and one sentence, as functions of
-the form name, and link text:
+the form name, and link text. When its words need one more fact, such as the time a link stops
+working, a function takes that fact and returns the template, as
+`backend/src/plugins/post-submission-email-package/email.ts` does:
 
 ```ts
 export const ASSIGNED_EMAIL = defineSubmissionEmail({
@@ -95,12 +97,14 @@ const content = renderSubmissionEmail(
 ```
 
 For each language, the submission block renders the Confirmation ID in bold, the sentence and the
-link. An email may also name a second link, with `secondLinkText` in its template and `secondLink`
-in its facts, such as a signed-in submitter's past submissions; the block renders it after the
-first, and leaves it out when either is missing. After every language's section it adds the
-reviewer's comment, once, under "Comments:", "Commentaires :", or "Comments: / Commentaires :" in an
-email in both. The subject ends with the Confirmation ID, as ` (code)`, so mail clients do not
-thread every email about one form into a single conversation.
+link. A template may add a `title`, rendered as a heading above the Confirmation ID, and a
+`linksIntro`, a line before the links that is left out when the email has no link. An email may
+also name a second link, with `secondLinkText` in its template and `secondLink` in its facts, such
+as a signed-in submitter's past submissions; the block renders it after the first, and leaves it
+out when either is missing. After every language's section it adds the reviewer's comment, once,
+under "Comments:", "Commentaires :", or "Comments: / Commentaires :" in an email in both. The
+subject ends with the Confirmation ID, as ` (code)`, so mail clients do not thread every email
+about one form into a single conversation.
 
 - **Form names** go through `cleanName` before a template sees them: no control or format
   characters, no links, one line, at most 200 characters.
@@ -111,7 +115,8 @@ thread every email about one form into a single conversation.
   only on localhost; they refuse credentials, a query or a fragment; they are built from the parsed
   base, so stray whitespace in a setting never reaches a link; and they encode each path segment.
   A link is built when the email renders, once for each language, so each language links
-  under its own path. With no base URL set, the email has no link.
+  under its own path. With no base URL set, the email has no link, except the submission package
+  email, which is not sent without one.
 
 Templates live beside the feature that sends them, such as
 `backend/src/features/submission-review/statusEmailTemplates.ts` and the notice in
@@ -133,7 +138,8 @@ French copy is reviewed by a fluent French speaker before it merges.
 ## Content
 
 - **What an email carries:** the Confirmation ID, the form name, the reviewer's comment when one is
-  attached, and a link. Never submitted answers or other personal data.
+  attached, a link, and the time that link stops working when it does. Never submitted answers or
+  other personal data.
 - **One email per address,** so no recipient sees another's address.
 - **No email to the person who made the change.** Assigning a submission to yourself sends nothing,
   and whoever made the change is left out of the submitters an email goes to, even a reviewer who
@@ -176,11 +182,13 @@ address with no expiry, as `notification_audit` rows keep recipients.
   decided inside it, and the event's `params.actions` records them, so later settings changes don't
   alter them. The Jobs tabs show them as "Actions recorded". A new reaction to an existing event is
   a new entry in that event's list; the code that records the event does not change.
-- **The fan-out queues the reactions.** In one transaction it marks the event's children queued and
-  inserts one job per recorded reaction, with dedupe key `<reaction type>:<event id>`, the event as
-  parent and the event's creator as its own. Once the children are queued, the event can't be run
-  again; their jobs can. When the submission, its form or its workspace is already gone, the event
-  ends cancelled with that reason and queues nothing.
+- **The fan-out queues the reactions.** The transaction that records the event's job as succeeded
+  marks its children queued and inserts one job per recorded reaction, with dedupe key
+  `<reaction type>:<event id>`, the event as parent and the event's creator as its own. Once the
+  children are queued, the event can't be run again; their jobs can. A stop asked for before then
+  ends the event cancelled with nothing queued, and a reaction the database refuses ends it dead.
+  When the submission, its form or its workspace is already gone, the event ends cancelled with that
+  reason and queues nothing.
 - **Params hold ids and choices, never content.** A status-changed event's params are
   `{ statusChangeId, actions }`, and its status email's are
   `{ statusChangeId, options: { attachComment } }`: a reaction's job keeps its recorded options
@@ -196,6 +204,8 @@ address with no expiry, as `notification_audit` rows keep recipients.
   | the job                       | when                                                                                                                                                                 |
   | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
   | throws, so it retries         | the provider fails without refusing the address, or times out; an audit row could not be written                                                                     |
+  | waits for the daily reset     | the day's sends reached `NOTIFICATION_DAILY_LIMIT`; the job is deferred to the next midnight, without using an attempt                                               |
+  | waits for a pause             | the provider answered 429, or a pause after one is in force (see the provider's limit below); without using an attempt                                               |
   | ends cancelled, with a reason | notifications are off; the event no longer applies; no one is left to send to; a recipient cannot be resolved, such as an assignee who can no longer review the form |
 
   Cancel reasons show in the Jobs tabs, so they name no address, comment or form name.
@@ -204,35 +214,65 @@ address with no expiry, as `notification_audit` rows keep recipients.
   1. Puts each address in lower case and drops duplicates.
   2. Counts an address no provider would take as refused, without sending to it.
   3. Skips the addresses this job already handled. With none left it stops, unless none was ever
-     sent (step 7).
+     sent (step 6).
   4. Checks that notifications are on.
-  5. Runs the policy's `checkBudgets`, if any, until the run has handled an address.
-  6. Sends to one address at a time. A refused address (400 or 422) is recorded and skipped; any
-     other failure throws.
-  7. Ends cancelled when no email on the list has been sent, on this attempt or an earlier one:
+  5. Sends to one address at a time, checking before each send that the environment may still
+     send today and that no pause after the provider's limit is in force; otherwise the job waits
+     for the daily reset or the end of the pause, and goes on from that address. A refused address
+     (400 or 422) is recorded and skipped. A send refused at the provider's limit (429) is recorded
+     as `limited`, which starts or lengthens the pause, and the job waits for it to end. Any other
+     failure throws.
+  6. Ends cancelled when no email on the list has been sent, on this attempt or an earlier one:
      every address was refused.
 - **Attribution.** `jobNotifications(job, actorId)` binds the service to the job; `actorId` is a
   function that gives the user each send is attributed to. A send is attributed to the person whose
   action caused it. Running an email's job again attributes its sends to whoever ran it; running an
   event again does not, since the jobs it queues keep the event's creator. An action a form is
   configured with, such as the notice, sends as the system user.
-- **Hourly limits** apply where people choose the recipients. The notice, whose list staff set,
-  checks its form, workspace and environment limits before its run sends anything. A submitter's
-  copy, sent to an address they type, is checked when they ask: per submission, address, form,
-  workspace and environment, counted from its own requests, and refused with 429
-  `email_copy_limit_reached` (`SUBMITTER_EMAIL_COPY_*_HOURLY_LIMIT`). A sent copy is also an
-  accepted send in `notification_audit`, so it counts toward the notice's limits. Status emails go
-  out one per person's action and have none.
+- **The daily limit.** The environment sends up to `NOTIFICATION_DAILY_LIMIT` emails a day (3000
+  when unset, under Notify's 100,000 a month over 31 days; 100 in PR environments), counted from
+  midnight in `NOTIFICATION_DAILY_RESET_TIME_ZONE` (`America/Vancouver` when unset) over every email
+  job's sends the provider accepted or refused, by the database clock. Past it, a job sends what
+  fits and the rest wait for the next day; the limit drops no email, though a job that no longer
+  applies when it wakes ends cancelled. Each send reads the day's count from the database first, so
+  every backend pod shares it. The read and the send are separate steps, so sends in flight together
+  can each take the last of the room. Every email job runs in the light pool, so a day that reaches
+  the limit can end past it by up to the backend's pods times `JOB_LIGHT_CONCURRENCY`. The limit
+  stays at least that far under 3225, Notify's 100,000 over 31 days: prod's 3200 allows 6 pods of 4,
+  so 3224 at most.
+- **The provider's limit.** Notify answers 429 at a sending limit, a rate or its monthly quota. A
+  429 pauses every email job, and only email jobs, for a minute after it; each further 429 before
+  Notify accepts an email doubles the pause, up to an hour. 429s in the same clock minute, as from
+  sends in flight together, count once, and sends count in the order they started. The daily limit
+  keeps the environment under the monthly quota.
+- **Copy request limits.** A submitter's copy, sent to an address they type, is also checked when
+  they ask: per submission, address, form, workspace and environment, counted from its own
+  requests, and refused with 429 `email_copy_limit_reached` (`SUBMITTER_EMAIL_COPY_*_HOURLY_LIMIT`).
 
 ## Emails today
 
 | email                   | sent to                                                    | link                                                                                                                                          | sent by                                                                                                                                              |
 | ----------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | New submission (notice) | the addresses a form's "Email a notice" action lists       | the submission in the designer                                                                                                                | the action's job, queued by the `submission.submitted` fan-out (`plugins/post-submission-email-addresses`), as the system user                       |
+| Submission package      | the addresses a form's "Submit to Email" action lists      | the package's download page in the designer, until the package expires or its feature is off for the form                                     | the action's `email` step, after its build step stores the package (`plugins/post-submission-email-package`), as the system user                     |
 | Assigned                | the reviewer the submission is assigned to                 | the submission in the designer                                                                                                                | a `submission.status-email` job, queued by the `submission.status-changed` fan-out (`features/submission-review/statusEmailJob.ts`), as the reviewer |
 | Revision requested      | the submission's owner and active collaborators            | the submission's `submit` page in the forms app                                                                                               | a `submission.status-email` job, as the reviewer; none when a submitter sends their own submission back                                              |
 | Review complete         | the submission's owner and active collaborators            | the submission in the forms app                                                                                                               | a `submission.status-email` job, as the reviewer                                                                                                     |
 | Submitter's copy        | the address the submitter typed on the confirmation screen | for a signed-in submitter, the submission in the forms app, and their past submissions on a form that is not public; none for the public user | a `submission.email-copy` job, queued with the request (`features/submitter-email-copy`), as the requester                                           |
+
+The submission package email goes out once per address, on a submission's first submit, after the
+action's build step has stored `<form name>-<confirmation ID>.zip`. It holds the submission's
+document, named `<template name>-<confirmation ID>.pdf` after the name staff gave its template, and
+the files uploaded with it as `attachments/<n>-<original name>`. An upload over the per-file limit,
+or one deleted, is left out and listed in `missing-files.txt`; the email always says that files left
+out are listed in the package.
+The link opens the package page, which needs sign-in and `submission_read` on the form, and the
+email gives the time, in Pacific time, after which the link stops working. Each time the email step
+starts, the package is kept at least `PLUGIN_POST_SUBMISSION_EMAIL_PACKAGE_RETENTION_DAYS` (7 by
+default) from then. The build step ends cancelled while notifications are off, and waits while no
+email room is left today or the provider has paused sends; it does not check `DESIGNER_APP_URL`.
+The email step ends dead, sending nothing, when `DESIGNER_APP_URL` is not set or the package is
+gone.
 
 ## Adding an email
 
@@ -259,11 +299,9 @@ address with no expiry, as `notification_audit` rows keep recipients.
    - an enqueue function in `backend/src/core/jobs/enqueue.ts`, run in the transaction that saves
      the event, which records the reactions
    - `nudgeJobs` after the commit
-   - a fan-out registered in the catalog
+   - a fan-out registered in the catalog, which queues the reactions with `queueOnSuccess`, so
+     neither the server nor the page offers to run the event again once it has
    - its names in the Jobs tabs
-   - its type in both `FAN_OUT_TYPES` sets, in `jobViewService.ts` and
-     `frontend/src/features/jobs/jobs.ts`, so neither the server nor the page offers to run it again
-     once it has queued its reactions
 8. Test it: the full English body, a French subject and body, the reaction's rule, the handler's
    recipients, cancel reasons and attribution, and that the event records the reaction once. Unit
    tests use no real database.

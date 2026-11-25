@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { type FormEvent, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { FormType, Submission } from '@formio/react';
 import { withFilesReadOnly } from '@/src/features/formio-v5/filesReadOnly';
 import { DynamicForm } from './DynamicForm';
 import styles from './EditableFormView.module.css';
-import { useUserChange } from './useUserChange';
+import { isSelectSearch, useUserChange } from './useUserChange';
+
+const noop = () => undefined;
 
 /** What an editor reads of the live webform. */
 export type EditableFormInstance = {
@@ -14,6 +16,8 @@ export type EditableFormInstance = {
   checkValidity: (data: Record<string, unknown>, dirty: boolean) => boolean;
   /** Form.io's blur, scheduled to run a moment after a field loses focus. */
   pendingBlur?: { cancel?: () => void } | null;
+  /** Resolves once the given submission's answers are in the webform. */
+  submissionReady?: Promise<unknown>;
 };
 
 /**
@@ -39,7 +43,7 @@ export function EditableFormView({
   const options = useMemo(() => ({ readOnly: false, noAlerts: true }), []);
   const form = useMemo(() => withFilesReadOnly(schema), [schema]);
   const instance = useRef<EditableFormInstance | null>(null);
-  const { touchProps, isUserChange } = useUserChange();
+  const { touchProps, isUserChange, noteAnswers } = useUserChange();
 
   // A field that loses focus as the form unmounts leaves Form.io a blur to run a moment later on the
   // destroyed webform, where it throws.
@@ -52,10 +56,16 @@ export function EditableFormView({
     (webform: unknown) => {
       const ready = webform as EditableFormInstance;
       instance.current = ready;
+      ready.submissionReady?.then(() => noteAnswers(ready.data), noop);
       onFormReady?.(ready);
     },
-    [onFormReady],
+    [onFormReady, noteAnswers],
   );
+
+  // Typing counts as it happens: Form.io reports it a moment later, and a Tags field only once left.
+  const onInputCapture = (event: FormEvent) => {
+    if (!isSelectSearch(event.target) && instance.current) onDataChange(instance.current.data);
+  };
 
   return (
     <div
@@ -63,6 +73,7 @@ export function EditableFormView({
       data-soba-formio-chrome
       data-testid={testId}
       {...touchProps}
+      onInputCapture={onInputCapture}
     >
       <DynamicForm
         className="formio-v5-form-root"
@@ -73,10 +84,10 @@ export function EditableFormView({
         onFormReady={handleFormReady}
         onChange={(
           value: { data?: Record<string, unknown> },
-          _flags: unknown,
+          flags: unknown,
           modified: boolean,
         ) => {
-          if (value?.data && isUserChange(modified)) onDataChange(value.data);
+          if (isUserChange(value, flags, modified) && value?.data) onDataChange(value.data);
         }}
       />
     </div>

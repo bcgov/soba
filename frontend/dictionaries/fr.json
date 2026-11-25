@@ -1,6 +1,5 @@
 {
   "locale": "fr",
-  "name": "Common Hosted Forms",
   "general": {
     "login": "Connecter",
     "logout": "Déconnexion",
@@ -10,6 +9,12 @@
     "description": "Bienvenue sur Common Hosted Forms Service (CHEFS) où vous pouvez créer et publier des formulaires, recevoir et examiner des soumissions, et intégrer avec vos systèmes métier.",
     "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section.",
     "unknown": "Inconnu",
+    "unsavedChanges": {
+      "title": "Quitter sans enregistrer?",
+      "message": "Vos modifications n'ont pas été enregistrées. Si vous quittez, elles seront perdues.",
+      "confirm": "Quitter sans enregistrer",
+      "stay": "Continuer la modification"
+    },
     "home": "Accueil",
     "forms": "Formulaires",
     "myForms": "Mes formulaires",
@@ -106,6 +111,7 @@
     "unavailableFilter": "Cet espace de travail n'est pas disponible pour vous. Affichage de tous les formulaires.",
     "clearFilter": "Effacer le filtre",
     "listLoadError": "Échec du chargement des espaces de travail.",
+    "permissionsTab": "Autorisations",
     "rolesTab": "Rôles",
     "roles": {
       "addRole": "Ajouter un rôle",
@@ -414,7 +420,8 @@
       "submissionExport": "Exportation des soumissions",
       "submissionStatusChanged": "Statut modifié",
       "submissionStatusEmail": "Courriel de statut",
-      "submissionEmailCopy": "Copie par courriel au soumissionnaire"
+      "submissionEmailCopy": "Copie par courriel au soumissionnaire",
+      "actionStep": "{action} : {step}"
     },
     "detail": {
       "heading": "Tâche",
@@ -426,7 +433,7 @@
       "loadError": "Échec du chargement de la tâche.",
       "notFound": "Cette tâche est introuvable. Les tâches terminées sont supprimées après un certain temps.",
       "refreshError": "Impossible de relire la tâche; nouvelle tentative en cours.",
-      "actionsQueued": "Ses actions ont déjà été mises en file d'attente; elle ne peut donc pas être relancée. Relancez plutôt leurs tâches.",
+      "childrenQueued": "Elle a déjà mis des tâches en file d'attente; elle ne peut donc pas être relancée. Relancez plutôt les tâches qu'elle a mises en file d'attente.",
       "exportEnded": "Une exportation n'est pas relancée. La personne qui l'a démarrée peut en démarrer une nouvelle à partir de la page Exportations du formulaire.",
       "byValue": "{at}, par {by}",
       "rerunsValue": "{count}, la dernière le {at} par {by}",
@@ -806,10 +813,6 @@
       "cancelEdit": "Annuler",
       "editingNotice": "Vous modifiez les réponses soumises. Le formulaire les vérifie lors de la mise à jour. Les fichiers ne peuvent pas être modifiés ici.",
       "editInvalid": "Certaines réponses ne sont pas valides. Corrigez les champs indiqués, puis mettez à jour.",
-      "leaveEditTitle": "Quitter sans enregistrer?",
-      "leaveEditMessage": "Vos modifications aux réponses n’ont pas été enregistrées. Elles seront perdues si vous quittez cette page.",
-      "leaveEditConfirm": "Quitter sans enregistrer",
-      "leaveEditStay": "Continuer la modification",
       "submit": "Soumettre",
       "dataHistoryTitle": "Historique des données soumises",
       "dataHistoryIntro": "Ce journal indique qui a modifié cette soumission après la soumission initiale.",
@@ -914,6 +917,10 @@
       "filePageTitle": "Télécharger l’exportation",
       "backToExports": "Retour aux exportations",
       "fileNotFound": "Cette exportation n’est plus disponible. Démarrez-en une nouvelle."
+    },
+    "package": {
+      "pageTitle": "Télécharger le paquet de la soumission",
+      "notFound": "Ce paquet n’est plus disponible."
     },
     "emailReceipt": {
       "button": "Envoyer un reçu de la soumission par courriel",
@@ -1102,21 +1109,34 @@
     "status": "État : {status}",
     "on": "Activée",
     "off": "Désactivée",
-    "email": {
-      "label": "Envoyer un avis par courriel",
-      "description": "Envoie un court courriel à chaque adresse de la liste lorsqu'une soumission est reçue.",
-      "enabled": "Envoyer ces courriels",
+    "addressList": {
       "recipients": "Destinataires",
       "recipientsHelp": "Tapez une adresse et appuyez sur Entrée, ou collez-en plusieurs à la fois. Pour retirer une adresse, sélectionnez-la et appuyez sur Suppr ou Retour arrière.",
-      "noticeHelp": "Chaque adresse reçoit son propre courriel avec le nom du formulaire, l’ID de confirmation et un lien vers la soumission, qui exige une connexion. Les courriels au-delà de la limite horaire ne sont pas envoyés.",
       "count": "Adresses : {count} / {max}",
       "invalid": "Adresse courriel non valide. Corrigez ou supprimez le texte dans le champ.",
       "tooMany": "Une liste peut contenir jusqu'à {max} adresses. Les autres sont toujours dans le champ.",
       "duplicate": "Déjà dans la liste : {addresses}",
-      "required": "Ajoutez au moins une adresse, ou désactivez ces courriels.",
       "added": "Ajout : {addresses}",
       "removed": "Retrait : {address}",
       "none": "Aucune adresse pour l'instant."
+    },
+    "email": {
+      "label": "Envoyer un avis par courriel",
+      "description": "Envoie un court courriel à chaque adresse de la liste lorsqu'une soumission est reçue.",
+      "enabled": "Envoyer ces courriels",
+      "help": "Chaque adresse reçoit son propre courriel avec le nom du formulaire, l’ID de confirmation et un lien vers la soumission, qui exige une connexion. Au-delà de la limite quotidienne d’envoi, les courriels attendent et sont envoyés après sa remise à zéro, à minuit.",
+      "required": "Ajoutez au moins une adresse, ou désactivez ces courriels."
+    },
+    "emailPackage": {
+      "label": "Soumettre par courriel",
+      "description": "Lorsqu'une soumission est soumise pour la première fois, envoie à chaque adresse de la liste un lien vers un paquet de celle-ci : un PDF des réponses et les fichiers téléversés, dans un seul fichier zip.",
+      "enabled": "Envoyer par courriel un lien vers le paquet de la soumission",
+      "help": "Chaque adresse reçoit son propre courriel avec le nom du formulaire, l'ID de confirmation et un lien vers le paquet. Le téléchargement exige une connexion et l'accès aux soumissions du formulaire. Au-delà de la limite quotidienne d'envoi, les courriels attendent et sont envoyés après sa remise à zéro, à minuit.",
+      "required": "Ajoutez au moins une adresse, ou désactivez le paquet.",
+      "privacyNotice": "Le paquet contient les réponses de la soumission et les fichiers téléversés. Une copie téléchargée se trouve hors de CHEFS : n'ajoutez que des personnes qui doivent en conserver une.",
+      "templateNoticeWorkspace": "Un paquet n'est envoyé que pour les soumissions à une version de formulaire qui a un modèle CDOGS dans Modèles de documents. Les soumissions à une version sans modèle n'envoient rien.",
+      "templateNoticeForm": "Un paquet n'est envoyé que si la version soumise du formulaire a un modèle CDOGS dans Modèles de documents. Sans modèle, rien n'est envoyé.",
+      "emailStep": "courriels"
     },
     "log": {
       "label": "Consigner chaque soumission",
@@ -1146,6 +1166,7 @@
     "fileId": "Identifiant de fichier",
     "submissionId": "Identifiant de soumission",
     "exportId": "Identifiant d'exportation",
+    "packageId": "Identifiant de paquet",
     "type": "Type",
     "size": "Taille",
     "errorCode": "Code d'erreur",

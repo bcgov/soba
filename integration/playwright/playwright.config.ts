@@ -12,15 +12,15 @@ function getExpectedURL(depEnv: string): string {
   // PR environments: DEP_ENV is a PR number
   if (/^\d+$/.test(depEnv)) {
     const prNumber = Number(depEnv);
-    return `https://soba-dev.apps.gold.devops.gov.bc.ca/designer-${prNumber}/en`;
+    return `https://submit-dev.apps.gold.devops.gov.bc.ca/designer-${prNumber}/en`;
   }
 
   switch (depEnv.toLowerCase()) {
     case 'dev':
-      return 'https://soba-dev.apps.gold.devops.gov.bc.ca/designer/en';
+      return 'https://submit-dev.apps.gold.devops.gov.bc.ca/designer/en';
 
     case 'test':
-      return 'https://soba-test.apps.gold.devops.gov.bc.ca/designer/en';
+      return 'https://submit-test.apps.gold.devops.gov.bc.ca/designer/en';
 
     default:
       throw new Error(`Invalid DEP_ENV: ${depEnv}`);

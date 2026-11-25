@@ -1,6 +1,18 @@
 # Prod: 3 replicas (spread across nodes via podAntiAffinity) + PDB.
+# Capacity is replicas x limits.maxThreads (3 x 4 = 12 scans at once). The backend has no
+# per-pod scan cap, so a burst past that queues in clamd (MaxQueue, default 100 per pod), and
+# a scan still waiting when the backend's clamav.timeoutMs (60s) runs out fails.
 clamav:
   replicaCount: 3
+  resources:
+    # Loaded signatures take about 1Gi. All four scan threads unpacking compressed files
+    # (PDFs) at once push a pod past 2Gi, and clamd is OOM-killed.
+    requests:
+      cpu: 250m
+      memory: 3Gi
+    limits:
+      cpu: "1"
+      memory: 4Gi
 
 pdb:
   create: true

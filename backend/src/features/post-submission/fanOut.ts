@@ -1,31 +1,24 @@
 import { db } from '../../core/db/client';
-import {
-  insertJob,
-  markChildrenQueued,
-  type ClaimedJob,
-  type NewJob,
-} from '../../core/db/repos/jobRepo';
+import type { ChildJob } from '../../core/db/repos/jobRepo';
 import { findInstalledPostSubmissionAction } from '../../core/integrations/post-submission-action/PostSubmissionActionRegistry';
-import { mapInOrder } from '../../core/inOrder';
+import { JobCancelledError } from '../../core/jobs/errors';
+import type { JobFacts } from '../../core/jobs/facts';
 import type { JobContext } from '../../core/jobs/registry';
 import { getJobSettings } from '../../core/jobs/settings';
-import { JobCancelledError } from '../../core/jobs/settlement';
 import { SubmittedJobParamsSchema } from './params';
 import { isSubmissionLive, SUBMISSION_GONE } from './repo';
 import type { SubmittedAction } from './resolve';
 
 /** One action's job: a child of the submitted job, at most one per action and revision. */
 export const childJob = (
-  parent: ClaimedJob,
+  parent: JobFacts,
   action: SubmittedAction,
   maxAttempts: number,
-): NewJob => ({
+): ChildJob => ({
   type: action.code,
-  workspaceId: parent.workspaceId,
   formId: parent.formId,
   submissionId: parent.submissionId,
   revisionId: parent.revisionId,
-  parentJobId: parent.id,
   actionConfigId: action.source.settingId,
   createdBy: parent.createdBy,
   params: { options: action.options, source: action.source },
@@ -38,12 +31,11 @@ export const childAttempts = (code: string): number =>
   findInstalledPostSubmissionAction(code)?.job.maxAttempts ?? getJobSettings().maxAttempts;
 
 /**
- * The submitted job's run: queue one job per action recorded with the submission, in one
- * transaction. Dedupe keys make a retry safe. Only a pod with an action's plugin claims its job, and
- * the job's start check decides whether it runs. Ends cancelled, queuing nothing, once the
- * submission, its form or its workspace is gone.
+ * The submitted job's run: queue one job per action recorded with the submission, with its success.
+ * Only a pod with an action's plugin claims its job, and the job's start check decides whether it
+ * runs. Ends cancelled, queuing nothing, once the submission, its form or its workspace is gone.
  */
-export const fanOutSubmitted = async ({ job, log }: JobContext): Promise<void> => {
+export const fanOutSubmitted = async ({ job, log, queueOnSuccess }: JobContext): Promise<void> => {
   log.info({ submissionId: job.submissionId, revisionId: job.revisionId }, 'Submission received');
   const { actions } = SubmittedJobParamsSchema.parse(job.params);
   if (actions.length === 0) return;
@@ -53,21 +45,5 @@ export const fanOutSubmitted = async ({ job, log }: JobContext): Promise<void> =
     (await isSubmissionLive(db, { workspaceId: job.workspaceId, submissionId: job.submissionId }));
   if (!live) throw new JobCancelledError(SUBMISSION_GONE);
 
-  // The mark outlives the children, so a re-run is refused once they were queued, even after
-  // retention deletes them and frees their dedupe keys.
-  const jobIds = await db.transaction(async (tx) => {
-    if (!(await markChildrenQueued(tx, job.id, job.claimToken))) {
-      throw new Error('The job is no longer held; its actions were not queued');
-    }
-    return mapInOrder(actions, (action) =>
-      insertJob(tx, childJob(job, action, childAttempts(action.code))),
-    );
-  });
-  log.info(
-    {
-      // A null job id means the action was already queued for this revision.
-      queued: actions.map((action, index) => ({ code: action.code, jobId: jobIds[index] })),
-    },
-    'Post-submission actions queued',
-  );
+  queueOnSuccess(actions.map((action) => childJob(job, action, childAttempts(action.code))));
 };

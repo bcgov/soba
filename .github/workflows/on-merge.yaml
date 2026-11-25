@@ -33,9 +33,14 @@ concurrency:
 jobs:
   build:
     name: Build & Push
+    # Dev deploys only from develop, so a manual run from another branch skips every job.
+    # deploy-crunchy and deploy-mongodb carry the same condition; the rest need these jobs.
+    if: github.ref == 'refs/heads/develop'
     uses: ./.github/workflows/build-images.yaml
     with:
-      ref: develop
+      # The pushed commit, not the branch: develop can move before this run starts. The deploy
+      # jobs' checkouts default to the same commit.
+      ref: ${{ github.sha }}
       platforms: amd64
       image_version: develop
     secrets: inherit
@@ -45,6 +50,7 @@ jobs:
 
   deploy-crunchy:
     name: Deploy Crunchy Postgres
+    if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-24.04
     environment: dev
     outputs:
@@ -65,6 +71,7 @@ jobs:
 
   deploy-mongodb:
     name: Deploy MongoDB
+    if: github.ref == 'refs/heads/develop'
     permissions:
       contents: read
     environment:
@@ -118,7 +125,7 @@ jobs:
       contents: read
     environment:
       name: dev
-      url: https://soba-dev.${{ vars.OC_DOMAIN }}/designer
+      url: https://submit-dev.${{ vars.OC_DOMAIN }}/designer
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     steps:
@@ -275,7 +282,7 @@ jobs:
     with:
       DEP_ENV: dev
       pr_branch: develop
-      BASE_URL: https://soba-dev.${{ vars.OC_DOMAIN }}/designer/en
+      BASE_URL: https://submit-dev.${{ vars.OC_DOMAIN }}/designer/en
     secrets:
       keycloakUsername: ${{ secrets.keycloakUsername }}
       keycloakPassword: ${{ secrets.keycloakPassword }}

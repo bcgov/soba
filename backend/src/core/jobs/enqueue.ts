@@ -1,7 +1,7 @@
 import type { Tx } from '../db/client';
 import { JobType, SubmissionEventType, type SubmissionWriteEventCode } from '../db/codes';
 import { insertJob, type NewJob } from '../db/repos/jobRepo';
-import type { SubmissionRecord } from '../db/repos/submissionRepo';
+import type { RevisionAppendedFacts, SubmissionRecord } from '../db/repos/submissionRepo';
 import { resolveSubmittedActions, type ScopedAction } from '../../features/post-submission/resolve';
 import type { StatusChangedJobParams } from '../../features/submission-review/params';
 import {
@@ -30,12 +30,14 @@ export const enqueueSubmittedJob = async (
   revisionId: string,
   actorId: string,
   actions: readonly ScopedAction[],
+  facts: RevisionAppendedFacts,
 ): Promise<void> => {
   const submitted = await resolveSubmittedActions(
     tx,
     submission.workspaceId,
     submission.formId,
     actions,
+    facts,
   );
   await insertJob(tx, {
     type: JobType.submission_submitted,

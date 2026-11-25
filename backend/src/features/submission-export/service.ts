@@ -29,7 +29,7 @@ import {
   TooManyRequestsError,
   ValidationError,
 } from '../../core/errors';
-import { nudgeJobs } from '../../core/jobs';
+import { nudgeJobs } from '../../core/jobs/nudge';
 import { openJobResult, resultFacts, toJobResult } from '../../core/jobs/outputs';
 import { getCorrelationId, log } from '../../core/logging';
 import { exportSchemas } from './engineSource';

@@ -1,5 +1,4 @@
 import { db } from '../../core/db/client';
-import type { ClaimedJob } from '../../core/db/repos/jobRepo';
 import {
   findOtherSubmitters,
   findStatusChangeForEmail,
@@ -7,8 +6,9 @@ import {
   type StatusChangeForEmail,
 } from '../../core/db/repos/submissionReviewRepo';
 import { sendEachAddress } from '../../core/integrations/notification/sendEachAddress';
+import { JobCancelledError } from '../../core/jobs/errors';
+import type { JobFacts } from '../../core/jobs/facts';
 import type { JobContext } from '../../core/jobs/registry';
-import { JobCancelledError } from '../../core/jobs/settlement';
 import { StatusEmailJobParamsSchema } from '../../core/jobs/submissionStatusEmail';
 import { jobNotifications } from '../notifications/jobNotifications';
 import { findLiveSubmission, SUBMISSION_GONE } from '../post-submission/repo';
@@ -53,7 +53,7 @@ const recipientsFor = async (
 /** The change exists and is about the job's own submission. */
 const isJobsChange = (
   change: StatusChangeForEmail | null,
-  job: ClaimedJob,
+  job: JobFacts,
 ): change is StatusChangeForEmail =>
   change?.submissionId === job.submissionId && change.workspaceId === job.workspaceId;
 
@@ -72,14 +72,16 @@ export const runStatusEmailJob = async ({ job, signal, log }: JobContext): Promi
     submissionId: change.submissionId,
   });
   if (!submission) throw new JobCancelledError(SUBMISSION_GONE);
-  if (!change.current) throw new JobCancelledError('The status has changed since; no email sent');
+  // A list can be part sent when the change is overtaken while it waits for the reset or a pause.
+  if (!change.current) {
+    throw new JobCancelledError('The status has changed since; no more emails are sent');
+  }
   const email = statusEmailFor(change.status);
   if (!email) throw new JobCancelledError('This status sends no email');
   const to = await recipientsFor(email, change, submission.formId);
   const comment = options.attachComment ? (change.comment ?? undefined) : undefined;
-  const actorId = job.lastRequeuedBy ?? job.createdBy;
   await sendEachAddress(
-    { notifications: jobNotifications(job, () => Promise.resolve(actorId)), signal, log },
+    { notifications: jobNotifications(job, () => Promise.resolve(job.run.queuedBy)), signal, log },
     to,
     renderStatusEmail(email, submission, change.submissionId, comment),
   );

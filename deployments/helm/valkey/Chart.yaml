@@ -1,9 +1,9 @@
 apiVersion: v2
 name: valkey
-description: Chart for deploying Valkey (Redis-compatible) as a shared cache for SOBA
+description: Chart for deploying Valkey (Redis-compatible) as SOBA's shared cache, message bus and event-stream store
 type: application
-version: 1.0.0
-appVersion: "8.1"
+version: 1.1.0
+appVersion: "8.1.12"
 keywords:
   - valkey
   - redis

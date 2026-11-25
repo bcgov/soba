@@ -20,7 +20,12 @@ describe('post-submission-email-addresses', () => {
     });
   });
 
-  it('retries for about an hour in the light pool', () => {
-    expect(plugin.job).toMatchObject({ pool: 'light', maxAttempts: 8, timeoutMs: 300_000 });
+  it('retries for about an hour in the light pool, emailing the addresses in its options', () => {
+    expect(plugin.job).toMatchObject({
+      pool: 'light',
+      maxAttempts: 8,
+      timeoutMs: 300_000,
+      emails: { recipients: 'options' },
+    });
   });
 });

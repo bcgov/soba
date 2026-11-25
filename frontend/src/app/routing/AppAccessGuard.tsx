@@ -22,19 +22,27 @@ export function AppAccessGuard({ locale, designMode, children }: Readonly<AppAcc
   const dict = useDictionary();
   const router = useRouter();
   const pathname = usePathname();
-  const { refresh } = useKeycloak();
+  const { refresh, signInAfterRefusal } = useKeycloak();
   const refreshCurrentUser = useRefreshCurrentUser();
   const session = useAppSession();
 
-  const redirectTarget = useMemo(() => {
+  const redirect = useMemo(() => {
     return resolveRedirect(pathname, locale, session, designMode);
   }, [pathname, locale, session, designMode]);
+  const redirectPath = redirect?.kind === 'path' ? redirect.to : null;
+  const signIn = redirect?.kind === 'sign-in';
 
   useEffect(() => {
-    if (redirectTarget) {
-      router.replace(redirectTarget);
+    if (redirectPath) {
+      router.replace(redirectPath);
     }
-  }, [redirectTarget, router]);
+  }, [redirectPath, router]);
+
+  // The full address, so the query string survives sign-in too. Logging out signs the page out
+  // before Keycloak's logout page loads; signInAfterRefusal stands down for that.
+  useEffect(() => {
+    if (signIn) void signInAfterRefusal(globalThis.location.href);
+  }, [signIn, signInAfterRefusal]);
 
   const handleRetry = useCallback(async () => {
     // A failed bootstrap read is usually an expired token, so refresh before re-reading. If the
@@ -45,7 +53,7 @@ export function AppAccessGuard({ locale, designMode, children }: Readonly<AppAcc
 
   // Same rule as the spinner below: once bootstrapped, a failed background reload must not replace
   // the route either. The retry lives on the next full load.
-  if (session.sessionFailed && !session.sessionLoadedOnce && !redirectTarget) {
+  if (session.sessionFailed && !session.sessionLoadedOnce && !redirect) {
     return (
       <PageColumn>
         <div className="mt-4" role="alert">
@@ -74,7 +82,7 @@ export function AppAccessGuard({ locale, designMode, children }: Readonly<AppAcc
     (session.initializing ||
       (session.authenticated && !session.sessionReady && !session.sessionFailed));
 
-  if (showLoading || redirectTarget !== null) {
+  if (showLoading || redirect !== null) {
     return (
       <PageColumn>
         <CenteredProgress label={dict.general.loading} minHeight="50vh" />

@@ -19,8 +19,9 @@ valkey:
   # valkey.image -- The Valkey image (Redis-compatible, OSI-licensed)
   # Google's Docker Hub mirror — avoids the anonymous pull-rate limit on the cluster (same image).
   image: mirror.gcr.io/valkey/valkey
-  # valkey.tag -- The Valkey image tag
-  tag: 8-alpine
+  # valkey.tag -- The Valkey image tag. Pinned to a patch release so a rescheduled pod never comes
+  # up on a different version than the one that wrote its AOF (an older Valkey may not read it).
+  tag: 8.1.12-alpine
   # valkey.imagePullPolicy -- IfNotPresent
   imagePullPolicy: IfNotPresent
   # valkey.replicas -- Number of Valkey pods. KEEP AT 1 unless you have added a real HA topology.

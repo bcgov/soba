@@ -8,6 +8,7 @@ import type {
   StaffJobDetail,
   StaffJobListItem,
 } from '@soba/lib';
+import { postSubmissionActionStepType } from '@soba/lib';
 import { JobPool } from '../config/env';
 import { JobStatus, JobType } from '../db/codes';
 import {
@@ -29,9 +30,10 @@ import {
 import { ConflictError, NotFoundError } from '../errors';
 import { isHandledSend, isRefusedSend } from '../integrations/notification/sendOutcome';
 import { getPostSubmissionActionPluginDefinitions } from '../integrations/plugins/PluginRegistry';
-import { nudgeJobs } from '../jobs';
 import { getJobRegistry } from '../jobs/catalog';
+import { nudgeJobs } from '../jobs/nudge';
 import { listJobOutputs, toJobResult, type JobOutput } from '../jobs/outputs';
+import type { JobTypeDefinition } from '../jobs/registry';
 import { getJobSettings } from '../jobs/settings';
 import { log } from '../logging';
 
@@ -62,18 +64,10 @@ export interface RerunFacts {
   leaseMs: number;
 }
 
-/** Jobs whose run queues child jobs: an event's fan-out. */
-const FAN_OUT_TYPES: ReadonlySet<string> = new Set([
-  JobType.submission_submitted,
-  JobType.submission_status_changed,
-]);
-
-const isFanOut = (type: string): boolean => FAN_OUT_TYPES.has(type);
-
 /**
- * Why a job may not run again, or null when it may. A fan-out that queued its actions would queue
- * new action jobs once retention freed their dedupe keys, and those would have handled nobody yet,
- * so their emails would go to every address again.
+ * Why a job may not run again, or null when it may. A job that queued children would queue new ones
+ * once retention freed their dedupe keys, and those would have handled nobody yet, so their emails
+ * would go to every address again.
  */
 export const rerunRefusal = (facts: RerunFacts): string | null => {
   // An export is the person's own request, under their limit; they start a new one.
@@ -84,8 +78,8 @@ export const rerunRefusal = (facts: RerunFacts): string | null => {
     return 'Only a dead or cancelled job can be run again';
   }
   if (!facts.registered) return 'This environment does not run jobs of this type';
-  if (isFanOut(facts.type) && (facts.childCount > 0 || facts.childrenQueuedAt !== null)) {
-    return 'Its actions were queued already; run their jobs again instead';
+  if (facts.childCount > 0 || facts.childrenQueuedAt !== null) {
+    return 'It queued jobs already; run the jobs it queued again instead';
   }
   const finishedMs = facts.finishedAt ? facts.now.getTime() - facts.finishedAt.getTime() : 0;
   // A job the sweeper ended for an expired lease may still be running on the worker that held it.
@@ -139,16 +133,18 @@ const addressesOf = (params: Record<string, unknown>): string[] | null => {
 };
 
 /**
- * Where a job's emails stand. A job whose options list its addresses is counted against that list.
- * One that reads its recipients when it runs, such as a status email, has no list until it runs, so
- * only the addresses it has sent to or had refused are counted, and its total and those not sent
- * yet are left unknown. Null when there is nothing to count.
+ * Where a job's emails stand. A job whose type emails the `to` list in its options is counted against
+ * that list, with the total and those still to send. Any other job is counted from what it sent: the
+ * addresses it has sent to or had refused, its total and those not sent yet unknown. That covers a
+ * job that finds its recipients when it runs, such as a status email, a step that only builds what a
+ * later step emails, and a type this backend no longer runs. Null when there is nothing to count.
  */
 export const emailCountsOf = (
+  type: Pick<JobTypeDefinition, 'emails'> | undefined,
   params: Record<string, unknown>,
   sends: readonly JobNotificationSend[],
 ): JobEmailCounts | null => {
-  const listed = addressesOf(params);
+  const listed = type?.emails?.recipients === 'options' ? addressesOf(params) : null;
   if (listed) return countEmails(listed, sends);
   if (sends.length === 0) return null;
   const tried = countEmails([...new Set(sends.flatMap((send) => send.recipients.to))], sends);
@@ -244,7 +240,7 @@ const loadJob = async (scope: JobScope, id: string): Promise<LoadedJob> => {
     row,
     parent,
     children,
-    emailCounts: emailCountsOf(row.params, sends),
+    emailCounts: emailCountsOf(getJobRegistry().get(row.type), row.params, sends),
     output: outputs.get(row.id) ?? null,
   };
 };
@@ -310,11 +306,23 @@ const TYPE_NAMES: Record<string, string> = {
   [JobType.submission_email_copy]: 'Submitter email copy',
 };
 
-/** The job types this environment runs, named for the admin filter. */
+/**
+ * The job types this environment runs, named for the admin filter. An action's later step is named
+ * by the action, then the step.
+ */
 export const listJobTypes = (): JobTypeItem[] => {
   const registry = getJobRegistry();
   const pluginNames = new Map(
-    getPostSubmissionActionPluginDefinitions().map((plugin) => [plugin.code, plugin.metadata.name]),
+    getPostSubmissionActionPluginDefinitions().flatMap((plugin) => [
+      [plugin.code, plugin.metadata.name] as const,
+      ...(plugin.steps ?? []).map(
+        (step) =>
+          [
+            postSubmissionActionStepType(plugin.code, step.name),
+            `${plugin.metadata.name} (${step.name})`,
+          ] as const,
+      ),
+    ]),
   );
   return Object.values(JobPool)
     .flatMap((pool) => registry.typesIn(pool))
@@ -330,7 +338,7 @@ export const rerunJob = async (scope: JobScope, id: string, actorId: string): Pr
   if (!row) throw new NotFoundError(NOT_FOUND);
   const definition = getJobRegistry().get(row.type);
   const settings = getJobSettings();
-  const children = isFanOut(row.type) ? await listChildJobs(scope, row.id) : [];
+  const children = await listChildJobs(scope, row.id);
   const refusal = rerunRefusal({
     status: row.status,
     type: row.type,

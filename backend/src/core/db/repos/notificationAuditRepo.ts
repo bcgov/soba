@@ -1,4 +1,5 @@
-import { and, count, eq, gte, inArray, or, sql, type SQL } from 'drizzle-orm';
+import { and, eq, gte, inArray, or, sql, type SQL } from 'drizzle-orm';
+import { alias, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { db } from '../client';
 import { NotificationOutcome, type NotificationOutcomeCode } from '../codes';
 import { notificationAudits, type NotificationAuditRecipients } from '../schema';
@@ -64,36 +65,75 @@ export const listJobNotificationSends = (jobId: string): Promise<JobNotification
     .from(notificationAudits)
     .where(eq(notificationAudits.jobId, jobId));
 
-/** Which audit rows to count: one form's, one workspace's, or every row. */
-export type NotificationCountScope =
-  | { kind: 'form'; id: string }
-  | { kind: 'workspace'; id: string }
-  | { kind: 'environment' };
+const acceptedSends = alias(notificationAudits, 'accepted_send');
+
+/** When a send's request started: its row is written once the provider answers. */
+const startedAt = (sends: { createdAt: AnyPgColumn; durationMs: AnyPgColumn }): SQL =>
+  sql`${sends.createdAt} - ${sends.durationMs} * interval '1 millisecond'`;
+
+/** The environment's emails, by the database clock, which also stamps each send. */
+export interface EmailDay {
+  /** The database clock when it was read. */
+  now: Date;
+  /** Sends since the day began that the provider dealt with: accepted, or refused for the address. */
+  counted: number;
+  /** When the next day begins. */
+  resetsAt: Date;
+  /** The provider's last refusal at its limit within the last day; null when there was none. */
+  lastLimitedAt: Date | null;
+  /**
+   * The clock minutes within the last day with a refusal at the provider's limit, among sends
+   * started after the last accepted one started; refusals in the same minute count once.
+   */
+  limitedInARow: number;
+}
 
 /**
- * Sends the provider dealt with in the last `seconds`, by the database clock: accepted, or refused
- * with one of `refusedStatuses`. Failures to be retried are not counted.
+ * The environment's emails: those since the last midnight in `timeZone` that count against the
+ * day, accepted or refused with one of `refusedStatuses`, and the provider's latest refusals at its
+ * limit. Failures to be retried are not counted. Reads back a day, or to midnight on a longer day,
+ * so a run of refusals keeps its count across midnight.
  */
-export const countNotificationsSince = async (
-  scope: NotificationCountScope,
-  seconds: number,
+export const readEmailDay = async (
+  timeZone: string,
   refusedStatuses: readonly number[],
-): Promise<number> => {
-  const filters: SQL[] = [
-    or(
-      eq(notificationAudits.outcome, NotificationOutcome.accepted),
+): Promise<EmailDay> => {
+  const localDay = sql`date_trunc('day', now() at time zone ${timeZone})`;
+  const dayStart = sql`${localDay} at time zone ${timeZone}`;
+  const since = sql`least(${dayStart}, now() - interval '1 day')`;
+  const dealtWith = or(
+    eq(notificationAudits.outcome, NotificationOutcome.accepted),
+    and(
+      eq(notificationAudits.outcome, NotificationOutcome.error),
+      inArray(notificationAudits.httpStatus, [...refusedStatuses]),
+    ),
+  );
+  const limited = eq(notificationAudits.outcome, NotificationOutcome.limited);
+  const lastAcceptedStart = db
+    .select({ at: sql`max(${startedAt(acceptedSends)})` })
+    .from(acceptedSends)
+    .where(
       and(
-        eq(notificationAudits.outcome, NotificationOutcome.error),
-        inArray(notificationAudits.httpStatus, [...refusedStatuses]),
+        eq(acceptedSends.outcome, NotificationOutcome.accepted),
+        gte(acceptedSends.createdAt, since),
       ),
-    ) as SQL,
-    gte(notificationAudits.createdAt, sql`now() - make_interval(secs => ${seconds})`),
-  ];
-  if (scope.kind === 'form') filters.push(eq(notificationAudits.formId, scope.id));
-  if (scope.kind === 'workspace') filters.push(eq(notificationAudits.workspaceId, scope.id));
+    );
+  const inARow = sql`${limited} and ${startedAt(notificationAudits)} > coalesce((${lastAcceptedStart}), '-infinity'::timestamptz)`;
   const [row] = await db
-    .select({ total: count() })
+    .select({
+      now: sql<Date>`now()`.mapWith(notificationAudits.createdAt),
+      counted: sql<number>`(count(*) filter (where ${notificationAudits.createdAt} >= ${dayStart} and ${dealtWith}))::int`,
+      resetsAt: sql<Date>`(${localDay} + interval '1 day') at time zone ${timeZone}`.mapWith(
+        notificationAudits.createdAt,
+      ),
+      lastLimitedAt:
+        sql<Date | null>`max(${notificationAudits.createdAt}) filter (where ${limited})`.mapWith(
+          notificationAudits.createdAt,
+        ),
+      limitedInARow: sql<number>`(count(distinct date_trunc('minute', ${notificationAudits.createdAt})) filter (where ${inARow}))::int`,
+    })
     .from(notificationAudits)
-    .where(and(...filters));
-  return row?.total ?? 0;
+    .where(gte(notificationAudits.createdAt, since));
+  if (!row) throw new Error('The email day read returned no row');
+  return row;
 };

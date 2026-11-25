@@ -18,6 +18,10 @@ import { rolesDomain } from './roles';
 import { accessDomain } from './access';
 import { filesDesignRouter, filesDomain } from '../../features/files';
 import {
+  registerSubmissionPackageOpenApi,
+  submissionPackageRouter,
+} from '../../features/submission-package';
+import {
   documentGenerationDesignRouter,
   documentGenerationDomain,
 } from '../../features/document-generation';
@@ -42,7 +46,7 @@ import { registerOpenApiPaths } from './shared/openapi';
 
 // API surfaces, each mounted under its own base path with its own auth (see app.ts):
 //  - designRouter   (/api/v1/design): staff form authoring + submission management.
-//  - submitRouter   (/api/v1/submit): public-capable submissions, file attachments, documents.
+//  - submitRouter   (/api/v1/submit): public-capable submissions, documents.
 //  - filesApiRouter (/api/v1/files):  public-capable submission file attachments.
 //  - coreRouter     (/api/v1):        workspace/account management, and staff document templates.
 registerOpenApiPaths((registry) => {
@@ -51,6 +55,7 @@ registerOpenApiPaths((registry) => {
   registerSubmissionsOpenApi(registry);
   registerSubmissionReviewOpenApi(registry);
   registerSubmissionExportOpenApi(registry);
+  registerSubmissionPackageOpenApi(registry);
   registerSubmitOpenApi(registry);
   groupsDomain.registerOpenApi(registry);
   rolesDomain.registerOpenApi(registry);
@@ -83,16 +88,15 @@ designRouter.use('/submissions', designSubmissionsRouter);
 designRouter.use(documentGenerationDesignRouter);
 // Staff attachment download; gates itself.
 designRouter.use(filesDesignRouter);
+// Submission package download at /submissions/:id/packages/:jobId/file; gates itself.
+designRouter.use(submissionPackageRouter);
 designRouter.use(notFoundHandler);
 designRouter.use(coreErrorHandler);
 
-// Submit feature: submission open/save/submit + reads of an existing submission, plus file
-// attachments at /files (upload/download/delete) and document templates/print, each
-// authorized by the submitter rules in @soba/lib. The files feature flag is enforced inside
-// filesDomain.router. Same routes as /files, mounted under submit for the Form.io file component.
+// Submit feature: submission open/save/submit, reads of an existing submission, email copy of a
+// submitted one and document templates/print, each authorized by the submitter rules in @soba/lib.
 const submitRouter = express.Router();
 submitRouter.use('/', submitRoutes);
-submitRouter.use('/files', filesDomain.router);
 // Before document generation: its router gates every request that reaches it on its own flags.
 submitRouter.use(submitterEmailCopyDomain.path, submitterEmailCopyDomain.router);
 // Mounted after submitRoutes so only the fall-through actions (templates, print) reach it;
@@ -101,7 +105,8 @@ submitRouter.use('/submissions', documentGenerationDomain.router);
 submitRouter.use(notFoundHandler);
 submitRouter.use(coreErrorHandler);
 
-// Files feature: submission attachments, authorized through the submission each file belongs to.
+// Files feature: submission attachments, authorized through the submission each file belongs to;
+// gates itself on the files flag.
 const filesApiRouter = express.Router();
 filesApiRouter.use('/', filesDomain.router);
 filesApiRouter.use(notFoundHandler);

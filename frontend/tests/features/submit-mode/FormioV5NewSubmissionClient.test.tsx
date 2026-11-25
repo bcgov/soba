@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   saveSobaFormSubmission: vi.fn(),
   submitSobaFormSubmission: vi.fn(),
   getSubmitFillBundle: vi.fn(),
+  signInAfterRefusal: vi.fn(),
   formData: {} as Record<string, unknown>,
   instance: {
     emit: vi.fn(),
@@ -40,10 +41,12 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/app/[lang]/Providers', () => ({
   useDictionary: () => ({
+    modal: { dialogActions: 'Dialog actions' },
     general: {
       sessionExpired: 'Your session has ended.',
       noAccess: 'You do not have access.',
       version: 'Version',
+      unsavedChanges: { title: 'Leave?', message: 'Not saved.', confirm: 'Leave', stay: 'Stay' },
     },
     form: {
       loading: 'Loading...',
@@ -112,6 +115,11 @@ vi.mock('@/src/shared/api/sobaApi', () => ({
   saveSobaFormSubmission: (...args: unknown[]) => h.saveSobaFormSubmission(...args),
   submitSobaFormSubmission: (...args: unknown[]) => h.submitSobaFormSubmission(...args),
   getSubmitFillBundle: (...args: unknown[]) => h.getSubmitFillBundle(...args),
+}));
+
+vi.mock('@/lib/slices/keycloakSlice', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/slices/keycloakSlice')>()),
+  signInAfterRefusal: (redirectUri: string) => () => h.signInAfterRefusal(redirectUri),
 }));
 
 vi.mock('@/src/features/formio-v5/useBcgovFileOption', () => ({
@@ -771,6 +779,31 @@ describe('FormioV5NewSubmissionClient', () => {
       expect(screen.getByTestId('submission-fill-save-draft')).toBeInTheDocument();
     });
 
+    it('asks before a link leaves the answers it moved over, as they are not saved', async () => {
+      h.getSubmitForm.mockReset();
+      h.getSubmitForm
+        .mockResolvedValueOnce({ ...form, allowSubmitterDrafts: false })
+        .mockResolvedValue({ ...form, publishedVersionId: 'ver-2', allowSubmitterDrafts: true });
+      h.getSubmitFormVersionSchema.mockImplementation(async (_token: unknown, id: string) =>
+        id === 'ver-2'
+          ? version(id, 'hash-2', { components: [{ key: 'email', type: 'email' }] })
+          : version(id, 'hash-1'),
+      );
+      await renderPage();
+      await waitFor(() => expect(screen.getByTestId('fill-form')).toBeInTheDocument());
+      await submit({ name: 'Ada' });
+      await userEvent.click(screen.getByTestId('submission-fill-continue-updated'));
+      await waitFor(() => expect(h.mounts).toBe(2));
+
+      const link = document.body.appendChild(document.createElement('a'));
+      link.href = '/en/forms';
+      // jsdom cannot navigate; the guard listens earlier, on the document.
+      link.addEventListener('click', (event) => event.preventDefault());
+      await userEvent.click(link);
+      expect(await screen.findByText('Leave?')).toBeInTheDocument();
+      link.remove();
+    });
+
     it('counts answers carried to the new version as unsaved until a save lands', async () => {
       const changed = { components: [{ key: 'email', type: 'email' }] };
       h.getSubmitFormVersionSchema.mockImplementation(async (_token: unknown, id: string) =>
@@ -901,15 +934,37 @@ describe('FormioV5NewSubmissionClient', () => {
     expect(h.openSobaFormSubmission).not.toHaveBeenCalled();
   });
 
+  it('sends an anonymous caller refused on the form read to sign in, back to this address', async () => {
+    h.getSubmitForm.mockRejectedValue(
+      new ApiError('Not authorized to submit this form', 401, 'open_denied'),
+    );
+    await renderPage();
+    await waitFor(() =>
+      expect(h.signInAfterRefusal).toHaveBeenCalledWith(
+        `${globalThis.location.origin}/en/form/form-1`,
+      ),
+    );
+    expect(screen.getByRole('progressbar', { name: 'Loading...' })).toBeInTheDocument();
+    expect(screen.queryByTestId('new-submission-loaderror')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('fill-form')).not.toBeInTheDocument();
+  });
+
+  it('says why when the form read is refused to a signed-in caller', async () => {
+    h.getSubmitForm.mockRejectedValue(
+      new ApiError('Not authorized to submit this form', 403, 'open_denied'),
+    );
+    await renderPage({ authenticated: true, token: 'token' });
+    await waitFor(() =>
+      expect(screen.getByTestId('new-submission-refused')).toHaveTextContent(
+        'You are not able to submit this form.',
+      ),
+    );
+    expect(h.signInAfterRefusal).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
-      'refused to an anonymous caller',
-      new ApiError('Not authorized to submit this form', 401, 'open_denied'),
-      'new-submission-loaderror',
-      'You are not able to submit this form.',
-    ],
-    [
-      'refused to a signed-in caller',
+      'refused with 403',
       new ApiError('Not authorized to submit this form', 403, 'open_denied'),
       'new-submission-refused',
       'You are not able to submit this form.',

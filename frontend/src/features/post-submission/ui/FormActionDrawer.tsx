@@ -62,7 +62,7 @@ export default function FormActionDrawer({
   if (workspaceOnly) {
     return (
       <ReadOnlyActionDrawer id={id} label={ui.label(dict)}>
-        <ActionDrawerIntro dict={dict} id={id} description={ui.description(dict)} error={error} />
+        <ActionDrawerIntro dict={dict} id={id} ui={ui} scope="form" error={error} />
         {settings && <View dict={dict} values={settings.effective} />}
         <p data-testid={`${id}-workspace-only`}>{t.workspaceOnlyNote}</p>
       </ReadOnlyActionDrawer>
@@ -104,7 +104,7 @@ export default function FormActionDrawer({
       onCancel={drawer.reset}
       canSave={canSave}
     >
-      <ActionDrawerIntro dict={dict} id={id} description={ui.description(dict)} error={error} />
+      <ActionDrawerIntro dict={dict} id={id} ui={ui} scope="form" error={error} />
       {canInherit && (
         <InheritCheckbox
           label={dict.form.settings.inheritWorkspaceLabel}

@@ -49,7 +49,7 @@ import { readTemplateContent } from './templateContent';
 import { scanUpload } from '../../core/services/scanUpload';
 import { TEMPLATE_NOT_RENDERED, toRenderError } from './renderError';
 import { withRenderSlot } from './renderSlots';
-import { printContextOf, printSourceOf } from './printSource';
+import { printContextOf, printSourceOf, submittedRevisionContext } from './printSource';
 
 export interface PrintInput {
   submissionId: string;
@@ -151,7 +151,8 @@ async function recordAudit(params: {
 }): Promise<void> {
   const createdBy = params.audit.actorId;
   if (!createdBy) {
-    // Shouldn't happen: both surfaces resolve an actor (the public user on submit); flag if it does.
+    // Shouldn't happen: every surface resolves an actor (the public user on submit, the system
+    // user in a job); flag if it does.
     log.warn(
       { mode: params.audit.mode },
       'skipping document-generation audit: no actor to attribute',
@@ -372,6 +373,59 @@ async function printStored(
     printAudit(record, actorId, stored, context),
   );
 }
+
+/** A job's render of one submitted revision's answers. */
+export interface RevisionRenderInput {
+  workspaceId: string;
+  formId: string;
+  formVersionId: string;
+  submissionId: string;
+  confirmationCode: string;
+  revisionId: string;
+  revisionNo: number;
+  answers: Record<string, unknown>;
+  actorId: string;
+}
+
+/** A job's render: a document comes with the name staff gave the template it was rendered from. */
+export type RevisionRenderOutcome =
+  | (Extract<DocumentRenderOutcome, { status: 'ok' }> & { templateName: string })
+  | Exclude<DocumentRenderOutcome, { status: 'ok' }>;
+
+/** Render from a job. No caller is checked: the job checks the submission before it renders. */
+export const jobDocumentService = {
+  /**
+   * Render the answers as a PDF with the CDOGS template on the form version, with the submitted
+   * revision's print context, audited in `package` mode against the revision. template-notfound
+   * when the version has none.
+   */
+  async renderRevision(input: RevisionRenderInput): Promise<RevisionRenderOutcome> {
+    const [stored] = await listLiveDocumentTemplates(
+      input.formVersionId,
+      DocumentTemplateType.cdogs,
+    );
+    if (!stored) return { status: 'template-notfound' };
+    const { workspaceId, formId, formVersionId } = input;
+    const outcome = await renderWith(
+      { workspaceId, formId, formVersionId },
+      stored,
+      {
+        options: { convertTo: 'pdf' },
+        data: input.answers,
+        context: submittedRevisionContext(input),
+      },
+      {
+        mode: DocumentGenerationMode.package,
+        actorId: input.actorId,
+        submissionId: input.submissionId,
+        revisionId: input.revisionId,
+        templateId: stored.template.id,
+        templateFileId: stored.file.id,
+      },
+    );
+    return outcome.status === 'ok' ? { ...outcome, templateName: stored.template.name } : outcome;
+  },
+};
 
 /** Print from the submit surface: the submitter rules decide, and only stored templates render. */
 export const documentGenerationService = {

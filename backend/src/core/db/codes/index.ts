@@ -146,9 +146,9 @@ export type FeatureStatusCode = (typeof FeatureStatus)[keyof typeof FeatureStatu
 
 /**
  * Feature codes backed by the soba.feature table. Most gate a mounted API surface via
- * requireFeature and mirror the frontend FEATURE_CODES. Dev-data, antivirus, post-submission-email
- * and the per-backend document generation codes have no frontend code; antivirus gates the upload
- * scan in the core file store rather than a surface of its own.
+ * requireFeature and mirror the frontend FEATURE_CODES. Dev-data, antivirus, post-submission-email,
+ * post-submission-email-package and the per-backend document generation codes have no frontend
+ * code; antivirus gates the upload scan in the core file store rather than a surface of its own.
  */
 export const Features = {
   design_mode: 'design-mode',
@@ -172,6 +172,8 @@ export const Features = {
   post_submission: 'post-submission',
   /** Emailing a notice to a list of addresses when a form receives a submission. */
   post_submission_email: 'post-submission-email',
+  /** Emailing staff a link to a package of a submission when it is first submitted. */
+  post_submission_email_package: 'post-submission-email-package',
   /** The confirmation screen settings group; each of its settings has a feature of its own. */
   confirmation_screen: 'confirmation-screen',
   /** Submitters emailing themselves a copy of their confirmation, from the confirmation screen. */
@@ -226,6 +228,8 @@ export type FeatureScopeStatusCode = (typeof FeatureScopeStatus)[keyof typeof Fe
  */
 export const DocumentGenerationMode = {
   print: 'print',
+  /** A post-submission action job's render of a revision. */
+  package: 'package',
 } as const;
 export type DocumentGenerationModeCode =
   (typeof DocumentGenerationMode)[keyof typeof DocumentGenerationMode];
@@ -246,6 +250,8 @@ export const NotificationOutcome = {
   not_sent: 'not_sent',
   /** The notifications feature is off, so no plugin was called. */
   disabled: 'disabled',
+  /** The provider refused it at a sending limit; it is sent again after the pause that starts. */
+  limited: 'limited',
   error: 'error',
 } as const;
 export type NotificationOutcomeCode =
@@ -287,6 +293,13 @@ export const SubmissionExportAuditAction = {
 } as const;
 export type SubmissionExportAuditActionCode =
   (typeof SubmissionExportAuditAction)[keyof typeof SubmissionExportAuditAction];
+
+/** What a submission_package_audit row records. */
+export const SubmissionPackageAuditAction = {
+  downloaded: 'downloaded',
+} as const;
+export type SubmissionPackageAuditActionCode =
+  (typeof SubmissionPackageAuditAction)[keyof typeof SubmissionPackageAuditAction];
 
 /** What a document template is for (document_template.type). The list lives in @soba/lib. */
 export const DocumentTemplateType = {

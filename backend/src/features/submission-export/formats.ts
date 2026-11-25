@@ -8,6 +8,7 @@ import {
   type SubmissionExportLayout,
 } from '@soba/lib';
 import { getTempStorageAdapter } from '../../core/integrations/plugins/PluginRegistry';
+import { isRecord } from '../../core/records';
 import { addressFields, exportFieldNames, parentFields } from './schemaFields';
 import { tooLarge } from './sizeLimit';
 import type { ExportRow, ExportSchema } from './source';
@@ -104,9 +105,6 @@ const join = (path: string, key: string) => (path ? `${path}.${key}` : key);
 
 /** The path is the field or sits under it. */
 const within = (path: string, field: string) => path === field || path.startsWith(`${field}.`);
-
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
  * Each leaf under its column. `indexed` gives each array item its own columns, tracking the index

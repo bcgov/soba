@@ -1,9 +1,11 @@
 import { JOB_STATUSES } from '@soba/lib';
 import type { StatusTagVariant } from '@/src/components/StatusTag';
 import {
-  postSubmissionActionCodes,
+  postSubmissionActionStep,
   postSubmissionActionUi,
+  postSubmissionJobTypes,
 } from '@/src/features/post-submission/actions/registry';
+import { fillTemplate } from '@/src/shared/util/stringUtils';
 import type { Dictionary } from '@/src/types/dictionary';
 import type { JobStatus, JobTypeItem, JobViewModel } from '@/src/types/jobs';
 
@@ -38,16 +40,25 @@ export const jobTypeLabel = (
   if (own) return { text: own(dict) };
   const action = postSubmissionActionUi(type);
   if (action) return { text: action.label(dict) };
+  const step = postSubmissionActionStep(type);
+  if (step) {
+    return {
+      text: fillTemplate(dict.jobs.types.actionStep, {
+        action: step.action.label(dict),
+        step: step.label(dict),
+      }),
+    };
+  }
   return { text: types.find((item) => item.type === type)?.name ?? type, lang: 'en' };
 };
 
 /**
  * The types a submission's jobs can have that this build names: submission received and its
- * actions, status changed and its status emails, and submitter email copies.
+ * actions with their later steps, status changed and its status emails, and submitter email copies.
  */
 export const submissionJobTypes = (): string[] => [
   SUBMISSION_SUBMITTED,
-  ...postSubmissionActionCodes(),
+  ...postSubmissionJobTypes(),
   SUBMISSION_STATUS_CHANGED,
   SUBMISSION_STATUS_EMAIL,
   SUBMISSION_EMAIL_COPY,
@@ -75,17 +86,10 @@ export const canRerunJob = (status: JobStatus): boolean =>
 /** An export is its starter's own request: they start a new one rather than run it again. */
 export const isExportJob = (type: string): boolean => type === SUBMISSION_EXPORT;
 
-/** Event jobs whose run queues a job for each action or reaction recorded with the event. */
-const FAN_OUT_TYPES: ReadonlySet<string> = new Set([
-  SUBMISSION_SUBMITTED,
-  SUBMISSION_STATUS_CHANGED,
-]);
-
 /**
- * An event job that queued its actions: the server refuses to run it again, since its actions'
- * jobs are the ones to run.
+ * A job that queued jobs: the server refuses to run it again, since the jobs it queued are the ones
+ * to run.
  */
-export const queuedItsActions = (
-  job: Pick<JobViewModel, 'type' | 'childrenQueuedAt' | 'children'>,
-): boolean =>
-  FAN_OUT_TYPES.has(job.type) && (job.childrenQueuedAt !== null || job.children.length > 0);
+export const queuedItsChildren = (
+  job: Pick<JobViewModel, 'childrenQueuedAt' | 'children'>,
+): boolean => job.childrenQueuedAt !== null || job.children.length > 0;

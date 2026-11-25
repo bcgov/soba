@@ -7,6 +7,7 @@ const DESIGNER = 'https://soba.example/designer';
 const submission = {
   id: 's1',
   formId: 'f1',
+  formVersionId: 'v1',
   formName: 'Permit application',
   workspaceId: 'w1',
   workspaceName: 'Licensing',

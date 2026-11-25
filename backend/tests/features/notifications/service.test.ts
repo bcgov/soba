@@ -118,6 +118,27 @@ describe('notification service', () => {
     });
   });
 
+  it('records a send refused at a sending limit as limited, with the status and text', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ message: 'Exceeded send limits (10000) for today' }), {
+        status: 429,
+      }),
+    );
+    const { service, audits } = serviceWith(new NotifyV1Adapter(config));
+
+    await expect(service.sendEmail(context, email)).resolves.toEqual({
+      outcome: 'limited',
+      providerMessageId: null,
+      httpStatus: 429,
+      audited: true,
+    });
+    expect(audits[0]).toMatchObject({
+      outcome: 'limited',
+      httpStatus: 429,
+      errorDetail: 'NotificationLimitError upstream 429: Exceeded send limits (10000) for today',
+    });
+  });
+
   it('bounds the error detail', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValue(new Response('x'.repeat(2000), { status: 502 }));
     const { service, audits } = serviceWith(new NotifyV1Adapter(config));

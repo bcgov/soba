@@ -71,5 +71,7 @@ describe('Jobs copy', () => {
     expect(section.detail.rerunsValue).toContain('{by}');
     expect(section.detail.rerunEmails).toContain('{count}');
     expect(section.detail.refused).toContain('{reason}');
+    expect(section.types.actionStep).toContain('{action}');
+    expect(section.types.actionStep).toContain('{step}');
   });
 });

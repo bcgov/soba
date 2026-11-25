@@ -348,7 +348,9 @@ read with it (`canContinueSubmission`, `canDeleteOwnSubmission`), so a row offer
 the caller can still write it and Delete only when they can delete it. The public user's ownership
 grants no delete, because every anonymous caller shares it. Design routes do not use these rules;
 staff read, delete and print submissions through form permissions. Staff download a submission's
-files through `/design/submissions/:id/files/:fileId` with `submission_read`. Staff print through
+files through `/design/submissions/:id/files/:fileId` with `submission_read`, and a package of a
+submission through `/design/submissions/:id/packages/:jobId/file` with `submission_read`, while the
+`post-submission-email-package` feature is available for the form. Staff print through
 `/design/submissions/:id/{templates,print}` with `submission_read`, and with a template uploaded for
 that print through `/design/print-upload/:id` with `submission_print_upload` as well.
 

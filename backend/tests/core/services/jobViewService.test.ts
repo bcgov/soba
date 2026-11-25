@@ -50,7 +50,7 @@ describe('rerunRefusal', () => {
 
   const received = (overrides: Partial<RerunFacts>) =>
     rerunRefusal(facts({ type: JobType.submission_submitted, ...overrides }));
-  const queuedAlready = 'Its actions were queued already; run their jobs again instead';
+  const queuedAlready = 'It queued jobs already; run the jobs it queued again instead';
 
   it('runs a submission-received job again when it queued no actions', () => {
     expect(received({})).toBeNull();
@@ -64,13 +64,14 @@ describe('rerunRefusal', () => {
     expect(received({ childrenQueuedAt: ago(40 * DAY) })).toBe(queuedAlready);
   });
 
-  it('treats a status-changed job like a submission-received one: once its reactions are queued', () => {
-    const changed = (overrides: Partial<RerunFacts>) =>
-      rerunRefusal(facts({ type: JobType.submission_status_changed, ...overrides }));
-    expect(changed({})).toBeNull();
-    expect(changed({ childCount: 1 })).toBe(queuedAlready);
-    expect(changed({ childrenQueuedAt: ago(40 * DAY) })).toBe(queuedAlready);
-  });
+  it.each([JobType.submission_status_changed, 'post-submission-email-addresses'])(
+    'refuses a %s job once it queued jobs',
+    (type) => {
+      expect(rerunRefusal(facts({ type }))).toBeNull();
+      expect(rerunRefusal(facts({ type, childCount: 1 }))).toBe(queuedAlready);
+      expect(rerunRefusal(facts({ type, childrenQueuedAt: ago(40 * DAY) }))).toBe(queuedAlready);
+    },
+  );
 
   // Its fan-out rolled back, so no dedupe key was taken and nothing was sent.
   it('runs a submission-received job again however old, when it never queued its actions', () => {
@@ -154,9 +155,12 @@ describe('emailCountsOf', () => {
     send('c@example.com', 'error', 503),
   ];
 
-  it('counts a job whose options list its addresses against that list', () => {
-    const params = { options: { to: ['a@example.com', 'd@example.com'] } };
-    expect(emailCountsOf(params, sends)).toEqual({
+  const fromOptions = { emails: { recipients: 'options' as const } };
+  const listed = { options: { to: ['a@example.com', 'd@example.com'] } };
+  const triedCounts = { addresses: null, sent: 1, refused: 1, pending: null };
+
+  it('counts a job whose type emails the list in its options against that list', () => {
+    expect(emailCountsOf(fromOptions, listed, sends)).toEqual({
       addresses: 2,
       sent: 1,
       refused: 0,
@@ -165,15 +169,21 @@ describe('emailCountsOf', () => {
   });
 
   // Its list is read when it runs, so a retrying job cannot say how many are left.
-  it('counts only the sent and refused for a job that reads its recipients when it runs', () => {
+  it('counts any other job from what it sent, whatever its options hold', () => {
     const params = { statusChangeId: 'change-1', options: { attachComment: false } };
-    expect(emailCountsOf(params, sends)).toEqual({
-      addresses: null,
-      sent: 1,
-      refused: 1,
-      pending: null,
-    });
-    expect(emailCountsOf(params, [])).toBeNull();
+    expect(emailCountsOf({}, params, sends)).toEqual(triedCounts);
+    expect(emailCountsOf({}, listed, sends)).toEqual(triedCounts);
+  });
+
+  // A step that only builds what a later step emails still carries the action's options.
+  it('counts nothing for a job that sent nothing, even with addresses in its options', () => {
+    expect(emailCountsOf({}, listed, [])).toBeNull();
+  });
+
+  // A type from a plugin no longer installed is never counted against its options.
+  it('counts a job of a type this backend does not run only from what it sent', () => {
+    expect(emailCountsOf(undefined, listed, sends)).toEqual(triedCounts);
+    expect(emailCountsOf(undefined, listed, [])).toBeNull();
   });
 });
 

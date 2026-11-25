@@ -13,7 +13,8 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: {{ include "soba.fullname" $root }}-frontend-{{ $name }}
+  {{- /* Named after the host base, like the backend Routes: a new host gets new Routes. */}}
+  name: {{ include "soba.hostBase" $root }}-frontend-{{ $name }}
   labels:
     {{- include "soba.labels" (dict "root" $root "component" (printf "frontend-%s" $name)) | nindent 4 }}
   {{- with $annotations }}

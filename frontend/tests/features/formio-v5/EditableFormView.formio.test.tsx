@@ -41,17 +41,36 @@ const SCHEMA = {
   ],
 } as unknown as FormType;
 
+// Both draw a Choices.js text box: Tags to type a tag, Select to search its options.
+const CHOICES_SCHEMA = {
+  display: 'form',
+  components: [
+    { type: 'tags', key: 'tags', label: 'Tags', input: true, storeas: 'array' },
+    {
+      type: 'select',
+      key: 'colour',
+      label: 'Colour',
+      input: true,
+      widget: 'choicesjs',
+      dataSrc: 'values',
+      data: { values: [{ label: 'Red', value: 'red' }] },
+    },
+  ],
+} as unknown as FormType;
+
 type Webform = EditableFormInstance & {
   getComponent: (key: string) => {
     disabled: boolean;
     refs: { removeLink?: unknown[]; fileBrowse?: unknown };
     setValue: (value: unknown) => void;
   };
+  onChange: (flags: unknown) => void;
+  setSubmission: (submission: Submission) => Promise<unknown>;
 };
 
 const settle = (ms = 800) => act(() => new Promise((resolve) => setTimeout(resolve, ms)));
 
-const renderEditor = async (data: Record<string, unknown>) => {
+const renderEditor = async (data: Record<string, unknown>, schema: FormType = SCHEMA) => {
   let webform: Webform | undefined;
   const onDataChange = vi.fn();
   const onFormReady = vi.fn((instance: EditableFormInstance) => {
@@ -60,7 +79,7 @@ const renderEditor = async (data: Record<string, unknown>) => {
   const submission = { data } as Submission;
   const editor = () => (
     <EditableFormView
-      schema={SCHEMA}
+      schema={schema}
       submission={submission}
       onDataChange={onDataChange}
       onFormReady={onFormReady}
@@ -81,10 +100,19 @@ const typeIntoName = async (value: string) => {
   await settle();
 };
 
+const typeIntoChoices = (componentType: string, value: string) => {
+  const input = screen
+    .getByTestId('editor')
+    .querySelector(`.formio-component-${componentType} .choices__input--cloned`);
+  if (!(input instanceof HTMLInputElement)) throw new Error(`No ${componentType} text box`);
+  input.value = value;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
 describe('EditableFormView on the real Form.io', () => {
   beforeAll(async () => {
     const { Formio } = await import('@formio/js');
-    const bcgov = (await import('formio-components@0.0.1')) as { default?: unknown };
+    const bcgov = (await import('formio-components@0.0.3')) as { default?: unknown };
     (Formio as unknown as { use: (plugin: unknown) => void }).use(bcgov.default ?? bcgov);
   });
 
@@ -109,6 +137,52 @@ describe('EditableFormView on the real Form.io', () => {
     expect(webform.data).toMatchObject({ name: 'normalized' });
     expect(onDataChange).not.toHaveBeenCalled();
     view.unmount();
+  });
+
+  it('does not take answers set after a click for an edit', async () => {
+    const { webform, onDataChange, view } = await renderEditor({ name: 'original' });
+
+    fireEvent.pointerDown(screen.getByTestId('editor'));
+    await act(() => webform.setSubmission({ data: { name: 'reloaded' } } as Submission));
+    await settle();
+
+    expect(onDataChange).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  // Validate On: Blur reports a change, without `modified`, when a field the user entered is left.
+  it('does not take a change that leaves the answers as they were for an edit', async () => {
+    const { webform, onDataChange, view } = await renderEditor({ name: 'original' });
+
+    fireEvent.pointerDown(screen.getByTestId('editor'));
+    act(() => webform.onChange({}));
+    await settle();
+
+    expect(onDataChange).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  // Tags adds the typed text as a tag only once the field is left, after a link click has gone through.
+  it('reports typing in a Tags field before it is left', async () => {
+    const { onDataChange, view } = await renderEditor({}, CHOICES_SCHEMA);
+
+    typeIntoChoices('tags', 'foo');
+
+    expect(onDataChange).toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("does not take typing in a Select's search box for an edit", async () => {
+    // Choices.js opens the options as it searches, and reads matchMedia, which jsdom lacks.
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    const { onDataChange, view } = await renderEditor({}, CHOICES_SCHEMA);
+
+    typeIntoChoices('select', 're');
+    await settle();
+
+    expect(onDataChange).not.toHaveBeenCalled();
+    view.unmount();
+    vi.unstubAllGlobals();
   });
 
   // Form.io emits this change with `modified` false.

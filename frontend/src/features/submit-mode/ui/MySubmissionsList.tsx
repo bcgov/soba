@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button as DSButton, Select } from '@bcgov/design-system-react-components';
+import { ButtonGroup, Button as DSButton, Select } from '@bcgov/design-system-react-components';
 import { usePathname, useRouter } from 'next/navigation';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import {
@@ -277,7 +277,7 @@ export function MySubmissionsList() {
           const toFill = continues(item);
           const values = labelValues(item);
           return (
-            <div className="d-flex gap-2 justify-content-start">
+            <ButtonGroup ariaLabel={dictMine.columns.actions}>
               <RowActionButton
                 aria-label={fillTemplate(
                   toFill ? dictMine.continueLabel : dictMine.viewLabel,
@@ -306,7 +306,7 @@ export function MySubmissionsList() {
                   {dictMine.delete}
                 </RowActionButton>
               ) : null}
-            </div>
+            </ButtonGroup>
           );
         },
       },

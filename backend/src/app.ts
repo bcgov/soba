@@ -22,11 +22,15 @@ import {
   logNotificationReadiness,
   logUserSearchReadiness,
 } from './core/api/health';
+import { getNotificationSettings } from './core/integrations/notification/settings';
+import { assertPostSubmissionActionsInstalled } from './core/integrations/post-submission-action/PostSubmissionActionRegistry';
 const port = Number(process.env.PORT) || 4000;
 const integrationPort = env.getIntegrationPort();
 // Read before listening, so an invalid value stops startup before the port opens.
 const shutdownSettings = env.getShutdownSettings();
 assertJobShutdownFits(getJobSettings(), shutdownSettings.timeoutMs);
+getNotificationSettings();
+assertPostSubmissionActionsInstalled();
 assertAppLinkBases({
   DESIGNER_APP_URL: env.getDesignerAppUrl(),
   FORMS_APP_URL: env.getFormsAppUrl(),

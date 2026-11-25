@@ -1,17 +1,34 @@
-import type { ClaimedJob } from '../../core/db/repos/jobRepo';
+import type { Logger } from 'pino';
+import {
+  assertCanSend,
+  sendEachAddress,
+} from '../../core/integrations/notification/sendEachAddress';
 import type { PostSubmissionActionNotifications } from '../../core/integrations/post-submission-action/PostSubmissionActionPluginDefinition';
+import type { JobFacts } from '../../core/jobs/facts';
 import { getSystemUser } from '../../core/services/systemUser';
 import { jobNotifications } from '../notifications/jobNotifications';
 
-const systemUserId = async (): Promise<string> => {
+/** The system user's id; throws when there is none. */
+export const systemUserId = async (): Promise<string> => {
   const systemUser = await getSystemUser();
   if (!systemUser) throw new Error('The system user is missing');
   return systemUser.id;
 };
 
 /**
- * The notification service for one action job. Sends are attributed to the system user, since the
- * submitter chose neither the recipients nor the text.
+ * Email for one action job, sent with `sendEachAddress`. Sends are attributed to the system user,
+ * since the submitter chose neither the recipients nor the text.
  */
-export const actionNotifications = (job: ClaimedJob): PostSubmissionActionNotifications =>
-  jobNotifications(job, systemUserId);
+export const actionNotifications = (
+  job: JobFacts,
+  signal: AbortSignal,
+  log: Logger,
+): PostSubmissionActionNotifications => ({
+  sendToEach: (addresses, content) =>
+    sendEachAddress(
+      { notifications: jobNotifications(job, systemUserId), signal, log },
+      addresses,
+      content,
+    ),
+  ready: () => assertCanSend({ notifications: jobNotifications(job, systemUserId), signal }),
+});

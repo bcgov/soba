@@ -9,6 +9,12 @@
     "description": "Welcome to Common Hosted Forms Service (CHEFS) where you can create and publish forms, receive and review submissions, and integrate with your line of business systems.",
     "notAuthenticated": "You are not authenticated. Please login to access this section.",
     "unknown": "Unknown",
+    "unsavedChanges": {
+      "title": "Leave without saving?",
+      "message": "Your changes have not been saved. If you leave, they will be lost.",
+      "confirm": "Leave without saving",
+      "stay": "Keep editing"
+    },
     "home": "Home",
     "forms": "Forms",
     "myForms": "My Forms",
@@ -105,6 +111,7 @@
     "unavailableFilter": "That workspace is not available to you. Showing all forms instead.",
     "clearFilter": "Clear filter",
     "listLoadError": "Failed to load workspaces.",
+    "permissionsTab": "Permissions",
     "rolesTab": "Roles",
     "roles": {
       "addRole": "Add Role",
@@ -413,7 +420,8 @@
       "submissionExport": "Submission export",
       "submissionStatusChanged": "Status changed",
       "submissionStatusEmail": "Status email",
-      "submissionEmailCopy": "Submitter email copy"
+      "submissionEmailCopy": "Submitter email copy",
+      "actionStep": "{action}: {step}"
     },
     "detail": {
       "heading": "Job",
@@ -425,7 +433,7 @@
       "loadError": "Failed to load the job.",
       "notFound": "This job was not found. Finished jobs are deleted after a while.",
       "refreshError": "Could not read the job again; trying again.",
-      "actionsQueued": "Its actions were queued already, so it cannot run again. Run their jobs again instead.",
+      "childrenQueued": "It queued jobs already, so it cannot run again. Run the jobs it queued again instead.",
       "exportEnded": "An export does not run again. Its starter can start a new one from the form's Exports page.",
       "byValue": "{at}, by {by}",
       "rerunsValue": "{count}, last on {at} by {by}",
@@ -805,10 +813,6 @@
       "cancelEdit": "Cancel",
       "editingNotice": "You are changing the submitted answers. The form checks them when you update. Files cannot be changed here.",
       "editInvalid": "Some answers are not valid. Correct the marked fields, then update.",
-      "leaveEditTitle": "Leave without saving?",
-      "leaveEditMessage": "Your changes to the answers have not been saved. They will be lost if you leave this page.",
-      "leaveEditConfirm": "Leave without saving",
-      "leaveEditStay": "Keep editing",
       "submit": "Submit",
       "dataHistoryTitle": "Submitted Data History",
       "dataHistoryIntro": "This is an audit log of who has made changes to this submission after the original submission.",
@@ -913,6 +917,10 @@
       "filePageTitle": "Download export",
       "backToExports": "Back to exports",
       "fileNotFound": "This export is no longer available. Start a new one."
+    },
+    "package": {
+      "pageTitle": "Download submission package",
+      "notFound": "This package is no longer available."
     },
     "emailReceipt": {
       "button": "Email receipt of submission",
@@ -1101,21 +1109,34 @@
     "status": "Status: {status}",
     "on": "On",
     "off": "Off",
-    "email": {
-      "label": "Email a notice",
-      "description": "Sends a short email to each address on the list when a submission is received.",
-      "enabled": "Send these emails",
+    "addressList": {
       "recipients": "Recipients",
       "recipientsHelp": "Type an address and press Enter, or paste several at once. To remove an address, select it and press Delete or Backspace.",
-      "noticeHelp": "Each address gets its own email with the form name, the confirmation ID and a link to the submission, which needs sign-in. Emails over the hourly limit are not sent.",
       "count": "Addresses: {count} / {max}",
       "invalid": "Not a valid email address. Fix or remove the text in the field.",
       "tooMany": "A list can have up to {max} addresses. The rest are still in the field.",
       "duplicate": "Already on the list: {addresses}",
-      "required": "Add at least one address, or turn these emails off.",
       "added": "Added: {addresses}",
       "removed": "Removed: {address}",
       "none": "No addresses yet."
+    },
+    "email": {
+      "label": "Email a notice",
+      "description": "Sends a short email to each address on the list when a submission is received.",
+      "enabled": "Send these emails",
+      "help": "Each address gets its own email with the form name, the confirmation ID and a link to the submission, which needs sign-in. Past the daily email limit, emails wait and are sent after it resets at midnight.",
+      "required": "Add at least one address, or turn these emails off."
+    },
+    "emailPackage": {
+      "label": "Submit to Email",
+      "description": "When a submission is first submitted, emails each address on the list a link to a package of it: a PDF of the answers and the uploaded files, in one zip.",
+      "enabled": "Email a link to the submission package",
+      "help": "Each address gets its own email with the form name, the confirmation ID and a link to the package. Downloading needs sign-in and access to the form's submissions. Past the daily email limit, emails wait and are sent after it resets at midnight.",
+      "required": "Add at least one address, or turn the package off.",
+      "privacyNotice": "The package holds the submission's answers and uploaded files. A downloaded copy is outside CHEFS, so add only people who should keep one.",
+      "templateNoticeWorkspace": "A package is sent only for submissions to a form version with a CDOGS template under Document Templates. Submissions to a version without one send nothing.",
+      "templateNoticeForm": "A package is sent only when the submitted form version has a CDOGS template under Document Templates. Without one, nothing is sent.",
+      "emailStep": "emails"
     },
     "log": {
       "label": "Log each submission",
@@ -1145,6 +1166,7 @@
     "fileId": "File ID",
     "submissionId": "Submission ID",
     "exportId": "Export ID",
+    "packageId": "Package ID",
     "type": "Type",
     "size": "Size",
     "errorCode": "Error code",

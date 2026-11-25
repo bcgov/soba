@@ -14,8 +14,9 @@ let registry: JobRegistry | undefined;
 
 /**
  * Every job type this backend runs: the submitted and status-changed fan-outs, submission export,
- * review status emails, submitter email copies, and one type per installed action plugin. Built on
- * first use, so plugins load when jobs start rather than when a module imports this.
+ * review status emails, submitter email copies, and one type per step of each installed action
+ * plugin. Built on first use, so plugins load when jobs start rather than when a module imports
+ * this.
  */
 export const getJobRegistry = (): JobRegistry => {
   if (!registry) {

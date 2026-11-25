@@ -3,7 +3,7 @@ import { ApiErrorCodes, type EmailSubmissionCopyBody } from '@soba/lib';
 import { asyncHandler } from '../../core/api/shared/asyncHandler';
 import { ServiceUnavailableError, TooManyRequestsError } from '../../core/errors';
 import { JobType } from '../../core/db/codes';
-import { nudgeJobs } from '../../core/jobs';
+import { nudgeJobs } from '../../core/jobs/nudge';
 import { getJobSettings } from '../../core/jobs/settings';
 import { submitterEmailCopyJob } from '../../core/jobs/submitterEmailCopy';
 import { log } from '../../core/logging';

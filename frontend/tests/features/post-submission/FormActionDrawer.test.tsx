@@ -31,10 +31,14 @@ import makeStore from '@/lib/store';
 import { setAuthenticated, setToken } from '@/lib/slices/keycloakSlice';
 import FormActionDrawer from '@/src/features/post-submission/ui/FormActionDrawer';
 import { postSubmissionActionUi } from '@/src/features/post-submission/actions/registry';
+import { addressListAction } from '@/src/features/post-submission/actions/addressList';
+import type { PostSubmissionActionUi } from '@/src/features/post-submission/actions/types';
 
 const dict: Dictionary = en;
 const EMAIL = 'post-submission-email-addresses';
 const LOG = 'post-submission-log';
+const PACKAGE = 'post-submission-email-package';
+const pkg = en.postSubmission.emailPackage;
 const OFF: PostSubmissionActionValues = { enabled: false, options: {} };
 const TEAM: PostSubmissionActionValues = { enabled: true, options: { to: ['team@example.com'] } };
 
@@ -62,8 +66,7 @@ const inheriting = (workspace: PostSubmissionActionValues): PostSubmissionFormAc
 
 let store: ReturnType<typeof makeStore>;
 
-function renderDrawer(action: Item) {
-  const ui = postSubmissionActionUi(action.code);
+function renderDrawer(action: Item, ui = postSubmissionActionUi(action.code)) {
   if (!ui) throw new Error(`no fields for ${action.code}`);
   return render(
     <Provider store={store}>
@@ -75,6 +78,23 @@ function renderDrawer(action: Item) {
     </Provider>,
   );
 }
+
+// The email action with two notes that name the scope they were asked for.
+const withNotices = (): PostSubmissionActionUi => {
+  const ui = postSubmissionActionUi(EMAIL);
+  if (!ui) throw new Error(`no fields for ${EMAIL}`);
+  return {
+    ...ui,
+    notices: (_dict, scope) => [
+      { key: 'first', variant: 'warning', text: `First note for the ${scope}` },
+      { key: 'second', variant: 'info', text: `Second note for the ${scope}` },
+    ],
+  };
+};
+// The notes in the drawer, in the order it shows them.
+const notices = () =>
+  screen.queryAllByTestId(new RegExp(`^${EMAIL}-notice-`)).map((notice) => notice.textContent);
+const FORM_NOTES = ['First note for the form', 'Second note for the form'];
 
 const inputIn = (testId: string) =>
   screen.getByTestId(testId).querySelector('input') as HTMLInputElement;
@@ -252,5 +272,107 @@ describe('FormActionDrawer', () => {
     expect(await screen.findByTestId(`${EMAIL}-error`)).toHaveTextContent(
       en.postSubmission.settingsLoadError,
     );
+  });
+
+  it("shows the action's notes for a form, in order, both while it uses the workspace's values and when it sets its own", async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(inheriting(TEAM));
+    renderDrawer(item(EMAIL), withNotices());
+    await waitFor(() => expect(inputIn(`${EMAIL}-inherit`)).toBeEnabled());
+    expect(notices()).toEqual(FORM_NOTES);
+    expect(screen.getByTestId(`${EMAIL}-notice-first`)).toHaveClass('warning');
+    expect(screen.getByTestId(`${EMAIL}-notice-second`)).toHaveClass('info');
+
+    await user.click(inputIn(`${EMAIL}-inherit`));
+    expect(inputIn('post-submission-email-input')).toBeInTheDocument();
+    expect(notices()).toEqual(FORM_NOTES);
+  });
+
+  it("shows the action's notes for a form in a read-only drawer", async () => {
+    mockGetSettings.mockResolvedValue(inheriting(TEAM));
+    renderDrawer(item(EMAIL, { scopes: ['workspace'] }), withNotices());
+
+    await screen.findByTestId('post-submission-email-view-list');
+    expect(notices()).toEqual(FORM_NOTES);
+  });
+
+  it('shows another address-list action read-only under its own test ids', async () => {
+    const other = addressListAction({
+      copy: () => ({
+        label: 'Other action',
+        description: 'Sends something else.',
+        enabled: 'Send it',
+        help: 'Each address gets something else.',
+        required: 'Add an address for it.',
+      }),
+      testIdPrefix: 'other',
+    });
+    mockGetSettings.mockResolvedValue(inheriting(TEAM));
+    renderDrawer(item(EMAIL, { scopes: ['workspace'] }), other);
+
+    expect(await screen.findByTestId('other-view-list')).toHaveTextContent('team@example.com');
+    expect(screen.getByTestId('other-view')).toHaveTextContent(
+      en.postSubmission.addressList.recipients,
+    );
+    expect(screen.queryByTestId('post-submission-email-view')).not.toBeInTheDocument();
+  });
+
+  it("shows Submit to Email's warning and its template note for a form, then its own fields", async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(inheriting(TEAM));
+    renderDrawer(item(PACKAGE));
+    await waitFor(() => expect(inputIn(`${PACKAGE}-inherit`)).toBeEnabled());
+
+    expect(mockGetSettings).toHaveBeenCalledWith('token', 'f1', `post-submission/${PACKAGE}`);
+    expect(screen.getByTestId(`accordion-${PACKAGE}`)).toHaveTextContent(pkg.label);
+    expect(screen.getByTestId(`${PACKAGE}-description`)).toHaveTextContent(pkg.description);
+    expect(screen.getByTestId(`${PACKAGE}-notice-privacy`)).toHaveTextContent(pkg.privacyNotice);
+    expect(screen.getByTestId(`${PACKAGE}-notice-privacy`)).toHaveClass('warning');
+    expect(screen.getByTestId(`${PACKAGE}-notice-template`)).toHaveTextContent(
+      pkg.templateNoticeForm,
+    );
+    expect(screen.getByTestId(`${PACKAGE}-notice-template`)).toHaveClass('info');
+    expect(screen.getByTestId(`${PACKAGE}-view-list`)).toHaveTextContent('team@example.com');
+
+    await user.click(inputIn(`${PACKAGE}-inherit`));
+    expect(screen.getByTestId(`${PACKAGE}-notice-template`)).toHaveTextContent(
+      pkg.templateNoticeForm,
+    );
+    expect(screen.getByTestId(`${PACKAGE}-help`)).toHaveTextContent(pkg.help);
+    expect(screen.getByTestId(`${PACKAGE}-enabled`)).toHaveTextContent(pkg.enabled);
+    await user.type(inputIn(`${PACKAGE}-input`), 'form@example.com{Enter}');
+    await user.click(saveButton(PACKAGE));
+
+    await waitFor(() => expect(mockSetSettings).toHaveBeenCalledTimes(1));
+    expect(savedBody()).toEqual({
+      inherit: false,
+      values: { enabled: true, options: { to: ['team@example.com', 'form@example.com'] } },
+      version: 0,
+    });
+  });
+
+  it('says in its own words that Submit to Email needs an address on a form set alone', async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValue(inheriting(OFF));
+    renderDrawer(item(PACKAGE, { workspaceConfigurable: false }));
+    await waitFor(() => expect(inputIn(`${PACKAGE}-input`)).toBeEnabled());
+
+    expect(screen.getByTestId(`${PACKAGE}-form-only`)).toHaveTextContent(
+      en.postSubmission.formOnlyNote,
+    );
+    expect(screen.getByTestId(`${PACKAGE}-notice-template`)).toHaveTextContent(
+      pkg.templateNoticeForm,
+    );
+    await user.click(inputIn(`${PACKAGE}-enabled`));
+    expect(screen.getByTestId(`${PACKAGE}-list`)).toHaveTextContent(pkg.required);
+    expect(saveButton(PACKAGE)).toBeDisabled();
+  });
+
+  it('shows no notes for an action without any', async () => {
+    mockGetSettings.mockResolvedValue(inheriting(TEAM));
+    renderDrawer(item(EMAIL));
+
+    await screen.findByTestId('post-submission-email-view-list');
+    expect(notices()).toEqual([]);
   });
 });

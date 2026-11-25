@@ -195,7 +195,7 @@ export const MAX_TIMER_MS = 2_147_483_647;
 const MIN_LEASE_MS = 1000;
 
 /** Past this, now() minus the retention overflows a Postgres timestamp. */
-const MAX_RETENTION_DAYS = 36_500;
+export const MAX_RETENTION_DAYS = 36_500;
 
 /** file.size is an integer column. */
 const MAX_RESULT_BYTES = 2_147_483_647;
@@ -297,6 +297,46 @@ export function resolveShutdownSettings(source: EnvSource): ShutdownSettings {
   };
 }
 
+export interface NotificationSettings {
+  /** Emails the environment sends in a day; the rest wait for the next day. */
+  dailyLimit: number;
+  /** The IANA time zone whose midnight starts each day of the email limit. */
+  dailyResetTimeZone: string;
+}
+
+// The provider's quota is 100,000 emails a month; 3,000 a day over 31 days stays under it.
+const DEFAULT_DAILY_LIMIT = 3000;
+const MAX_DAILY_LIMIT = 100_000;
+
+// An IANA name as written. Intl also takes offsets and abbreviations, which Postgres, applying the
+// zone, reads differently: '-07:00' as seven hours ahead, 'PST' as a fixed offset.
+const isTimeZone = (zone: string): boolean => {
+  try {
+    const resolved = new Intl.DateTimeFormat('en-US', { timeZone: zone }).resolvedOptions()
+      .timeZone;
+    return resolved === zone && !/^[+-]/.test(zone);
+  } catch {
+    return false;
+  }
+};
+
+/** Notification settings from `source`. A set value that is not valid stops startup. */
+export function resolveNotificationSettings(source: EnvSource): NotificationSettings {
+  const dailyResetTimeZone =
+    getOptionalEnvFrom(source, 'NOTIFICATION_DAILY_RESET_TIME_ZONE') ?? 'America/Vancouver';
+  if (!isTimeZone(dailyResetTimeZone)) {
+    throw new Error(
+      `NOTIFICATION_DAILY_RESET_TIME_ZONE is not an IANA time zone, got '${dailyResetTimeZone}'`,
+    );
+  }
+  return {
+    dailyLimit: wholeNumberSetting(source, 'NOTIFICATION_DAILY_LIMIT', DEFAULT_DAILY_LIMIT, {
+      max: MAX_DAILY_LIMIT,
+    }),
+    dailyResetTimeZone,
+  };
+}
+
 /** Build an env reader that reads from the given source. Use in tests with a simulated .env object. */
 export function createEnvReader(source: EnvSource) {
   return {
@@ -386,6 +426,7 @@ export function createEnvReader(source: EnvSource) {
       getNumberEnvFrom(source, 'TEMPORAL_WORKER_HEALTH_PORT') ?? 9090,
     getJobSettings: () => resolveJobSettings(source),
     getShutdownSettings: () => resolveShutdownSettings(source),
+    getNotificationSettings: () => resolveNotificationSettings(source),
   };
 }
 
@@ -547,4 +588,5 @@ export const env = {
     wholeNumberSetting(process.env, 'SUBMISSION_EXPORT_ACTIVE_LIMIT', 2),
   getJobSettings: () => resolveJobSettings(process.env),
   getShutdownSettings: () => resolveShutdownSettings(process.env),
+  getNotificationSettings: () => resolveNotificationSettings(process.env),
 };

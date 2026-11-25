@@ -29,12 +29,12 @@ describe('After Submission copy', () => {
     ['en', en.postSubmission],
     ['fr', fr.postSubmission],
   ])('%s keeps the placeholders the tab fills in', (_language, section) => {
-    expect(section.email.count).toContain('{count}');
-    expect(section.email.count).toContain('{max}');
-    expect(section.email.tooMany).toContain('{max}');
-    expect(section.email.added).toContain('{addresses}');
-    expect(section.email.duplicate).toContain('{addresses}');
-    expect(section.email.removed).toContain('{address}');
+    expect(section.addressList.count).toContain('{count}');
+    expect(section.addressList.count).toContain('{max}');
+    expect(section.addressList.tooMany).toContain('{max}');
+    expect(section.addressList.added).toContain('{addresses}');
+    expect(section.addressList.duplicate).toContain('{addresses}');
+    expect(section.addressList.removed).toContain('{address}');
     expect(section.status).toContain('{status}');
     expect(section.log.noteHelp).toContain('{max}');
     expect(section.log.noteValue).toContain('{note}');

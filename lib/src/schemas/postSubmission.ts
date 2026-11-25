@@ -9,6 +9,16 @@ import {
 /** URL segment of the group; one action's settings are at `post-submission/<code>`. */
 export const POST_SUBMISSION_SETTINGS_KEY = 'post-submission';
 
+/** The email-package action's plugin and feature code, and its package job's type. */
+export const POST_SUBMISSION_EMAIL_PACKAGE_CODE = 'post-submission-email-package';
+
+/** The email-package action's second step, which emails the package's link. */
+export const POST_SUBMISSION_EMAIL_PACKAGE_EMAIL_STEP = 'email';
+
+/** The job type of an action's step after the first: the action's code, then the step's name. */
+export const postSubmissionActionStepType = (code: string, step: string): string =>
+  `${code}:${step}`;
+
 /** Where an action is set: a workspace default its forms inherit, or one form. */
 export const PostSubmissionActionScopeSchema = z.enum(['workspace', 'form']);
 export type PostSubmissionActionScope = z.infer<typeof PostSubmissionActionScopeSchema>;
@@ -75,16 +85,22 @@ export const POST_SUBMISSION_EMAIL_MAX_ADDRESSES = 100;
 /** One recipient as the email action keeps it: trimmed, lower-cased, then checked. */
 export const PostSubmissionEmailAddressSchema = NormalizedEmailAddressSchema;
 
-/** The email action's options: 1 to 100 addresses, de-duplicated. */
-export const PostSubmissionEmailAddressesOptionsSchema = z.strictObject({
-  to: z
-    .array(PostSubmissionEmailAddressSchema)
-    .min(1)
-    .max(POST_SUBMISSION_EMAIL_MAX_ADDRESSES)
-    .transform((addresses) => [...new Set(addresses)]),
-});
+/** 1 to 100 addresses, each kept once; the limit counts them after duplicates are dropped. */
+const addressList = z
+  .array(PostSubmissionEmailAddressSchema)
+  .transform((addresses) => [...new Set(addresses)])
+  .pipe(z.array(z.string()).min(1).max(POST_SUBMISSION_EMAIL_MAX_ADDRESSES));
+
+/** The email action's options. */
+export const PostSubmissionEmailAddressesOptionsSchema = z.strictObject({ to: addressList });
 export type PostSubmissionEmailAddressesOptions = z.infer<
   typeof PostSubmissionEmailAddressesOptionsSchema
+>;
+
+/** The email-package action's options. */
+export const PostSubmissionEmailPackageOptionsSchema = z.strictObject({ to: addressList });
+export type PostSubmissionEmailPackageOptions = z.infer<
+  typeof PostSubmissionEmailPackageOptionsSchema
 >;
 
 /** The longest note the log action keeps. */

@@ -29,11 +29,11 @@ jest.mock('../../../src/core/config/env', () => ({
 }));
 
 import type { Logger } from 'pino';
-import type { ClaimedJob } from '../../../src/core/db/repos/jobRepo';
 import type { SendEmail } from '../../../src/core/integrations/notification/NotificationAdapter';
 import type { JobNotifications } from '../../../src/core/integrations/notification/JobNotifications';
+import { JobCancelledError } from '../../../src/core/jobs/errors';
+import type { JobFacts } from '../../../src/core/jobs/facts';
 import type { JobContext } from '../../../src/core/jobs/registry';
-import { JobCancelledError } from '../../../src/core/jobs/settlement';
 import { runStatusEmailJob } from '../../../src/features/submission-review/statusEmailJob';
 
 const CHANGE_ID = '0190f3a2-7c1e-7a4b-9d2e-5f6a7b8c9d0e';
@@ -58,25 +58,24 @@ const SUBMITTERS = { count: 2, emails: ['sub@example.com', 'collab@example.com']
 
 let emails: SendEmail[] = [];
 
-const run = (job: Partial<ClaimedJob> = {}, options = { attachComment: false }) =>
+const run = (job: Partial<JobFacts> = {}, options = { attachComment: false }) =>
   runStatusEmailJob({
     job: {
       id: 'job-1',
       workspaceId: 'ws1',
       submissionId: 's1',
       createdBy: 'rev-1',
-      lastRequeuedBy: null,
-      lastRequeuedAt: null,
       params: { statusChangeId: CHANGE_ID, options },
+      run: { number: 1, queuedAt: new Date('2026-11-01T00:00:00Z'), queuedBy: 'rev-1' },
       ...job,
-    } as ClaimedJob,
+    } as JobFacts,
     signal: new AbortController().signal,
     log: { info: jest.fn(), warn: jest.fn() } as unknown as Logger,
   } as unknown as JobContext);
 
 /** The actor the job's sends are attributed to. */
 const actor = async (): Promise<string> => {
-  const [, actorId] = mockJobNotifications.mock.calls[0] as [ClaimedJob, () => Promise<string>];
+  const [, actorId] = mockJobNotifications.mock.calls[0] as [JobFacts, () => Promise<string>];
   return actorId();
 };
 
@@ -95,9 +94,8 @@ beforeEach(() => {
         emails.push(email);
         return Promise.resolve({ outcome: 'accepted', httpStatus: null, audited: true });
       },
-      handled: () =>
-        Promise.resolve({ recipients: new Set<string>(), runStarted: false, anySent: false }),
-      sentSince: () => Promise.resolve(0),
+      handled: () => Promise.resolve({ recipients: new Set<string>(), anySent: false }),
+      emailRoom: () => Promise.resolve({ room: 3000, resetInMs: 3_600_000, pauseLeftMs: null }),
     }),
   );
 });
@@ -119,7 +117,9 @@ it('emails the assignee in both languages, as the reviewer who made the change',
 });
 
 it('attributes a re-run to whoever ran the job again', async () => {
-  await run({ lastRequeuedBy: 'admin-1' });
+  await run({
+    run: { number: 2, queuedAt: new Date('2026-11-02T00:00:00Z'), queuedBy: 'admin-1' },
+  });
   await expect(actor()).resolves.toBe('admin-1');
 });
 
@@ -145,7 +145,7 @@ it('ends cancelled, sending nothing, once the submission, its form or its worksp
 it('ends cancelled, sending nothing, when the status has moved on', async () => {
   mockChange.mockResolvedValue({ ...ASSIGNED, current: false });
   await expect(run()).rejects.toThrow(
-    new JobCancelledError('The status has changed since; no email sent'),
+    new JobCancelledError('The status has changed since; no more emails are sent'),
   );
   expect(mockUserEmail).not.toHaveBeenCalled();
   expect(emails).toEqual([]);

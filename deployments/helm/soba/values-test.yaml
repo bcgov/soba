@@ -19,6 +19,7 @@ backend:
     notifications: "enabled"
     post-submission: "enabled"
     post-submission-email: "enabled"
+    post-submission-email-package: "enabled"
     submission-export: "enabled"
     user-search: "enabled"
   replicas: 2
@@ -34,14 +35,13 @@ backend:
       cpu: 500m
       memory: 512Mi
   config:
-    nodeEnv: production
     documentGenerationDefaultCode: cdogs-v2
     tenantEngineDefaultCode: cstar-v1
     credentialIssuerDefaultCode: aps-credential-issuer-v3
     notificationDefaultCode: notify-v1
     userSearchPlugins: css-v1,user-search-soba
     # Emails go through Notify test, which only delivers to its safelist.
-    postSubmissionActionPlugins: post-submission-email-addresses
+    postSubmissionActionPlugins: post-submission-email-addresses,post-submission-email-package
   credentialIssuer:
     apsCredentialIssuerV3:
       apiBaseUrl: https://api.gov.bc.ca/ds/api/v3
@@ -69,6 +69,8 @@ backend:
       tokenUrl: https://loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
 
 frontend:
+  externalHosts:
+    - submit-test.api.gov.bc.ca
   replicas: 2
   resources:
     requests:

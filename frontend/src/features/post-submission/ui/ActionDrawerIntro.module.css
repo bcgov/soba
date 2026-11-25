@@ -1,0 +1,6 @@
+.alerts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-margin-small);
+  margin-bottom: var(--layout-margin-medium);
+}

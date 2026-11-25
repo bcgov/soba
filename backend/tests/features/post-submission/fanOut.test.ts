@@ -1,8 +1,8 @@
 import type { Logger } from 'pino';
-import type { ClaimedJob } from '../../../src/core/db/repos/jobRepo';
+import { JobCancelledError } from '../../../src/core/jobs/errors';
+import type { JobFacts } from '../../../src/core/jobs/facts';
 import type { JobContext } from '../../../src/core/jobs/registry';
 import { getJobSettings } from '../../../src/core/jobs/settings';
-import { JobCancelledError } from '../../../src/core/jobs/settlement';
 import {
   childAttempts,
   childJob,
@@ -10,11 +10,7 @@ import {
 } from '../../../src/features/post-submission/fanOut';
 import type { SubmittedAction } from '../../../src/features/post-submission/resolve';
 
-const mockTransaction = jest.fn();
-jest.mock('../../../src/core/db/client', () => ({
-  db: { transaction: (...args: unknown[]) => mockTransaction(...args) },
-  quietDb: {},
-}));
+jest.mock('../../../src/core/db/client', () => ({ db: {}, quietDb: {} }));
 const mockIsLive = jest.fn();
 jest.mock('../../../src/features/post-submission/repo', () => ({
   ...jest.requireActual('../../../src/features/post-submission/repo'),
@@ -36,24 +32,22 @@ const action = (code: string): SubmittedAction => ({
   source: { scope: 'form', settingId: `${code}-setting`, version: 3 },
 });
 
-describe('childJob', () => {
-  const parent = {
-    id: 'parent-job',
-    workspaceId: 'ws1',
-    formId: 'f1',
-    submissionId: 's1',
-    revisionId: 'r9',
-    createdBy: 'actor-1',
-  } as ClaimedJob;
+const parent = {
+  id: 'parent-job',
+  workspaceId: 'ws1',
+  formId: 'f1',
+  submissionId: 's1',
+  revisionId: 'r9',
+  createdBy: 'actor-1',
+} as JobFacts;
 
-  it("is the submitted job's child, deduped per action and revision, with the recorded options", () => {
+describe('childJob', () => {
+  it('is deduped per action and revision, with the recorded options', () => {
     expect(childJob(parent, action('post-submission-a'), 5)).toEqual({
       type: 'post-submission-a',
-      workspaceId: 'ws1',
       formId: 'f1',
       submissionId: 's1',
       revisionId: 'r9',
-      parentJobId: 'parent-job',
       actionConfigId: 'post-submission-a-setting',
       createdBy: 'actor-1',
       params: {
@@ -77,22 +71,40 @@ describe('childAttempts', () => {
 });
 
 describe('fanOutSubmitted', () => {
-  it('ends cancelled, queuing nothing, once the submission, its form or its workspace is gone', async () => {
-    mockIsLive.mockResolvedValue(false);
-    const run = fanOutSubmitted({
-      job: {
-        id: 'parent-job',
-        workspaceId: 'ws1',
-        submissionId: 's1',
-        revisionId: 'r9',
-        params: { actions: [action('post-submission-a')] },
-      } as unknown as ClaimedJob,
+  const queueOnSuccess = jest.fn();
+  const fanOut = (actions: SubmittedAction[]) =>
+    fanOutSubmitted({
+      job: { ...parent, params: { actions } },
       log: { info: jest.fn() } as unknown as Logger,
+      queueOnSuccess,
     } as unknown as JobContext);
 
-    await expect(run).rejects.toThrow(
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsLive.mockResolvedValue(true);
+  });
+
+  it("queues each recorded action as a child job, with its plugin's attempts", async () => {
+    await fanOut([action('post-submission-a'), action('post-submission-newer')]);
+
+    expect(queueOnSuccess).toHaveBeenCalledWith([
+      childJob(parent, action('post-submission-a'), 5),
+      childJob(parent, action('post-submission-newer'), getJobSettings().maxAttempts),
+    ]);
+  });
+
+  it('reads nothing more for a submission that recorded no actions', async () => {
+    await fanOut([]);
+    expect(mockIsLive).not.toHaveBeenCalled();
+    expect(queueOnSuccess).not.toHaveBeenCalled();
+  });
+
+  it('ends cancelled, queuing nothing, once the submission, its form or its workspace is gone', async () => {
+    mockIsLive.mockResolvedValue(false);
+
+    await expect(fanOut([action('post-submission-a')])).rejects.toThrow(
       new JobCancelledError('The submission, its form or its workspace is gone'),
     );
-    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(queueOnSuccess).not.toHaveBeenCalled();
   });
 });
