@@ -12,6 +12,7 @@
     "db:seed": "tsx src/core/db/seed.ts",
     "db:dev-data": "tsx src/features/dev-data/cli.ts",
     "db:dev-data:verify": "tsx src/features/dev-data/access/cli.ts",
+    "dev:gateway": "tsx src/features/dev-gateway/cli.ts",
     "build": "tsc",
     "serve": "pnpm run build && node dist/src/app.js",
     "dev": "npx nodemon",

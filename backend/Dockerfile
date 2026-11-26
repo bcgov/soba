@@ -30,7 +30,7 @@ ENV HOME=/tmp
 ENV XDG_CACHE_HOME=/tmp/.cache
 USER 1001
 
-EXPOSE 4000
+EXPOSE 4000 4001
 
 # Run compiled app only (no corepack/pnpm — avoids EACCES on /.cache)
 WORKDIR /app

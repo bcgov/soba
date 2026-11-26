@@ -45,8 +45,9 @@ OAuth scopes, when required, come from the service account's default scopes.
 
 In Helm, set `backend.config.credentialIssuerDefaultCode` and `backend.credentialIssuer.apsCredentialIssuerV3`.
 The base chart defaults to the no-op; every environment selects APS. Each environment declares its APS
-connection settings and gateway ID. PR reads dev's Vault secret, so it uses dev's gateway and product
-environment appId. Select APS for an environment once its Vault secret holds the keys below. Vault
+connection settings and gateway ID. Each environment's Vault secret, including the PR one, holds the
+account credentials and product environment appId for that environment's gateway. Select APS once
+the Vault keys are in place. Vault
 injects `PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_ID`, `PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_SECRET` and
 `PLUGIN_APS_CREDENTIAL_ISSUER_V3_ENVIRONMENT_APP_ID` only when APS is selected, and a missing key keeps the
 backend pod from starting. Without Vault, supply these keys through an existing deployment
@@ -98,14 +99,14 @@ configured (`FEATURE_API_KEYS_STATUS`, or `backend.features.api-keys` in Helm); 
 lists it in its frontend feature allowlist. The group is a form settings module at the `api-keys` key, so it
 is served at both levels, relative to the API base (normally `/chefs/api/v1`):
 
-| Method | Path                                    | Response                                          |
-| ------ | --------------------------------------- | ------------------------------------------------- |
-| GET    | `<base>`                                | `{ available, items, page, filters, sort }`       |
-| POST   | `<base>`                                | 201 `{ credential, apiKey }`                      |
-| GET    | `<base>/:credentialId`                  | the key's metadata                                |
-| PATCH  | `<base>/:credentialId`                  | the key's metadata after the save                 |
-| POST   | `<base>/:credentialId/regenerate`       | 200 `{ credential, apiKey }`                      |
-| DELETE | `<base>/:credentialId`                  | 204                                               |
+| Method | Path                              | Response                                                     |
+| ------ | --------------------------------- | ------------------------------------------------------------ |
+| GET    | `<base>`                          | `{ available, integrationApi?, items, page, filters, sort }` |
+| POST   | `<base>`                          | 201 `{ credential, apiKey }`                                 |
+| GET    | `<base>/:credentialId`            | the key's metadata                                           |
+| PATCH  | `<base>/:credentialId`            | the key's metadata after the save                            |
+| POST   | `<base>/:credentialId/regenerate` | 200 `{ credential, apiKey }`                                 |
+| DELETE | `<base>/:credentialId`            | 204                                                          |
 
 `<base>` is `/workspaces/:id/settings/api-keys` or `/design/forms/:id/settings/api-keys`.
 Permissions are those of every settings group. A form's keys are read with `form_read` and changed
@@ -132,7 +133,8 @@ rejected. Rows and the total are read from one snapshot.
 `available` is false when the default issuer cannot be built from its configuration or cannot
 generate keys, as with the no-op. It is not a live readiness check. Metadata holds `id`, `scope`,
 `label`, `notes`, `types`, `status`, `createdAt`, `updatedAt` and nullable `rotatedAt`, never the
-consumer ID or issuer settings. Every response of the group carries `Cache-Control: no-store`.
+consumer ID or issuer settings. `integrationApi.url` is `INTEGRATION_API_PUBLIC_URL`, present only
+when it is set. Every response of the group carries `Cache-Control: no-store`.
 
 ## Key lifecycle
 

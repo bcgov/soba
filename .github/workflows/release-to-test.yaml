@@ -314,7 +314,7 @@ jobs:
 
   gateway:
     name: Verify Test through APS gateway
-    needs: [deploy]
+    needs: [set-vars, deploy]
     permissions:
       contents: read
       pull-requests: read
@@ -322,6 +322,10 @@ jobs:
     with:
       environment: test
       release: soba-test
+      ref: ${{ needs.set-vars.outputs.ref }}
+      integration_enabled: true
+      # Temporarily verify with a manually approved key after deployment.
+      integration_health_check: false
     secrets: inherit
 
   Tests:

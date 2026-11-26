@@ -4,6 +4,7 @@ import type {
   CredentialSecret,
   CredentialState,
 } from '@soba/lib';
+import { env } from '../../core/config/env';
 import { ConflictError, NotFoundError, ServiceUnavailableError } from '../../core/errors';
 import {
   createCredentialIssuerAdapter,
@@ -70,8 +71,10 @@ const rotateAway = async (
 export class CredentialService {
   async list(owner: repo.CredentialOwner, query: CredentialListQuery): Promise<CredentialState> {
     const { items, total } = await repo.listWorkspaceCredentials(owner, query);
+    const integrationApiUrl = env.getIntegrationApiPublicUrl();
     return {
       available: usableIssuer(resolveDefaultCredentialIssuerCode()) !== null,
+      ...(integrationApiUrl ? { integrationApi: { url: integrationApiUrl } } : {}),
       items: items.map(credentialMetadata),
       page: { offset: query.offset, limit: query.limit, total },
       filters: { q: query.q },

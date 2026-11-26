@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import en from '@/dictionaries/en.json';
@@ -210,6 +210,38 @@ describe('ApiKeysTab', () => {
     await generateNewKey(user);
     expect(await screen.findByDisplayValue('shown-once')).toBeInTheDocument();
     await waitFor(() => expect(mockApi.listCredentials.mock.calls.length).toBeGreaterThan(reads));
+  });
+
+  it('shows where keys are used, the header and the API reference, and repeats them with a new key', async () => {
+    const user = userEvent.setup();
+    const url = 'https://gateway.example.test/pr/1/integrations/v2';
+    mockApi.listCredentials.mockResolvedValue({
+      ...state([key({ id: 'k-active', label: 'Integration' })]),
+      integrationApi: { url },
+    });
+    mockApi.issueCredential.mockResolvedValue({
+      credential: key({ id: 'k-new', label: 'New' }),
+      apiKey: 'shown-once',
+    });
+    renderTab();
+    expect(await screen.findByTestId('api-key-integration-url')).toHaveTextContent(url);
+    expect(screen.getByText(t.integrationApiHeader)).toBeInTheDocument();
+    const docs = screen.getByTestId('api-key-integration-docs');
+    expect(docs).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/api\/docs\/\?urls\.primaryName=Integration%20API%20v2$/),
+    );
+    expect(docs).toHaveAttribute('target', '_blank');
+
+    await generateNewKey(user);
+    const panel = await screen.findByTestId('api-key-secret-panel');
+    expect(within(panel).getByTestId('api-key-integration-url')).toHaveTextContent(url);
+  });
+
+  it('shows no integration API details when the deployment has none', async () => {
+    renderTab();
+    await screen.findByTestId('api-key-label-k-active');
+    expect(screen.queryByTestId('api-key-integration-api')).not.toBeInTheDocument();
   });
 
   it('keeps a generated key out of the cache, with the list mounted', async () => {

@@ -1,0 +1,78 @@
+# Publish on gw-7f49d with --qualifier chefs-test.
+services:
+  - name: chefs-2-backend
+    host: soba-test-api.apps.gold.devops.gov.bc.ca
+    port: 443
+    protocol: https
+    retries: 0
+    tags: [ns.gw-7f49d.chefs-test]
+    routes:
+      - name: chefs-2-backend
+        tags: [ns.gw-7f49d.chefs-test]
+        hosts: [submit.digital.gov.bc.ca]
+        protocols: [https]
+        paths: [/chefs]
+        strip_path: false
+        path_handling: v0
+
+  - name: chefs-2-designer
+    host: soba-test.apps.gold.devops.gov.bc.ca
+    port: 443
+    protocol: https
+    retries: 0
+    tags: [ns.gw-7f49d.chefs-test]
+    routes:
+      - name: chefs-2-designer
+        tags: [ns.gw-7f49d.chefs-test]
+        hosts: [submit.digital.gov.bc.ca]
+        protocols: [https]
+        paths: [/designer]
+        strip_path: false
+        path_handling: v0
+
+  - name: chefs-2-forms
+    host: soba-test.apps.gold.devops.gov.bc.ca
+    port: 443
+    protocol: https
+    retries: 0
+    tags: [ns.gw-7f49d.chefs-test]
+    routes:
+      - name: chefs-2-forms
+        tags: [ns.gw-7f49d.chefs-test]
+        hosts: [submit.digital.gov.bc.ca]
+        protocols: [https]
+        paths: [/forms]
+        strip_path: false
+        path_handling: v0
+
+  - name: chefs-1-api
+    host: chefs-test.apps.silver.devops.gov.bc.ca
+    port: 443
+    protocol: https
+    retries: 0
+    path: /app/api/v1
+    tags: [ns.gw-7f49d.chefs-test]
+    routes:
+      - name: chefs-1-api
+        tags: [ns.gw-7f49d.chefs-test]
+        hosts: [submit.digital.gov.bc.ca]
+        protocols: [https]
+        paths: [/api/v1]
+        strip_path: true
+        path_handling: v0
+
+  - name: chefs-1-frontend
+    host: chefs-test.apps.silver.devops.gov.bc.ca
+    port: 443
+    protocol: https
+    retries: 0
+    path: /app
+    tags: [ns.gw-7f49d.chefs-test]
+    routes:
+      - name: chefs-1-frontend
+        tags: [ns.gw-7f49d.chefs-test]
+        hosts: [submit.digital.gov.bc.ca]
+        protocols: [https]
+        paths: [/app, /apps]
+        strip_path: true
+        path_handling: v0

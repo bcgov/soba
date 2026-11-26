@@ -19,6 +19,7 @@ import type { CredentialMetadata, CredentialOwner } from '@/src/types/credential
 import { useCredentials } from '../data/useCredentials';
 import { useCredentialWriter } from '../data/useCredentialWriter';
 import { ApiKeyForm } from './ApiKeyForm';
+import { IntegrationApiDetails } from './IntegrationApiDetails';
 
 export interface ApiKeysTabProps {
   dict: Dictionary;
@@ -163,6 +164,11 @@ export function ApiKeysTab({ dict, owner }: Readonly<ApiKeysTabProps>) {
       {keys.available === false && (
         <InlineAlert variant="info" description={t.unavailable} data-testid="api-key-unavailable" />
       )}
+      {keys.integrationApiUrl && (
+        <div className="mb-3">
+          <IntegrationApiDetails dict={dict} url={keys.integrationApiUrl} />
+        </div>
+      )}
       <ListPageToolbar>
         <ListPageSearchField
           value={query.searchInput}
@@ -196,6 +202,7 @@ export function ApiKeysTab({ dict, owner }: Readonly<ApiKeysTabProps>) {
           owner={owner}
           credentialId={editingId}
           available={keys.available === true}
+          integrationApiUrl={keys.integrationApiUrl}
           onHoldChange={setFormHeld}
           onDone={() => setFormView(null)}
         />

@@ -81,6 +81,27 @@ const assignTypes = (tx: DbOrTx, key: KeyRef, types: CredentialType[]) =>
 
 const sortedTypes = (types: CredentialType[]) => [...types].sort((a, b) => a.localeCompare(b));
 
+/** Only a configured issuer's live, active API credentials may authenticate incoming requests. */
+export const findActiveApiCredential = async (
+  issuerCode: string,
+  clientId: string,
+): Promise<CredentialRecord | null> => {
+  const rows = await db
+    .select(credentialSelection)
+    .from(workspaceCredentials)
+    .where(
+      and(
+        eq(workspaceCredentials.issuerCode, issuerCode),
+        eq(workspaceCredentials.clientId, clientId),
+        eq(workspaceCredentials.status, 'active'),
+        live,
+      ),
+    )
+    .limit(1);
+  const record = rows[0];
+  return record?.types.includes('api') ? record : null;
+};
+
 export const getWorkspaceCredential = async (
   owner: CredentialOwner,
   id: string,

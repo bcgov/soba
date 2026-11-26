@@ -35,6 +35,8 @@ export interface ApiKeyFormProps {
   credentialId?: string;
   /** Whether the issuer can generate keys. */
   available: boolean;
+  /** Where consumers call the integration API; shown with a newly issued key. */
+  integrationApiUrl?: string;
   /** Told whether the form is issuing, showing or holding an unsaved new key. */
   onHoldChange?: (held: boolean) => void;
   onDone: () => void;
@@ -49,6 +51,7 @@ export function ApiKeyForm({
   owner,
   credentialId,
   available,
+  integrationApiUrl,
   onHoldChange,
   onDone,
 }: Readonly<ApiKeyFormProps>) {
@@ -69,6 +72,7 @@ export function ApiKeyForm({
         owner={owner}
         credential={seed}
         available={available}
+        integrationApiUrl={integrationApiUrl}
         onHoldChange={onHoldChange}
         onDone={onDone}
       />
@@ -103,6 +107,7 @@ interface ApiKeyFieldsProps {
   /** The key as read for this form, or null to generate one. Seeds the fields on mount. */
   credential: CredentialMetadata | null;
   available: boolean;
+  integrationApiUrl?: string;
   onHoldChange?: (held: boolean) => void;
   onDone: () => void;
 }
@@ -125,6 +130,7 @@ function ApiKeyFields({
   owner,
   credential,
   available,
+  integrationApiUrl,
   onHoldChange,
   onDone,
 }: Readonly<ApiKeyFieldsProps>) {
@@ -317,6 +323,7 @@ function ApiKeyFields({
           dict={dict}
           stage={stage}
           pending={busy === 'generate'}
+          integrationApiUrl={integrationApiUrl}
           onConfirm={() => void regenerate()}
           onClose={closeModal}
         />

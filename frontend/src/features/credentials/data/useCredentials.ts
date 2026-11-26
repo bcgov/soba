@@ -12,13 +12,16 @@ import type { ListQueryArgs } from '@/src/types/list';
 import { listCredentials } from './api';
 
 /**
- * One page of the owner's API keys, plus whether keys can be generated. Holds metadata only: a key
- * is returned to the form that asked for it and never enters the cache.
+ * One page of the owner's API keys, plus whether keys can be generated and where they are used.
+ * Holds metadata only: a key is returned to the form that asked for it and never enters the cache.
  */
 export function useCredentials(
   owner: CredentialOwner,
   query: ListQueryArgs,
-): ListResult<CredentialMetadata> & { available: boolean | undefined } {
+): ListResult<CredentialMetadata> & {
+  available: boolean | undefined;
+  integrationApiUrl: string | undefined;
+} {
   const locale = useSortLocale();
   const { data, isLoading, isValidating, error, mutate } = useAuthedSWR(
     [
@@ -44,6 +47,7 @@ export function useCredentials(
     rows,
     total: data?.page.total,
     available: data?.available,
+    integrationApiUrl: data?.integrationApi?.url,
     isLoading,
     isRefreshing: isValidating && data !== undefined,
     error: error ? classifyDataError(error) : null,

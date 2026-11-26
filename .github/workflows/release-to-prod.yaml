@@ -286,4 +286,7 @@ jobs:
     with:
       environment: prod
       release: soba-prod
+      integration_enabled: true
+      # Temporarily verify with a manually approved key after deployment.
+      integration_health_check: false
     secrets: inherit

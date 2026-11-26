@@ -11,5 +11,9 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    - port: {{ .Values.backend.service.integrationPort }}
+      targetPort: integration
+      protocol: TCP
+      name: integration
   selector:
     {{- include "soba.selectorLabels" (dict "root" . "component" "backend") | nindent 4 }}

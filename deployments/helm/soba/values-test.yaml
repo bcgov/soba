@@ -1,5 +1,13 @@
 # Test / UAT environment — two replicas, moderate resources
 backend:
+  # Integration API v2 through the Gold APS gateway. The audience is the Kong service the gateway
+  # check publishes for this release, <release>-integrations-v2.
+  integrationGateway:
+    issuer: https://aps-jwks-upstream-jwt.api.gov.bc.ca
+    jwksUri: https://aps-jwks-upstream-jwt.api.gov.bc.ca/certs
+    audience: soba-test-integrations-v2
+    clientIdClaim: consumername
+    publicUrl: https://soba-test.api.gov.bc.ca/integrations/v2
   # Development data generator: on in test, for integration runs. Notifications send through notify-v1.
   # API keys issue through the APS issuer below.
   features:

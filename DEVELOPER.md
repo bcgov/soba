@@ -80,9 +80,10 @@ The repo is a **[pnpm](https://pnpm.io) workspace** (faster installs, shared sto
 | `pnpm build`                                       | `build:lib`, `build:frontend`, then `build:backend`             |
 | `pnpm build:frontend` / `pnpm build:backend`       | Build one app                                                   |
 | `pnpm build:lib`                                   | Build the shared lib into `lib/dist`                            |
-| `pnpm test`                                        | Run lib, frontend and backend tests                             |
+| `pnpm test`                                        | Run lib, frontend, backend and gateway tests                    |
 | `pnpm test:frontend` / `pnpm test:backend`         | Test one app                                                    |
 | `pnpm test:lib`                                    | Test the shared lib                                             |
+| `pnpm test:gateway`                                | Test the APS gateway config scripts                             |
 | `pnpm lint`                                        | Lint lib, frontend and backend                                  |
 | `pnpm lint:fix`                                    | Lint with auto-fix, all three                                   |
 | `pnpm db:migrate`                                  | Run pending DB migrations (backend)                             |
@@ -220,7 +221,7 @@ gets built and for the gitignored owner file that seeds a fresh database without
 ### API layout
 
 - **Base path:** `/api/v1`. Core domains live under this prefix.
-- **Public (no JWT):** `/api/v1/meta`, `/api/v1/health`. OpenAPI spec: `/api/docs/openapi.json`; Swagger UI: `/api/docs`.
+- **Public (no JWT):** `/api/v1/meta`, `/api/v1/health`. OpenAPI spec: `/api/docs/openapi.json`; integration API v2 spec: `/api/docs/integrations/v2/openapi.json`; Swagger UI, with a selector for both: `/api/docs`.
 - **Public submissions (optional JWT):** `POST /api/v1/submissions` and `POST /api/v1/submissions/:id/save` are mounted **before** the JWT middleware. They use optional auth (`checkJwtOptional`, `resolveActorOptional`) and **`checkFormVisibility`** so anonymous users can submit when the form version's `visibility` allows it.
 - **Protected:** Other `/api/v1` routes use `checkJwt()` then `resolveActor`; core context (workspace, etc.) is required for domain routes. Admin routes under `/api/v1/admin` additionally require SOBA admin (`requireSobaAdmin`).
 - **CORS:** All origins allowed in `development`; in other environments set comma-separated **`CORS_ORIGIN`** or cross-origin requests are blocked.
