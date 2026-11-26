@@ -14,18 +14,15 @@ describe('LanguageSelector', () => {
     const toggle = screen.getByRole('button', { name: `${LABEL}: FR` });
     expect(toggle).toHaveTextContent('FR');
     fireEvent.click(toggle);
-    expect(screen.getByRole('button', { name: 'EN', exact: true })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'FR', exact: true })).toHaveAttribute(
-      'aria-current',
-      'true',
-    );
+    expect(screen.getByRole('button', { name: 'EN' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'FR' })).toHaveAttribute('aria-current', 'true');
   });
 
   it('calls onChange with the selected value', () => {
     const onChange = vi.fn();
     render(<LanguageSelector locale="en" label={LABEL} options={options} onChange={onChange} />);
     fireEvent.click(screen.getByTestId('lang-selector'));
-    fireEvent.click(screen.getByRole('button', { name: 'FR', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'FR' }));
     expect(onChange).toHaveBeenCalledWith('fr');
   });
 });
