@@ -9,6 +9,9 @@
     "description": "Welcome to Common Hosted Forms Service (CHEFS) where you can create and publish forms, receive and review submissions, and integrate with your line of business systems.",
     "notAuthenticated": "You are not authenticated. Please login to access this section.",
     "unknown": "Unknown",
+    "nameChecking": "Checking…",
+    "nameAvailable": "Available",
+    "nameUnavailable": "Unavailable",
     "unsavedChanges": {
       "title": "Leave without saving?",
       "message": "Your changes have not been saved. If you leave, they will be lost.",
@@ -704,7 +707,8 @@
     },
     "descriptionLabel": "Description",
     "submit": "Submit",
-    "noFormName": "Form name is required"
+    "noFormName": "Form name is required",
+    "nameCheckNeedsWorkspace": "Pick a workspace to check name availability"
   },
   "team": {
     "members": "Team members",

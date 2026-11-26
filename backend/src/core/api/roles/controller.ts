@@ -2,14 +2,27 @@ import type { Request, Response } from 'express';
 import type { z } from 'zod';
 import { asyncHandler } from '../shared/asyncHandler';
 import { rolesApiService } from './service';
-import type { CreateRoleBodySchema, RoleCodeParamsSchema, UpdateRoleBodySchema } from './schema';
+import type {
+  CreateRoleBodySchema,
+  RoleCodeParamsSchema,
+  RoleNameAvailabilityQuerySchema,
+  UpdateRoleBodySchema,
+} from './schema';
 
 type RoleCodeParams = z.infer<typeof RoleCodeParamsSchema>;
+type RoleNameAvailabilityQuery = z.infer<typeof RoleNameAvailabilityQuerySchema>;
 type CreateRoleBody = z.infer<typeof CreateRoleBodySchema>;
 type UpdateRoleBody = z.infer<typeof UpdateRoleBodySchema>;
 
 export const listWorkspaceRoles = asyncHandler(async (req: Request, res: Response) => {
   res.json(await rolesApiService.list(req.coreContext!.workspaceId));
+});
+
+export const checkRoleNameAvailable = asyncHandler(async (req: Request, res: Response) => {
+  const { name, excludeCode } = req.query as unknown as RoleNameAvailabilityQuery;
+  res.json(
+    await rolesApiService.checkNameAvailable(req.coreContext!.workspaceId, name, excludeCode),
+  );
 });
 
 export const getWorkspaceRole = asyncHandler(

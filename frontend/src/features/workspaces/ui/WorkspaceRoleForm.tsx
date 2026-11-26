@@ -12,7 +12,10 @@ import {
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { apiErrorMessage, messageForDataError } from '@/src/shared/api/dataError';
+import { apiErrorMessage, isConflict, messageForDataError } from '@/src/shared/api/dataError';
+import { useNameCheck } from '@/src/shared/api/useNameCheck';
+import { NameCheckAnnouncement } from '@/src/components/NameCheckAnnouncement';
+import { checkWorkspaceRoleName } from '../data/api';
 import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
 import type { Dictionary } from '@/src/types/dictionary';
 import { WORKSPACE_ROLE_NAME_MAX_LENGTH, type WorkspaceRole } from '@/src/types/workspaceRoles';
@@ -112,8 +115,29 @@ function RoleFields({ dict, workspaceId, role, onDone }: Readonly<RoleFieldsProp
   const [seed] = useState(role);
 
   const trimmedName = name.trim();
+  // A fixed role can't be renamed, so its name is never checked.
+  const nameCheck = useNameCheck({
+    name,
+    scope: isFixed ? null : ['workspace-role', workspaceId],
+    savedName: seed?.name,
+    check: (authToken, checked) =>
+      checkWorkspaceRoleName(authToken, workspaceId, {
+        name: checked,
+        excludeCode: seed?.roleCode,
+      }),
+    labels: {
+      checking: dict.general.nameChecking,
+      available: dict.general.nameAvailable,
+      unavailable: dict.general.nameUnavailable,
+    },
+  });
   const canSave =
-    Boolean(token) && trimmedName.length > 0 && permissionCodes.length > 0 && !saving && !isFixed;
+    Boolean(token) &&
+    trimmedName.length > 0 &&
+    permissionCodes.length > 0 &&
+    !saving &&
+    !isFixed &&
+    !nameCheck.blocksSave;
 
   const save = async () => {
     if (!token || !canSave) return;
@@ -125,6 +149,8 @@ function RoleFields({ dict, workspaceId, role, onDone }: Readonly<RoleFieldsProp
       addNotification({ text: role ? t.updateSuccess : t.createSuccess, type: 'success' });
       onDone();
     } catch (err: unknown) {
+      // Someone else just took this name: check it again, so it stops saying "Available".
+      if (isConflict(err)) nameCheck.revalidate();
       // A coded refusal, such as a name already in use, says why; anything else is generic.
       addNotification({
         text: apiErrorMessage(err, dict.apiErrors) ?? (role ? t.updateError : t.createError),
@@ -164,8 +190,12 @@ function RoleFields({ dict, workspaceId, role, onDone }: Readonly<RoleFieldsProp
         maxLength={WORKSPACE_ROLE_NAME_MAX_LENGTH}
         isRequired
         isDisabled={saving || isFixed}
+        isInvalid={nameCheck.status === 'unavailable'}
+        description={nameCheck.description}
+        errorMessage={nameCheck.errorMessage}
         data-testid="role-name-input"
       />
+      <NameCheckAnnouncement announcement={nameCheck.announcement} testId="role-name-status" />
       {!isFixed && <p data-testid="role-permissions-help">{t.permissionsHelp}</p>}
       {PERMISSION_AREAS.map(({ area, codes }) => (
         <CheckboxGroup

@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FormSettingsDrawer from '@/src/features/form-settings/form/FormSettingsDrawer';
 import type { Dictionary } from '@/src/types/dictionary';
+import { ApiError } from '@/src/shared/api/sobaHelpers';
 
 const { mockFormUpdate, mockAddNotification, loaded } = vi.hoisted(() => ({
   mockFormUpdate: vi.fn(),
@@ -27,6 +28,28 @@ vi.mock('@/lib/hooks/useNotificationStore', () => ({
     addNotification: mockAddNotification,
   }),
 }));
+
+// The live name check has its own tests; here it answers whatever a test sets.
+const { nameCheck } = vi.hoisted(() => ({
+  nameCheck: {
+    calls: [] as unknown[][],
+    revalidate: () => undefined as void,
+    result: {} as Record<string, unknown>,
+  },
+}));
+vi.mock('@/src/features/designer/data/useFormNameCheck', () => ({
+  useFormRenameCheck: (...args: unknown[]) => {
+    nameCheck.calls.push(args);
+    return { ...nameCheck.result, revalidate: nameCheck.revalidate };
+  },
+}));
+const idleNameCheck = {
+  status: null,
+  blocksSave: false,
+  description: undefined,
+  errorMessage: undefined,
+  announcement: '',
+};
 
 const mockDict = {
   form: {
@@ -53,6 +76,9 @@ describe('FormSettingsDrawer', () => {
   let store: ReturnType<typeof makeStore>;
   beforeEach(() => {
     vi.clearAllMocks();
+    nameCheck.calls = [];
+    nameCheck.result = { ...idleNameCheck };
+    nameCheck.revalidate = vi.fn();
     loaded.name = 'Initial name';
     loaded.description = 'Initial description';
     store = makeStore();
@@ -167,6 +193,65 @@ describe('FormSettingsDrawer', () => {
 
     expect(await screen.findByText('Form name is required')).toBeInTheDocument();
     expect(mockFormUpdate).not.toHaveBeenCalled();
+  });
+
+  it("checks the name typed against the form's own", async () => {
+    renderDrawer();
+    const input = screen.getByTestId('form-settings-name').querySelector('input')!;
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Renamed');
+
+    expect(nameCheck.calls.at(-1)?.slice(0, 3)).toEqual(['Renamed', 'f1', 'Initial name']);
+  });
+
+  it('says a free name is available', () => {
+    nameCheck.result = {
+      ...idleNameCheck,
+      status: 'available',
+      description: 'Available ✓',
+      announcement: 'Available',
+    };
+    renderDrawer();
+
+    expect(screen.getByTestId('form-settings-name')).toHaveTextContent('Available ✓');
+    expect(screen.getByTestId('form-settings-name-status')).toHaveTextContent('Available');
+  });
+
+  it('marks a taken name on the field, and saves nothing', async () => {
+    nameCheck.result = {
+      ...idleNameCheck,
+      status: 'unavailable',
+      blocksSave: true,
+      errorMessage: 'Unavailable ✕',
+      announcement: 'Unavailable',
+    };
+    renderDrawer();
+    const input = screen.getByTestId('form-settings-name').querySelector('input')!;
+    await userEvent.type(input, ' 2');
+
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByTestId('form-settings-name')).toHaveTextContent('Unavailable ✕');
+    expect(screen.getByTestId('form-settings-name-status')).toHaveTextContent('Unavailable');
+    expect(screen.getByTestId('form-settings-test-drawer-save')).toBeDisabled();
+  });
+
+  it('waits for the check before saving', async () => {
+    nameCheck.result = { ...idleNameCheck, status: 'checking', blocksSave: true };
+    renderDrawer();
+    const input = screen.getByTestId('form-settings-name').querySelector('input')!;
+    await userEvent.type(input, ' 2');
+
+    expect(screen.getByTestId('form-settings-test-drawer-save')).toBeDisabled();
+  });
+
+  it('checks the name again when a rename is refused over it', async () => {
+    mockFormUpdate.mockRejectedValueOnce(new ApiError('A form with this name exists', 409));
+    renderDrawer();
+    const input = screen.getByTestId('form-settings-name').querySelector('input')!;
+    await userEvent.type(input, ' 2');
+    await userEvent.click(screen.getByTestId('form-settings-test-drawer-save'));
+
+    expect(nameCheck.revalidate).toHaveBeenCalled();
   });
 
   it('shows error notification on save failure', async () => {

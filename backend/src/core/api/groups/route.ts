@@ -8,6 +8,7 @@ import {
   requireWorkspacePeopleRead,
 } from '../../middleware/requireWorkspaceRole';
 import {
+  checkGroupNameAvailable,
   listGroups,
   getGroup,
   createGroup,
@@ -22,6 +23,7 @@ import {
   CreateGroupBodySchema,
   GroupIdParamsSchema,
   GroupMemberParamsSchema,
+  GroupNameAvailabilityQuerySchema,
   ListGroupsQuerySchema,
   SetGroupRolesBodySchema,
   UpdateGroupBodySchema,
@@ -47,6 +49,18 @@ router.get(
   workspaceResource,
   requireWorkspacePeopleRead,
   listGroups,
+);
+// Before GROUP_PATH, so `name-availability` isn't taken as a group id. Previews a create or rename,
+// so it needs the same authority they do.
+router.get(
+  `${GROUPS_PATH}/name-availability`,
+  validateRequest({
+    query: GroupNameAvailabilityQuerySchema,
+    params: WorkspaceGroupParamsSchema,
+  }),
+  workspaceResource,
+  requireWorkspaceManage,
+  checkGroupNameAvailable,
 );
 router.get(
   GROUP_PATH,

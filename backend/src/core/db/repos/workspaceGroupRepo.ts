@@ -371,7 +371,7 @@ export const groupNameExistsInWorkspace = async (
     .where(
       and(
         eq(workspaceGroups.workspaceId, workspaceId),
-        eq(workspaceGroups.name, name),
+        ilike(workspaceGroups.name, name),
         eq(workspaceGroups.status, WorkspaceGroupStatus.active),
         ...(exceptGroupId ? [ne(workspaceGroups.id, exceptGroupId)] : []),
       ),

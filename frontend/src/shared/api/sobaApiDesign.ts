@@ -3,6 +3,7 @@
 import { sobaFetch } from './sobaFetch';
 import { parseDownload, parseJson, type DownloadedFile } from './sobaHelpers';
 import { FormType } from '@formio/react';
+import type { NameAvailabilityResponse } from '@soba/lib';
 import type {
   SobaFormType,
   CreateFormFields,
@@ -61,6 +62,31 @@ export async function createSobaFormioForm(
     json: { ...data, formEngineCode: 'formio-v5', workspaceId },
   });
   return createResult(response);
+}
+
+/** Whether a new form could take this name in the workspace it would be created in. */
+export async function checkNewFormName(
+  token: string,
+  params: { workspaceId: string; name: string },
+): Promise<NameAvailabilityResponse> {
+  const response = await sobaFetch('/design/forms/name-availability', {
+    token,
+    query: { workspaceId: params.workspaceId, name: params.name },
+  });
+  return parseJson(response);
+}
+
+/** Whether a form could be renamed to this name; its own name is not counted. */
+export async function checkFormName(
+  token: string,
+  formId: string,
+  name: string,
+): Promise<NameAvailabilityResponse> {
+  const response = await sobaFetch(`/design/forms/${formId}/name-availability`, {
+    token,
+    query: { name },
+  });
+  return parseJson(response);
 }
 
 export async function updateSobaForm(

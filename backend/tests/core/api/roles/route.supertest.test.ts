@@ -39,6 +39,7 @@ import { coreErrorHandler } from '../../../../src/core/middleware/errorHandler';
 
 const ROLES = '/workspaces/01a0dc24-1f2e-7a3b-8c4d-5e6f7a8b9c0d/roles';
 const ROLE = `${ROLES}/custom-1`;
+const NAME_CHECK = `${ROLES}/name-availability`;
 const ACTOR = { workspaceId: 'ws1', actorId: 'actor1', actorDisplayLabel: 'Actor One' };
 const AUDITOR = { code: 'custom-1', name: 'Auditor', workspaceId: 'ws1' };
 const NEW_ROLE = { name: '  Auditor  ', permissionCodes: ['submission_read', 'form_create'] };
@@ -213,4 +214,47 @@ describe('workspace role routes', () => {
     expect(updateWorkspaceRole).not.toHaveBeenCalled();
     expect(softDeleteWorkspaceRole).not.toHaveBeenCalled();
   });
+
+  it.each([
+    [false, true],
+    [true, false],
+  ])('name check: answers a taken name (%s) as available: %s', async (taken, available) => {
+    jest.mocked(roleNameExistsInWorkspace).mockResolvedValue(taken);
+    const res = await request(app).get(NAME_CHECK).query({ name: '  Auditor  ' });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ available });
+    // Trimmed, as a save trims it, in the caller's workspace.
+    expect(roleNameExistsInWorkspace).toHaveBeenCalledWith('ws1', 'Auditor', undefined);
+  });
+
+  it('name check: leaves out the role being renamed', async () => {
+    const res = await request(app)
+      .get(NAME_CHECK)
+      .query({ name: 'Auditor', excludeCode: 'custom-1' });
+    expect(res.status).toBe(200);
+    expect(roleNameExistsInWorkspace).toHaveBeenCalledWith('ws1', 'Auditor', 'custom-1');
+  });
+
+  it('name check: is not read as a role code', async () => {
+    await request(app).get(NAME_CHECK).query({ name: 'Auditor' });
+    expect(listRolesForWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('name check: refuses a blank name', async () => {
+    const res = await request(app).get(NAME_CHECK).query({ name: '   ' });
+    expect(res.status).toBe(400);
+    expect(roleNameExistsInWorkspace).not.toHaveBeenCalled();
+  });
+
+  it.each(['member', 'viewer'])(
+    'name check: refuses a %s, who could not save the role',
+    async (role) => {
+      const res = await request(app)
+        .get(NAME_CHECK)
+        .set('x-test-role', role)
+        .query({ name: 'Auditor' });
+      expect(res.status).toBe(403);
+      expect(roleNameExistsInWorkspace).not.toHaveBeenCalled();
+    },
+  );
 });

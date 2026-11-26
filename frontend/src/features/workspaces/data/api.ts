@@ -1,3 +1,4 @@
+import type { NameAvailabilityResponse } from '@soba/lib';
 import type { SortLocale } from '@soba/lib/sort';
 import { sobaFetch } from '@/src/shared/api/sobaFetch';
 import { parseJson } from '@/src/shared/api/sobaHelpers';
@@ -49,6 +50,19 @@ export async function createWorkspaceRole(
   return parseJson(response);
 }
 
+/** Whether a role could take this name; `excludeCode` is the role being renamed. */
+export async function checkWorkspaceRoleName(
+  token: string,
+  workspaceId: string,
+  params: { name: string; excludeCode?: string },
+): Promise<NameAvailabilityResponse> {
+  const response = await sobaFetch(`${rolesPath(workspaceId)}/name-availability`, {
+    token,
+    query: { name: params.name, excludeCode: params.excludeCode },
+  });
+  return parseJson(response);
+}
+
 export async function updateWorkspaceRole(
   token: string,
   workspaceId: string,
@@ -96,6 +110,19 @@ export async function getWorkspaceGroup(
   const response = await sobaFetch(groupPath(workspaceId, groupId), {
     token,
     ...sortLocaleRequest(locale),
+  });
+  return parseJson(response);
+}
+
+/** Whether a group could take this name; `excludeId` is the group being renamed. */
+export async function checkWorkspaceGroupName(
+  token: string,
+  workspaceId: string,
+  params: { name: string; excludeId?: string },
+): Promise<NameAvailabilityResponse> {
+  const response = await sobaFetch(`${groupsPath(workspaceId)}/name-availability`, {
+    token,
+    query: { name: params.name, excludeId: params.excludeId },
   });
   return parseJson(response);
 }

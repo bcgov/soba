@@ -23,6 +23,8 @@ export type { WorkspaceItem, WorkspacesResponse } from '../../types/workspaces';
 export type { CurrentUserResponse } from '../../types/user';
 // Design-mode (staff, /design/*)
 export {
+  checkFormName,
+  checkNewFormName,
   createSobaFormioForm,
   publishSobaFormVersion,
   getSobaForm,

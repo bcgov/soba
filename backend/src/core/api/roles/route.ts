@@ -6,6 +6,7 @@ import {
   requireWorkspacePeopleRead,
 } from '../../middleware/requireWorkspaceRole';
 import {
+  checkRoleNameAvailable,
   createWorkspaceRole,
   deleteWorkspaceRole,
   getWorkspaceRole,
@@ -15,6 +16,7 @@ import {
 import {
   CreateRoleBodySchema,
   RoleCodeParamsSchema,
+  RoleNameAvailabilityQuerySchema,
   UpdateRoleBodySchema,
   WorkspaceRoleParamsSchema,
 } from './schema';
@@ -34,6 +36,15 @@ router.get(
   workspaceResource,
   requireWorkspacePeopleRead,
   listWorkspaceRoles,
+);
+// Before ROLE_PATH, so `name-availability` isn't taken as a role code. Previews a create or rename,
+// so it needs the same authority they do.
+router.get(
+  `${ROLES_PATH}/name-availability`,
+  validateRequest({ query: RoleNameAvailabilityQuerySchema, params: WorkspaceRoleParamsSchema }),
+  workspaceResource,
+  requireWorkspaceManage,
+  checkRoleNameAvailable,
 );
 router.get(
   ROLE_PATH,

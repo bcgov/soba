@@ -21,6 +21,7 @@ vi.mock('@/app/[lang]/Providers', () => ({
       nameLabel: 'Form Name',
       noActiveWorkspaceError: 'Select a workspace before saving this form.',
       noFormName: 'Enter a form name.',
+      nameCheckNeedsWorkspace: 'Pick a workspace to check name availability',
       saved: 'Form saved successfully.',
       saveError: 'Failed to save form.',
       versionConflict: 'Version conflict.',
@@ -61,6 +62,28 @@ const mockCreateSobaFormioForm = vi.fn();
 vi.mock('@/src/shared/api/sobaApi', () => ({
   createSobaFormioForm: (...args: unknown[]) => mockCreateSobaFormioForm(...args),
 }));
+
+// The live name check has its own tests; here it answers whatever a test sets.
+const { nameCheck } = vi.hoisted(() => ({
+  nameCheck: {
+    calls: [] as unknown[][],
+    revalidate: () => undefined as void,
+    result: {} as Record<string, unknown>,
+  },
+}));
+vi.mock('@/src/features/designer/data/useFormNameCheck', () => ({
+  useNewFormNameCheck: (...args: unknown[]) => {
+    nameCheck.calls.push(args);
+    return { ...nameCheck.result, revalidate: nameCheck.revalidate };
+  },
+}));
+const idleNameCheck = {
+  status: null,
+  blocksSave: false,
+  description: undefined,
+  errorMessage: undefined,
+  announcement: '',
+};
 
 vi.mock('@/src/shared/api/useCurrentUser', () => ({
   useCurrentUser: vi.fn(),
@@ -131,6 +154,9 @@ const workspaceAudiences: Record<string, unknown> = {
 describe('FormCreateContent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    nameCheck.calls = [];
+    nameCheck.result = { ...idleNameCheck };
+    nameCheck.revalidate = vi.fn();
     (useCurrentUser as Mock).mockReturnValue({
       data: { capabilities: { formCreate: 'allowed' } },
       loaded: true,
@@ -294,6 +320,76 @@ describe('FormCreateContent', () => {
       }),
     );
     expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it('checks the name typed in the workspace chosen', async () => {
+    renderComponent();
+    await userEvent.type(nameInput(), 'Permit');
+    await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
+
+    const [name, workspaceId] = nameCheck.calls.at(-1)!;
+    expect(name).toBe('Permit');
+    expect(workspaceId).toBe('ws-1');
+  });
+
+  it('says a free name is available', () => {
+    nameCheck.result = {
+      ...idleNameCheck,
+      status: 'available',
+      description: 'Available ✓',
+      announcement: 'Available',
+    };
+    renderComponent();
+
+    expect(screen.getByTestId('form-name-modal')).toHaveTextContent('Available ✓');
+    expect(screen.getByTestId('form-name-status')).toHaveTextContent('Available');
+    expect(screen.getByTestId('save-create-form')).toBeEnabled();
+  });
+
+  it('marks a taken name on the field, and creates nothing', async () => {
+    nameCheck.result = {
+      ...idleNameCheck,
+      status: 'unavailable',
+      blocksSave: true,
+      errorMessage: 'Unavailable ✕',
+      announcement: 'Unavailable',
+    };
+    renderComponent();
+    await userEvent.type(nameInput(), 'Permit');
+    await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
+
+    expect(nameInput()).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByTestId('form-name-modal')).toHaveTextContent('Unavailable ✕');
+    expect(screen.getByTestId('form-name-status')).toHaveTextContent('Unavailable');
+    expect(screen.getByTestId('save-create-form')).toBeDisabled();
+    // Enter submits the dialog without the button.
+    await userEvent.type(nameInput(), '{Enter}');
+    expect(mockCreateSobaFormioForm).not.toHaveBeenCalled();
+  });
+
+  it('waits for the check before creating', async () => {
+    nameCheck.result = {
+      ...idleNameCheck,
+      status: 'checking',
+      blocksSave: true,
+      description: 'Checking…',
+    };
+    renderComponent();
+    await userEvent.type(nameInput(), 'Permit{Enter}');
+
+    expect(screen.getByTestId('form-name-modal')).toHaveTextContent('Checking…');
+    expect(screen.getByTestId('save-create-form')).toBeDisabled();
+    expect(mockCreateSobaFormioForm).not.toHaveBeenCalled();
+  });
+
+  it('checks the name again when a create is refused over it', async () => {
+    mockCreateSobaFormioForm.mockRejectedValue(new ApiError('A form with this name exists.', 409));
+    renderComponent();
+    await userEvent.type(nameInput(), 'Permit');
+    await userEvent.selectOptions(screen.getByTestId('workspace-selector'), 'ws-1');
+    await userEvent.click(screen.getByTestId('save-create-form'));
+
+    expect(nameCheck.revalidate).toHaveBeenCalled();
   });
 
   it('falls back to the generic message when a create fails without one', async () => {

@@ -21,6 +21,7 @@ const { mockApi, mockAddNotification } = vi.hoisted(() => ({
   mockApi: {
     listWorkspaceRoles: vi.fn(),
     getWorkspaceGroup: vi.fn(),
+    checkWorkspaceGroupName: vi.fn(),
     createWorkspaceGroup: vi.fn(),
     renameWorkspaceGroup: vi.fn(),
     setWorkspaceGroupRoles: vi.fn(),
@@ -59,6 +60,12 @@ const nameInput = () => screen.getByRole('textbox', { name: new RegExp(t.name) }
 const roleBox = (code: keyof typeof en.workspaces.groups.roleNames) =>
   screen.getByRole('checkbox', { name: t.roleNames[code] });
 const saveButton = () => screen.getByTestId('group-submit-button');
+/** Save waits for the name to be checked, as a person would see it do. */
+const saveOnceChecked = async (user: ReturnType<typeof userEvent.setup>) => {
+  await waitFor(() => expect(saveButton()).toBeEnabled());
+  await user.click(saveButton());
+};
+const nameStatus = () => screen.getByTestId('group-name-status');
 const customLabel = (name: string) => t.customRoleName.replace('{name}', name);
 
 describe('WorkspaceGroupForm', () => {
@@ -66,6 +73,7 @@ describe('WorkspaceGroupForm', () => {
     vi.clearAllMocks();
     mockApi.listWorkspaceRoles.mockResolvedValue(ROLES);
     mockApi.getWorkspaceGroup.mockResolvedValue(REVIEWERS);
+    mockApi.checkWorkspaceGroupName.mockResolvedValue({ available: true });
   });
 
   it('creates a group with the name and the roles ticked', async () => {
@@ -76,7 +84,7 @@ describe('WorkspaceGroupForm', () => {
     await user.click(await screen.findByRole('textbox', { name: new RegExp(t.name) }));
     await user.paste('  Approvers  ');
     await user.click(roleBox('form_designer'));
-    await user.click(saveButton());
+    await saveOnceChecked(user);
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     expect(mockApi.createWorkspaceGroup).toHaveBeenCalledWith('token', WORKSPACE_ID, {
@@ -103,7 +111,7 @@ describe('WorkspaceGroupForm', () => {
     await user.click(await screen.findByRole('checkbox', { name: customLabel(AUDITOR.name) }));
     await user.click(nameInput());
     await user.paste('Auditors');
-    await user.click(saveButton());
+    await saveOnceChecked(user);
 
     await waitFor(() =>
       expect(mockApi.createWorkspaceGroup).toHaveBeenCalledWith('token', WORKSPACE_ID, {
@@ -164,7 +172,7 @@ describe('WorkspaceGroupForm', () => {
 
     await user.clear(nameInput());
     await user.paste('Senior reviewers');
-    await user.click(saveButton());
+    await saveOnceChecked(user);
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     expect(mockApi.renameWorkspaceGroup).toHaveBeenCalledWith('token', WORKSPACE_ID, REVIEWERS.id, {
@@ -218,7 +226,7 @@ describe('WorkspaceGroupForm', () => {
 
     await user.click(await screen.findByRole('textbox', { name: new RegExp(t.name) }));
     await user.paste('Approvers');
-    await user.click(saveButton());
+    await saveOnceChecked(user);
 
     await waitFor(() =>
       expect(mockAddNotification).toHaveBeenCalledWith(
@@ -238,7 +246,7 @@ describe('WorkspaceGroupForm', () => {
 
     await user.click(await screen.findByRole('textbox', { name: new RegExp(t.name) }));
     await user.paste(REVIEWERS.name);
-    await user.click(saveButton());
+    await saveOnceChecked(user);
 
     await waitFor(() =>
       expect(mockAddNotification).toHaveBeenCalledWith(
@@ -258,13 +266,82 @@ describe('WorkspaceGroupForm', () => {
 
     await user.clear(nameInput());
     await user.paste(ADMINS.name);
-    await user.click(saveButton());
+    await saveOnceChecked(user);
 
     await waitFor(() =>
       expect(mockAddNotification).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'error', text: en.apiErrors.group_name_taken }),
       ),
     );
+    // Taken since it was checked, so it is checked again rather than left saying "Available".
+    await waitFor(() => expect(mockApi.checkWorkspaceGroupName).toHaveBeenCalledTimes(2));
+  });
+
+  it('says as it is typed that a name is free', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(await screen.findByRole('textbox', { name: new RegExp(t.name) }));
+    await user.paste('  Approvers  ');
+
+    await waitFor(() => expect(nameStatus()).toHaveTextContent(dict.general.nameAvailable));
+    expect(screen.getByTestId('group-name-input')).toHaveTextContent(
+      `${dict.general.nameAvailable} ✓`,
+    );
+    expect(mockApi.checkWorkspaceGroupName).toHaveBeenCalledWith('token', WORKSPACE_ID, {
+      name: 'Approvers',
+      excludeId: undefined,
+    });
+    expect(saveButton()).toBeEnabled();
+  });
+
+  it('says as it is typed that a name is taken, and will not save it', async () => {
+    const user = userEvent.setup();
+    mockApi.checkWorkspaceGroupName.mockResolvedValue({ available: false });
+    renderForm();
+
+    await user.click(await screen.findByRole('textbox', { name: new RegExp(t.name) }));
+    await user.paste(REVIEWERS.name);
+    await user.click(roleBox('form_designer'));
+
+    await waitFor(() => expect(nameStatus()).toHaveTextContent(dict.general.nameUnavailable));
+    expect(nameInput()).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByTestId('group-name-input')).toHaveTextContent(
+      `${dict.general.nameUnavailable} ✕`,
+    );
+    expect(saveButton()).toBeDisabled();
+    expect(mockApi.createWorkspaceGroup).not.toHaveBeenCalled();
+  });
+
+  it("checks a rename without counting the group's own name", async () => {
+    const user = userEvent.setup();
+    renderForm(REVIEWERS.id);
+    await screen.findByDisplayValue(REVIEWERS.name);
+
+    await user.clear(nameInput());
+    await user.paste(REVIEWERS.name);
+    await user.click(roleBox('form_admin'));
+    // Its own name is never asked about.
+    expect(saveButton()).toBeEnabled();
+    expect(mockApi.checkWorkspaceGroupName).not.toHaveBeenCalled();
+
+    await user.click(nameInput());
+    await user.paste(' 2');
+    await waitFor(() =>
+      expect(mockApi.checkWorkspaceGroupName).toHaveBeenCalledWith('token', WORKSPACE_ID, {
+        name: `${REVIEWERS.name} 2`,
+        excludeId: REVIEWERS.id,
+      }),
+    );
+  });
+
+  it('does not check the name of a system group', async () => {
+    mockApi.getWorkspaceGroup.mockResolvedValue(ADMINS);
+    renderForm(ADMINS.id);
+    await screen.findByTestId('system-group-alert');
+
+    await act(() => new Promise((resolve) => setTimeout(resolve, 500)));
+    expect(mockApi.checkWorkspaceGroupName).not.toHaveBeenCalled();
   });
 
   it('shows no fields when the group cannot be read', async () => {

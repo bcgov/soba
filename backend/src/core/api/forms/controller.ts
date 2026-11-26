@@ -4,6 +4,7 @@ import {
   CreateFormBodySchema,
   CreateFormVersionBodySchema,
   FormIdParamsSchema,
+  FormNameAvailabilityQuerySchema,
   FormVersionIdParamsSchema,
   NormalizeSchemaBodySchema,
   ListFormsQuerySchema,
@@ -15,6 +16,8 @@ import {
   UpdateFormBodySchema,
 } from './schema';
 import { formsApiService } from './service';
+
+type FormNameAvailabilityQuery = z.infer<typeof FormNameAvailabilityQuerySchema>;
 import { asyncHandler } from '../shared/asyncHandler';
 import { NotFoundError } from '../../errors';
 import type { Request } from 'express';
@@ -43,6 +46,12 @@ export const createForm = asyncHandler(
     res.status(created ? 201 : 200).json(form);
   },
 );
+
+/** Serves both checks: a new form's, in the queried workspace, and a rename's, of the form in :id. */
+export const checkFormNameAvailable = asyncHandler(async (req: Request, res: Response) => {
+  const { name } = req.query as unknown as FormNameAvailabilityQuery;
+  res.json(await formsApiService.checkNameAvailable(req.coreContext!, name));
+});
 
 export const normalizeFormSchema = (
   req: Request<unknown, unknown, NormalizeSchemaBody>,

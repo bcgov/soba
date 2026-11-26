@@ -6,6 +6,7 @@ import {
   isNull,
   ne,
   or,
+  ilike,
   type InferSelectModel,
   type SQL,
 } from 'drizzle-orm';
@@ -164,19 +165,29 @@ export const lockRolesForWorkspace = async (
   return rows.map((row) => row.code);
 };
 
-/** True if one of the workspace's active roles has this name. */
+/** True if one of the workspace's active roles has this name (optionally excluding one role). */
 export const roleNameExistsInWorkspace = async (
   workspaceId: string,
   name: string,
+  exceptRoleCode?: string,
 ): Promise<boolean> => {
   const rows = await db
     .select({ code: roles.code })
     .from(roles)
     .where(
-      and(
-        eq(roles.workspaceId, workspaceId),
-        eq(roles.name, name),
-        eq(roles.status, RoleStatus.active),
+      or(
+        and(
+          eq(roles.workspaceId, workspaceId),
+          ilike(roles.name, name),
+          eq(roles.status, RoleStatus.active),
+          ...(exceptRoleCode ? [ne(roles.code, exceptRoleCode)] : []),
+        ),
+        and(
+          eq(roles.source, 'core'),
+          ilike(roles.name, name),
+          eq(roles.status, RoleStatus.active),
+          ...(exceptRoleCode ? [ne(roles.code, exceptRoleCode)] : []),
+        ),
       ),
     )
     .limit(1);

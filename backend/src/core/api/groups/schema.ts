@@ -3,6 +3,8 @@ import { z } from 'zod';
 import {
   CreateWorkspaceGroupBodySchema as LibCreateGroupBodySchema,
   ListWorkspaceGroupsResponseSchema as LibListGroupsResponseSchema,
+  NameAvailabilityResponseSchema as LibNameAvailabilityResponseSchema,
+  WORKSPACE_GROUP_NAME_MAX_LENGTH,
   SetWorkspaceGroupRolesBodySchema as LibSetGroupRolesBodySchema,
   UpdateWorkspaceGroupBodySchema as LibUpdateGroupBodySchema,
   WorkspaceGroupMemberSchema as LibGroupMemberSchema,
@@ -81,6 +83,17 @@ export const ListGroupsResponseSchema = LibListGroupsResponseSchema.extend({
   sort: GroupSortSchema,
 }).openapi('Groups_ListGroupsResponse');
 
+export const GroupNameAvailabilityQuerySchema = z
+  .object({
+    name: z.string().trim().min(1).max(WORKSPACE_GROUP_NAME_MAX_LENGTH),
+    // The group being renamed, so its own name doesn't report itself as taken.
+    excludeId: z.string().uuid().optional(),
+  })
+  .openapi('Groups_NameAvailabilityQuery');
+
+export const GroupNameAvailabilityResponseSchema =
+  LibNameAvailabilityResponseSchema.clone().openapi('Groups_NameAvailabilityResponse');
+
 const TAG = 'core.groups';
 const GROUPS_PATH = '/workspaces/{id}/groups';
 const GROUP_PATH = '/workspaces/{id}/groups/{groupId}';
@@ -104,6 +117,22 @@ const jsonResponse = (description: string, schema: z.ZodTypeAny) => ({
 });
 
 export const registerGroupsOpenApi = (registry: OpenAPIRegistry) => {
+  registry.registerPath({
+    method: 'get',
+    path: `${GROUPS_PATH}/name-availability`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    description:
+      "Whether a group name is free among the workspace's active groups, for a live check as the name is typed. Matches case insensitively, as a save does.",
+    request: { query: GroupNameAvailabilityQuerySchema, params: WorkspaceGroupParamsSchema },
+    responses: {
+      200: jsonResponse('Whether the name is free', GroupNameAvailabilityResponseSchema),
+      400: { description: 'Invalid query' },
+      403: { description: ERR_MANAGE },
+      404: { description: ERR_WORKSPACE_NOT_FOUND },
+    },
+  });
+
   registry.registerPath({
     method: 'get',
     path: GROUPS_PATH,
