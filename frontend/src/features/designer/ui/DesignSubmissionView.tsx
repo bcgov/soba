@@ -5,14 +5,14 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Link } from '@bcgov/design-system-react-components';
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useDictionary } from '@/app/[lang]/Providers';
-import { ConfirmModal } from '@/src/components/ConfirmModal';
+import { LeaveGuard } from '@/src/components/LeaveGuard';
 import { usePageHeading } from '@/src/components/PageHeader';
 import { SubmissionLoadAlert } from '@/src/features/submissions/ui/SubmissionLoadAlert';
 import { useDesignSubmission } from '@/src/features/designer/data/useDesignSubmission';
 import { useStaffPrint } from '@/src/features/templates/data/useSubmissionPrint';
 import { printBaseName } from '@/src/features/templates/printFileName';
 import { PrintSubmissionButton } from '@/src/features/templates/ui/PrintSubmissionButton';
-import { useLeaveWarning } from '@/src/shared/hooks/useLeaveWarning';
+import { requestLeave } from '@/src/shared/hooks/useLeaveGuard';
 import { navLink } from '@/src/shared/list/listQueryMemory';
 import { SubmissionReview } from './SubmissionReview';
 import { getLocaleFromPath } from '@/src/shared/util/locale';
@@ -34,13 +34,12 @@ export function DesignSubmissionView({
   const { data, error } = useDesignSubmission(submissionId, formId);
   const print = useStaffPrint(formId, submissionId);
   const [unsavedEdit, setUnsavedEdit] = useState(false);
-  const [confirmingBack, setConfirmingBack] = useState(false);
   const dictReview = dict.submission.review;
 
   usePageHeading({ heading: dictReview.heading });
-  useLeaveWarning(unsavedEdit);
 
-  const backToList = () => router.push(navLink(`/${locale}/build/${formId}?tab=submissions`));
+  const backToList = () =>
+    requestLeave(() => router.push(navLink(`/${locale}/build/${formId}?tab=submissions`)));
 
   const renderContent = () => {
     // A failed background revalidation keeps the submission already on screen.
@@ -61,10 +60,7 @@ export function DesignSubmissionView({
   return (
     <div className="mt-3" data-testid="design-submission-view">
       <div className="mb-3 d-flex align-items-center gap-2 d-print-none">
-        <Link
-          data-testid="design-submission-back"
-          onPress={() => (unsavedEdit ? setConfirmingBack(true) : backToList())}
-        >
+        <Link data-testid="design-submission-back" onPress={backToList}>
           {dict.submission.backToSubmissions}
         </Link>
         {data ? (
@@ -74,15 +70,7 @@ export function DesignSubmissionView({
         ) : null}
       </div>
       {renderContent()}
-      <ConfirmModal
-        show={confirmingBack}
-        title={dictReview.leaveEditTitle}
-        message={dictReview.leaveEditMessage}
-        confirmLabel={dictReview.leaveEditConfirm}
-        cancelLabel={dictReview.leaveEditStay}
-        onConfirm={backToList}
-        onCancel={() => setConfirmingBack(false)}
-      />
+      <LeaveGuard active={unsavedEdit} />
     </div>
   );
 }

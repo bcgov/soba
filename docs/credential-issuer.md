@@ -44,7 +44,7 @@ requires `Namespace.Manage`; perform it during setup rather than granting it to 
 OAuth scopes, when required, come from the service account's default scopes.
 
 In Helm, set `backend.config.credentialIssuerDefaultCode` and `backend.credentialIssuer.apsCredentialIssuerV3`.
-The base chart defaults to the no-op; dev, PR and test select APS. Each environment declares its APS
+The base chart defaults to the no-op; every environment selects APS. Each environment declares its APS
 connection settings and gateway ID. PR reads dev's Vault secret, so it uses dev's gateway and product
 environment appId. Select APS for an environment once its Vault secret holds the keys below. Vault
 injects `PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_ID`, `PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_SECRET` and
@@ -93,7 +93,7 @@ issued by health checks. Upstream response bodies and raw errors are not exposed
 
 ## API keys settings group
 
-API keys are a fixed feature, `api-keys`, off by default and on in dev, PR and test. Turn it on where an issuer is
+API keys are a fixed feature, `api-keys`, off by default and on in every environment. Turn it on where an issuer is
 configured (`FEATURE_API_KEYS_STATUS`, or `backend.features.api-keys` in Helm); the designer app also
 lists it in its frontend feature allowlist. The group is a form settings module at the `api-keys` key, so it
 is served at both levels, relative to the API base (normally `/chefs/api/v1`):

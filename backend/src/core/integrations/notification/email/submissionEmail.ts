@@ -2,6 +2,7 @@ import { cleanName } from '../emailText';
 import { markup, type SafeHtml } from './html';
 import type { EmailLanguage, EmailLanguages } from './language';
 import {
+  heading,
   languageSection,
   link,
   paragraph,
@@ -20,8 +21,12 @@ export interface SubmissionEmailVars {
 export interface SubmissionEmailCopy {
   /** Plain text; the Confirmation ID is added after it. */
   subject: (vars: SubmissionEmailVars) => string;
+  /** A heading above the Confirmation ID, for an email that has one. */
+  title?: (vars: SubmissionEmailVars) => string;
   /** The one sentence that says what happened. */
   sentence: (vars: SubmissionEmailVars) => string;
+  /** A line before the links, shown only when the email has a link. */
+  linksIntro?: string;
   linkText: string;
   /** Text for a second link, for an email that has one. */
   secondLinkText?: string;
@@ -58,9 +63,9 @@ const commentBlock = (order: readonly EmailLanguage[], comment: string): SafeHtm
   );
 
 /**
- * An email about a submission: in each language its Confirmation ID, one sentence and the link,
- * and a second link where the email has one, then the comment. The subject ends with the
- * Confirmation ID.
+ * An email about a submission: in each language its title where it has one, its Confirmation ID,
+ * one sentence and the link, and a second link where the email has one, then the comment. The
+ * subject ends with the Confirmation ID.
  */
 export const renderSubmissionEmail = (
   template: SubmissionEmailTemplate,
@@ -78,10 +83,12 @@ export const renderSubmissionEmail = (
         return {
           subject: copy.subject(vars),
           section: languageSection(language, [
+            copy.title && heading(copy.title(vars)),
             paragraph(
               markup`${COPY[language].confirmationId} <strong>${facts.confirmationCode}</strong>`,
             ),
             paragraph(copy.sentence(vars)),
+            url && copy.linksIntro && paragraph(copy.linksIntro),
             url && paragraph(link(url, copy.linkText)),
             secondUrl && copy.secondLinkText && paragraph(link(secondUrl, copy.secondLinkText)),
           ]),
