@@ -60,6 +60,11 @@ backend:
       environment: test
       tokenUrl: https://loginproxy.gov.bc.ca/auth/realms/standard/protocol/openid-connect/token
 
+database:
+  # Temporary PgBouncer compatibility workaround: omit statement_timeout at startup.
+  # Remove this override once a proper fix preserves server-side timeout protection.
+  statementTimeoutMs: "0"
+
 frontend:
   externalHosts:
     - submit-test.api.gov.bc.ca
