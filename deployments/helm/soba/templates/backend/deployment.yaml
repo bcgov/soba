@@ -71,9 +71,6 @@ spec:
         vault.hashicorp.com/agent-inject-secret-soba-aps-credential-issuer: {{ .Values.vault.secretPath | quote }}
         vault.hashicorp.com/agent-inject-template-soba-aps-credential-issuer: |
           {{`{{- with secret "`}}{{ .Values.vault.secretPath }}{{`" }}`}}
-          {{- if .Values.vault.apsGatewayIdFromVault }}
-          {{`export PLUGIN_APS_CREDENTIAL_ISSUER_V3_GATEWAY_ID="{{ .Data.data.PLUGIN_APS_CREDENTIAL_ISSUER_V3_GATEWAY_ID }}"`}}
-          {{- end }}
           {{`export PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_ID="{{ .Data.data.PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_ID }}"`}}
           {{`export PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_SECRET="{{ .Data.data.PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_SECRET }}"`}}
           {{`export PLUGIN_APS_CREDENTIAL_ISSUER_V3_ENVIRONMENT_APP_ID="{{ .Data.data.PLUGIN_APS_CREDENTIAL_ISSUER_V3_ENVIRONMENT_APP_ID }}"`}}

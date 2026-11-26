@@ -54,10 +54,10 @@ integration service after deploying the backend. For PR 123 the integration serv
 both qualifiers under the same per-release gateway lock. The gateway job checks out the PR source
 ref so the rendered configuration matches the deployed feature code.
 
-For PRs, the issuer and gateway publisher use the gateway ID and product environment appId from
-the PR Vault secret. The gateway job reads those two IDs from the deployed backend pod through
-OpenShift. Add `PLUGIN_APS_CREDENTIAL_ISSUER_V3_GATEWAY_ID` to the PR Vault secret before rolling
-out this change. The OpenShift workflow token needs `pods/exec` access in the PR namespace.
+For PRs, `values-pr.yaml` sets the gateway ID, and the PR Vault secret holds the issuer account
+and product environment appId for that gateway. The gateway job reads both IDs from the deployed
+backend pod through OpenShift, so it publishes to the gateway the issuer uses. The OpenShift
+workflow token needs `pods/exec` access in the PR namespace.
 PR Close resolves the gateway from the backend before uninstalling the release. If gateway cleanup
 fails, the release remains available for a retry.
 
@@ -184,7 +184,7 @@ the selected GitHub environment.
 
 | Environment | Gateway | APS instance |
 | --- | --- | --- |
-| `pr` | Set in the PR Vault secret | Gold |
+| `pr` | `gw-d3969` | Gold |
 | `dev` | `gw-93f93` | Gold |
 | `test` | `gw-7f49d` | Gold |
 | `prod` | not configured | Not configured |

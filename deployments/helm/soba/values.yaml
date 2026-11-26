@@ -623,7 +623,6 @@ temporalWorkers:
 # -- Vault Agent Injector
 vault:
   enabled: false
-  apsGatewayIdFromVault: false
   role: ""
   authPath: auth/k8s-silver
   namespace: platform-services

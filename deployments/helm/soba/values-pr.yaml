@@ -49,7 +49,7 @@ backend:
   credentialIssuer:
     apsCredentialIssuerV3:
       apiBaseUrl: https://api.gov.bc.ca/ds/api/v3
-      # The PR gateway. The issuer account and product environment in the PR Vault secret must belong to it.
+      # The PR gateway. The PR Vault secret holds its issuer account and product environment appId.
       gatewayId: "gw-d3969"
       tokenUrl: https://authz.apps.gov.bc.ca/auth/realms/aps/protocol/openid-connect/token
   documentGeneration:

@@ -45,9 +45,9 @@ OAuth scopes, when required, come from the service account's default scopes.
 
 In Helm, set `backend.config.credentialIssuerDefaultCode` and `backend.credentialIssuer.apsCredentialIssuerV3`.
 The base chart defaults to the no-op; every environment selects APS. Each environment declares its APS
-connection settings. For PRs, add `PLUGIN_APS_CREDENTIAL_ISSUER_V3_GATEWAY_ID` to the deployment's
-Vault secret along with the account credentials and product environment appId for that gateway.
-Other environments set the gateway ID in Helm. Select APS once the Vault keys are in place. Vault
+connection settings and gateway ID. Each environment's Vault secret, including the PR one, holds the
+account credentials and product environment appId for that environment's gateway. Select APS once
+the Vault keys are in place. Vault
 injects `PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_ID`, `PLUGIN_APS_CREDENTIAL_ISSUER_V3_CLIENT_SECRET` and
 `PLUGIN_APS_CREDENTIAL_ISSUER_V3_ENVIRONMENT_APP_ID` only when APS is selected, and a missing key keeps the
 backend pod from starting. Without Vault, supply these keys through an existing deployment
