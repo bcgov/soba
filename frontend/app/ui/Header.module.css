@@ -84,7 +84,8 @@
 
 /* Bootstrap buttons take their rest, hover and active colours from these variables. Two classes
    outrank `.btn-primary`, which sets them with one, whatever the stylesheet order. */
-:global(.btn).userDrop {
+:global(.btn).dropdownToggle {
+  min-height: 40px;
   --bs-btn-color: var(--app-text);
   --bs-btn-bg: var(--app-surface);
   --bs-btn-border-color: var(--app-border);
@@ -96,11 +97,19 @@
   --bs-btn-active-border-color: var(--app-border);
 }
 
-:global(.btn).userDrop:focus-visible {
+:global(.btn).dropdownToggle.languageSelectorToggle {
+  --bs-btn-border-radius: var(--layout-border-radius-medium);
+  --bs-btn-bg: var(--surface-color-secondary-button-default);
+  --bs-btn-hover-bg: var(--surface-color-secondary-button-hover);
+  --bs-btn-active-bg: var(--surface-color-secondary-pressed);
+}
+
+:global(.btn).dropdownToggle:focus-visible {
   /* Keyboard focus needs a clearly visible ring; the surface-pinning rules
      above otherwise leave focus indistinguishable from the resting state. */
   outline: var(--layout-border-width-medium) solid var(--app-focus-ring);
   outline-offset: 2px;
+  box-shadow: none;
 }
 
 .userNameSkeleton {
