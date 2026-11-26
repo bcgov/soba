@@ -255,6 +255,10 @@ export class FormService {
     return { form, version, created: false };
   }
 
+  async isNameAvailable(workspaceId: string, name: string, exceptFormId?: string) {
+    return !(await formNameExistsInWorkspace(workspaceId, name, exceptFormId));
+  }
+
   async update(input: UpdateInput): Promise<FormRecord | null> {
     if (
       input.name !== undefined &&

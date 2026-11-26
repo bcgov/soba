@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import en from '@/dictionaries/en.json';
@@ -14,6 +14,7 @@ const { mockApi, mockLocale, mockAddNotification } = vi.hoisted(() => ({
   mockApi: {
     listWorkspaceRoles: vi.fn(),
     getWorkspaceRole: vi.fn(),
+    checkWorkspaceRoleName: vi.fn(),
     createWorkspaceRole: vi.fn(),
     updateWorkspaceRole: vi.fn(),
     deleteWorkspaceRole: vi.fn(),
@@ -84,6 +85,13 @@ const shownNames = () => screen.getAllByTestId(/^role-name-(?!input)/).map((c) =
 const permissionBox = (code: keyof typeof en.workspaces.roles.permissionNames) =>
   screen.getByRole('checkbox', { name: t.permissionNames[code] });
 const nameInput = () => screen.getByRole('textbox', { name: new RegExp(t.name) });
+const saveButton = () => screen.getByTestId('role-submit-button');
+/** Save waits for the name to be checked, as a person would see it do. */
+const saveOnceChecked = async (user: ReturnType<typeof userEvent.setup>) => {
+  await waitFor(() => expect(saveButton()).toBeEnabled());
+  await user.click(saveButton());
+};
+const nameStatus = () => screen.getByTestId('role-name-status');
 
 const typeSearch = async (
   user: ReturnType<typeof userEvent.setup>,
@@ -106,6 +114,7 @@ describe('WorkspaceRoleDrawer', () => {
     mockApi.getWorkspaceRole.mockImplementation(async (_token, _workspace, code) =>
       items.find((item) => item.roleCode === code),
     );
+    mockApi.checkWorkspaceRoleName.mockResolvedValue({ available: true });
     mockApi.createWorkspaceRole.mockResolvedValue(AUDITOR);
     mockApi.updateWorkspaceRole.mockResolvedValue(AUDITOR);
     mockApi.deleteWorkspaceRole.mockResolvedValue(undefined);
@@ -282,7 +291,7 @@ describe('WorkspaceRoleDrawer', () => {
     expect(permissionBox('submission_read')).toBeChecked();
     expect(permissionBox('form_read')).toBeChecked();
 
-    await user.click(screen.getByTestId('role-submit-button'));
+    await saveOnceChecked(user);
     await waitFor(() =>
       expect(mockAddNotification).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'success', text: t.createSuccess }),
@@ -309,7 +318,7 @@ describe('WorkspaceRoleDrawer', () => {
     expect(permissionBox('form_read')).not.toBeChecked();
     expect(permissionBox('submission_read')).toBeChecked();
 
-    await user.click(screen.getByTestId('role-submit-button'));
+    await saveOnceChecked(user);
     await waitFor(() => expect(mockApi.createWorkspaceRole).toHaveBeenCalled());
     expect(mockApi.createWorkspaceRole.mock.calls[0][2].permissionCodes).toEqual([
       'submission_read',
@@ -337,7 +346,7 @@ describe('WorkspaceRoleDrawer', () => {
     await user.click(nameInput());
     await user.paste('Auditor');
     await user.click(permissionBox('form_read'));
-    await user.click(screen.getByTestId('role-submit-button'));
+    await saveOnceChecked(user);
 
     await waitFor(() =>
       expect(mockAddNotification).toHaveBeenCalledWith(
@@ -368,13 +377,67 @@ describe('WorkspaceRoleDrawer', () => {
     await screen.findByDisplayValue('Auditor');
     await user.clear(nameInput());
     await user.paste('Inspector');
-    await user.click(screen.getByTestId('role-submit-button'));
+    await saveOnceChecked(user);
 
     await waitFor(() =>
       expect(mockApi.updateWorkspaceRole).toHaveBeenCalledWith('token', WORKSPACE_ID, 'custom-1', {
         name: 'Inspector',
       }),
     );
+    // A rename is checked without counting the role's own name.
+    expect(mockApi.checkWorkspaceRoleName).toHaveBeenCalledWith('token', WORKSPACE_ID, {
+      name: 'Inspector',
+      excludeCode: 'custom-1',
+    });
+  });
+
+  it('says as it is typed that a name is free', async () => {
+    const user = userEvent.setup();
+    renderDrawer();
+    await user.click(await screen.findByTestId('create-ws-role-button'));
+    await user.click(nameInput());
+    await user.paste('  Clerk  ');
+
+    await waitFor(() => expect(nameStatus()).toHaveTextContent(dict.general.nameAvailable));
+    expect(screen.getByTestId('role-name-input')).toHaveTextContent(
+      `${dict.general.nameAvailable} ✓`,
+    );
+    expect(mockApi.checkWorkspaceRoleName).toHaveBeenCalledWith('token', WORKSPACE_ID, {
+      name: 'Clerk',
+      excludeCode: undefined,
+    });
+  });
+
+  it('says as it is typed that a name is taken, and will not save it', async () => {
+    const user = userEvent.setup();
+    mockApi.checkWorkspaceRoleName.mockResolvedValue({ available: false });
+    renderDrawer();
+    await user.click(await screen.findByTestId('create-ws-role-button'));
+    await user.click(nameInput());
+    await user.paste('Auditor');
+    await user.click(permissionBox('form_read'));
+
+    await waitFor(() => expect(nameStatus()).toHaveTextContent(dict.general.nameUnavailable));
+    expect(nameInput()).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByTestId('role-name-input')).toHaveTextContent(
+      `${dict.general.nameUnavailable} ✕`,
+    );
+    expect(saveButton()).toBeDisabled();
+    expect(mockApi.createWorkspaceRole).not.toHaveBeenCalled();
+  });
+
+  it("does not check a role's unchanged name, or a fixed role's", async () => {
+    const user = userEvent.setup();
+    renderDrawer();
+    await user.click(await screen.findByTestId('edit-role-button-custom-1'));
+    await screen.findByDisplayValue('Auditor');
+    await user.click(permissionBox('team_read'));
+    expect(saveButton()).toBeEnabled();
+
+    await user.click(screen.getByTestId('view-role-button-form_admin'));
+    await screen.findByTestId('fixed-role-alert');
+    await act(() => new Promise((resolve) => setTimeout(resolve, 500)));
+    expect(mockApi.checkWorkspaceRoleName).not.toHaveBeenCalled();
   });
 
   it('sends only the permissions when only they changed', async () => {
@@ -468,7 +531,7 @@ describe('WorkspaceRoleDrawer', () => {
     await user.click(permissionBox('form_read'));
     const readsBefore = mockApi.listWorkspaceRoles.mock.calls.length;
 
-    await user.click(screen.getByTestId('role-submit-button'));
+    await saveOnceChecked(user);
 
     await waitFor(() =>
       expect(mockApi.listWorkspaceRoles.mock.calls.length).toBeGreaterThan(readsBefore),
@@ -485,7 +548,7 @@ describe('WorkspaceRoleDrawer', () => {
     await user.paste('Inspector');
     const readsBefore = mockApi.listWorkspaceRoles.mock.calls.length;
 
-    await user.click(screen.getByTestId('role-submit-button'));
+    await saveOnceChecked(user);
 
     await waitFor(() =>
       expect(mockApi.listWorkspaceRoles.mock.calls.length).toBeGreaterThan(readsBefore),

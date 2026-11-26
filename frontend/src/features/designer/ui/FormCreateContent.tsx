@@ -13,6 +13,8 @@ import { useFormCreator } from '@/src/features/designer/data/useForm';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useCurrentUser } from '@/src/shared/api/useCurrentUser';
 import { isConflict } from '@/src/shared/api/sobaHelpers';
+import { useNewFormNameCheck } from '@/src/features/designer/data/useFormNameCheck';
+import { NameCheckAnnouncement } from '@/src/components/NameCheckAnnouncement';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import type { CreateFormFields } from '@/src/types/forms';
 import { AUDIENCE_SETTINGS_KEY, type Audience } from '@/src/types/formSettings';
@@ -47,6 +49,12 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const creatableWorkspaces = useFormCreateWorkspaceOptions(true);
+
+  const nameCheck = useNewFormNameCheck(formName, selectedWorkspaceId, {
+    checking: dict.general.nameChecking,
+    available: dict.general.nameAvailable,
+    unavailable: dict.general.nameUnavailable,
+  });
 
   // The new form inherits the selected workspace's audience unless the creator sets its own. Own
   // values start as a copy of the workspace's, so the read is a fresh one.
@@ -83,7 +91,8 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
   const audienceShown = !selectedWorkspaceId || (!!audienceView && !!providers);
 
   const saveForm = async () => {
-    if (isSaving) return;
+    // Enter submits too, so the name check holds it here as well as on the button.
+    if (isSaving || nameCheck.blocksSave) return;
     // Creating a form is workspace-scoped: without a selected workspace the backend
     // rejects the request with a generic error, so surface a clear message instead.
     if (!selectedWorkspaceId) {
@@ -116,6 +125,8 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
       // A 409 carries the backend's own reason: the name is taken, or the workspace disclaimer is
       // unaccepted. Nothing in this dialog has versions, so the version-conflict wording is wrong.
       const conflict = isConflict(e) && e instanceof Error && e.message;
+      // Someone else may just have taken the name: check it again, so it stops saying "Available".
+      if (conflict) nameCheck.revalidate();
       addNotification({
         text: conflict ? e.message : dict.form.saveError,
         type: 'error',
@@ -166,9 +177,17 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
         onChange={setFormName}
         isRequired={true}
         validate={(value) => (value.trim() ? null : dict.form.noFormName)}
-        errorMessage={dict.form.noFormName}
+        // Taken overrides the field's own validation; otherwise that decides, as before.
+        isInvalid={nameCheck.status === 'unavailable' || undefined}
+        // Names are unique per workspace, so until one is picked there is nothing to check against.
+        description={
+          nameCheck.description ??
+          (selectedWorkspaceId ? undefined : dict.form.nameCheckNeedsWorkspace)
+        }
+        errorMessage={nameCheck.errorMessage ?? dict.form.noFormName}
         data-testid="form-name-modal"
       />
+      <NameCheckAnnouncement announcement={nameCheck.announcement} testId="form-name-status" />
 
       {creatableWorkspaces.workspaces.length > 0 && (
         <WorkspaceSelector
@@ -227,7 +246,7 @@ export const FormCreateContent = ({ onCancelPress }: Readonly<FormCreateContentP
         </Button>
         <Button
           type="submit"
-          isDisabled={isSaving || !audienceValid || !audienceShown}
+          isDisabled={isSaving || !audienceValid || !audienceShown || nameCheck.blocksSave}
           data-testid="save-create-form"
         >
           {dict.general.next}

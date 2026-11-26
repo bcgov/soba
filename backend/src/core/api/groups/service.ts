@@ -77,6 +77,11 @@ export class GroupsApiService {
     return loadGroup(ctx, groupId);
   }
 
+  /** Whether a create or rename would take this name, for the live check as it is typed. */
+  async checkNameAvailable(workspaceId: string, name: string, exceptGroupId?: string) {
+    return { available: !(await groupNameExistsInWorkspace(workspaceId, name, exceptGroupId)) };
+  }
+
   async create(
     ctx: GroupsContextInput,
     input: { name: string; description?: string; roleCodes: string[] },

@@ -23,6 +23,7 @@ jest.mock('../../../../src/core/middleware/workspaceContext', () => {
   };
   return {
     workspaceFromBody: setContext,
+    workspaceFromQuery: setContext,
     workspaceListScope: () => setContext,
     workspaceFromResource: () => setContext,
   };

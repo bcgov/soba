@@ -3,12 +3,14 @@ import { validateRequest } from '../shared/validation';
 import { sortLocale } from '../../middleware/sortLocale';
 import {
   workspaceFromBody,
+  workspaceFromQuery,
   workspaceListScope,
   workspaceFromResource,
 } from '../../middleware/workspaceContext';
 import { requireFormPermissions } from '../../middleware/requireFormPermissions';
 import { FormCreatePermissions, Permissions } from '../../db/codes';
 import {
+  checkFormNameAvailable,
   createForm,
   normalizeFormSchema,
   createFormVersion,
@@ -30,7 +32,9 @@ import {
   CreateFormBodySchema,
   CreateFormVersionBodySchema,
   FormIdParamsSchema,
+  FormNameAvailabilityQuerySchema,
   FormVersionIdParamsSchema,
+  NewFormNameAvailabilityQuerySchema,
   NormalizeSchemaBodySchema,
   ListFormsQuerySchema,
   ListFormVersionsQuerySchema,
@@ -77,6 +81,22 @@ router.post(
   `${FORMS_PATH}/normalize`,
   validateRequest({ body: NormalizeSchemaBodySchema }),
   normalizeFormSchema,
+);
+// The name checks preview a create and a rename, so each needs the authority of the save it
+// previews. Before FORMS_ID_PATH, so `name-availability` isn't taken as a form id.
+router.get(
+  `${FORMS_PATH}/name-availability`,
+  validateRequest({ query: NewFormNameAvailabilityQuerySchema }),
+  workspaceFromQuery,
+  requireFormPermissions(FormCreatePermissions),
+  checkFormNameAvailable,
+);
+router.get(
+  `${FORMS_ID_PATH}/name-availability`,
+  validateRequest({ params: FormIdParamsSchema, query: FormNameAvailabilityQuerySchema }),
+  formResource,
+  requireFormPermissions([Permissions.form_update]),
+  checkFormNameAvailable,
 );
 router.get(
   FORMS_ID_PATH,

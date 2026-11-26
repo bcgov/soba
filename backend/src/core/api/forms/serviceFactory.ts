@@ -178,6 +178,11 @@ export function createFormsApiService(
     normalizeSchema: (_ctx: FormsContextInput, schema: Record<string, unknown>) =>
       formService.normalizeSchema(schema),
 
+    /** For a rename, the form in context is left out, so its own name isn't reported as taken. */
+    checkNameAvailable: async (ctx: FormsContextInput, name: string) => ({
+      available: await formService.isNameAvailable(ctx.workspaceId, name, ctx.formId),
+    }),
+
     updateForm: async (ctx: FormsContextInput, formId: string, input: UpdateFormInput) => {
       const row = await formService.update({
         workspaceId: ctx.workspaceId,

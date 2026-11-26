@@ -47,6 +47,11 @@ export class RolesApiService {
     return role;
   }
 
+  /** Whether a create or rename would take this name, for the live check as it is typed. */
+  async checkNameAvailable(workspaceId: string, name: string, exceptRoleCode?: string) {
+    return { available: !(await roleNameExistsInWorkspace(workspaceId, name, exceptRoleCode)) };
+  }
+
   async create(ctx: RoleWriteContext, body: CreateWorkspaceRoleBody): Promise<WorkspaceRole> {
     await assertNameFree(ctx.workspaceId, body.name);
     return this.get(ctx.workspaceId, await createWorkspaceRole(ctx, body));

@@ -9,6 +9,9 @@
     "description": "Bienvenue sur Common Hosted Forms Service (CHEFS) où vous pouvez créer et publier des formulaires, recevoir et examiner des soumissions, et intégrer avec vos systèmes métier.",
     "notAuthenticated": "Vous n'êtes pas authentifié. Veuillez vous connecter pour accéder à cette section.",
     "unknown": "Inconnu",
+    "nameChecking": "Vérification…",
+    "nameAvailable": "Disponible",
+    "nameUnavailable": "Indisponible",
     "home": "Accueil",
     "forms": "Formulaires",
     "myForms": "Mes formulaires",
@@ -698,7 +701,8 @@
     },
     "descriptionLabel": "Description du Formulaire",
     "submit": "Soumettre",
-    "noFormName": "Nom de formulaire est requise"
+    "noFormName": "Nom de formulaire est requise",
+    "nameCheckNeedsWorkspace": "Choisissez un espace de travail pour vérifier la disponibilité du nom"
   },
   "team": {
     "members": "Membres de l’équipe",

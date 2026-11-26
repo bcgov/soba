@@ -8,6 +8,9 @@ import type { FormSettingsSectionProps } from '@/src/features/form-settings/type
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useForm, useFormWriter } from '@/src/features/designer/data/useForm';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
+import { isConflict } from '@/src/shared/api/sobaHelpers';
+import { useFormRenameCheck } from '@/src/features/designer/data/useFormNameCheck';
+import { NameCheckAnnouncement } from '@/src/components/NameCheckAnnouncement';
 
 export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSettingsSectionProps) {
   const { token } = useKeycloak();
@@ -28,6 +31,12 @@ export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSet
   const edited = useMemo(() => {
     return editedName !== null || editedDescription !== null;
   }, [editedName, editedDescription]);
+
+  const nameCheck = useFormRenameCheck(formName, formId, form?.name, {
+    checking: dict.general.nameChecking,
+    available: dict.general.nameAvailable,
+    unavailable: dict.general.nameUnavailable,
+  });
 
   const saveChanges = async () => {
     if (token !== undefined) {
@@ -53,7 +62,9 @@ export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSet
             dict.form.settings.formSettingsDrawerSaveSuccessMessage ||
             'Changes saved successfully.',
         });
-      } catch {
+      } catch (err: unknown) {
+        // Someone else may just have taken the name: check it again, so it stops saying "Available".
+        if (isConflict(err)) nameCheck.revalidate();
         addNotification({
           type: 'error',
           text:
@@ -77,7 +88,7 @@ export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSet
       label={dict.form.settings.formSettingsDrawerLabel}
       onSave={saveChanges}
       onCancel={cancelChanges}
-      canSave={!saving && edited}
+      canSave={!saving && edited && !nameCheck.blocksSave}
     >
       <TextField
         label={dict.form.nameLabel}
@@ -85,9 +96,16 @@ export default function FormSettingsDrawer({ dict, drawerName, formId }: FormSet
         isDisabled={saving}
         isRequired
         validate={(value) => (value.trim() ? null : dict.form.noFormName)}
-        errorMessage={dict.form.noFormName}
+        // Taken overrides the field's own validation; otherwise that decides, as before.
+        isInvalid={nameCheck.status === 'unavailable' || undefined}
+        description={nameCheck.description}
+        errorMessage={nameCheck.errorMessage ?? dict.form.noFormName}
         data-testid="form-settings-name"
         onChange={(newName) => setEditedName(newName)}
+      />
+      <NameCheckAnnouncement
+        announcement={nameCheck.announcement}
+        testId="form-settings-name-status"
       />
       <TextArea
         id="form-settings-description"

@@ -255,7 +255,7 @@ export const formNameExistsInWorkspace = async (
     .where(
       and(
         eq(forms.workspaceId, workspaceId),
-        eq(forms.name, name),
+        ilike(forms.name, name),
         isNull(forms.deletedAt),
         ...(exceptFormId ? [ne(forms.id, exceptFormId)] : []),
       ),

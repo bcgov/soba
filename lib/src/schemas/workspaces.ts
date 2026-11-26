@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { LookupMetaSchema, OffsetPageSchema, makeSortEnum } from './pagination';
 import { WORKSPACE_SORT_FIELDS } from '../sort';
+import { NameAvailabilityResponseSchema, type NameAvailabilityResponse } from './nameAvailability';
 
 export const WorkspaceItemSchema = z.object({
   id: z.string(),
@@ -42,12 +43,8 @@ export type WorkspaceItem = z.infer<typeof WorkspaceItemSchema>;
 export type CreateWorkspaceBody = z.infer<typeof CreateWorkspaceBodySchema>;
 export type UpdateWorkspaceBody = z.infer<typeof UpdateWorkspaceBodySchema>;
 
-export const WorkspaceNameAvailabilityResponseSchema = z.object({
-  available: z.boolean(),
-});
-export type WorkspaceNameAvailabilityResponse = z.infer<
-  typeof WorkspaceNameAvailabilityResponseSchema
->;
+export const WorkspaceNameAvailabilityResponseSchema = NameAvailabilityResponseSchema;
+export type WorkspaceNameAvailabilityResponse = NameAvailabilityResponse;
 
 export const WorkspaceSortSchema = makeSortEnum(WORKSPACE_SORT_FIELDS);
 

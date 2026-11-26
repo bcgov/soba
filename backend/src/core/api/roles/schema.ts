@@ -3,6 +3,8 @@ import { z } from 'zod';
 import {
   CreateWorkspaceRoleBodySchema as LibCreateRoleBodySchema,
   ListWorkspaceRolesResponseSchema as LibListRolesResponseSchema,
+  NameAvailabilityResponseSchema as LibNameAvailabilityResponseSchema,
+  WORKSPACE_ROLE_NAME_MAX_LENGTH,
   UpdateWorkspaceRoleBodySchema as LibUpdateRoleBodySchema,
   WorkspaceRoleSchema as LibRoleSchema,
 } from '@soba/lib';
@@ -33,6 +35,18 @@ export const ListRolesResponseSchema = LibListRolesResponseSchema.extend({
   items: z.array(RoleSchema),
 }).openapi('Roles_ListRolesResponse');
 
+export const RoleNameAvailabilityQuerySchema = z
+  .object({
+    name: z.string().trim().min(1).max(WORKSPACE_ROLE_NAME_MAX_LENGTH),
+    // The role being renamed, so its own name doesn't report itself as taken.
+    excludeCode: z.string().min(1).optional(),
+  })
+  .openapi('Roles_NameAvailabilityQuery');
+
+export const RoleNameAvailabilityResponseSchema = LibNameAvailabilityResponseSchema.clone().openapi(
+  'Roles_NameAvailabilityResponse',
+);
+
 const TAG = 'core.roles';
 const ROLES_PATH = '/workspaces/{id}/roles';
 const ROLE_PATH = '/workspaces/{id}/roles/{roleCode}';
@@ -52,6 +66,22 @@ const jsonResponse = (description: string, schema: z.ZodTypeAny) => ({
 });
 
 export const registerRolesOpenApi = (registry: OpenAPIRegistry) => {
+  registry.registerPath({
+    method: 'get',
+    path: `${ROLES_PATH}/name-availability`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    description:
+      "Whether a role name is free among the workspace's own active roles, for a live check as the name is typed. Matches case insensitively, as a save does.",
+    request: { query: RoleNameAvailabilityQuerySchema, params: WorkspaceRoleParamsSchema },
+    responses: {
+      200: jsonResponse('Whether the name is free', RoleNameAvailabilityResponseSchema),
+      400: { description: 'Invalid query' },
+      403: { description: ERR_MANAGE },
+      404: { description: ERR_WORKSPACE_NOT_FOUND },
+    },
+  });
+
   registry.registerPath({
     method: 'get',
     path: ROLES_PATH,

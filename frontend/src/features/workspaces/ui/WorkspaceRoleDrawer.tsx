@@ -124,11 +124,7 @@ export function WorkspaceRoleDrawer({
         label: t.columns.name,
         width: '40%',
         sortField: 'name',
-        render: (role) => (
-          <span data-testid={`role-name-${role.roleCode}`}>
-            {groupRoleLabel(dict, role.roleCode, role.name)}
-          </span>
-        ),
+        render: (role) => <span data-testid={`role-name-${role.roleCode}`}>{role.name}</span>,
       },
       {
         key: 'type',

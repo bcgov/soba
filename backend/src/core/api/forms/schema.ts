@@ -14,6 +14,7 @@ import {
   ListFormVersionsResponseSchema as SobaListFormVersionsResponseSchema,
   FormVersionSummarySchema as SobaFormVersionSummarySchema,
   FormVersionLookupResponseSchema as SobaFormVersionLookupResponseSchema,
+  NameAvailabilityResponseSchema as SobaNameAvailabilityResponseSchema,
 } from '@soba/lib';
 import { LOOKUP_NOTE } from '../shared/lookup';
 
@@ -95,6 +96,19 @@ export const FormIdParamsSchema = z
     id: z.string().min(1),
   })
   .openapi('Forms_FormIdParams');
+
+/** A rename's check: the workspace and the form left out of it come from the form in the path. */
+export const FormNameAvailabilityQuerySchema = z
+  .object({ name: z.string().trim().min(1) })
+  .openapi('Forms_NameAvailabilityQuery');
+
+/** A new form's check, in the workspace it would be created in. */
+export const NewFormNameAvailabilityQuerySchema = FormNameAvailabilityQuerySchema.extend({
+  workspaceId: z.string().min(1),
+}).openapi('Forms_NewFormNameAvailabilityQuery');
+
+export const FormNameAvailabilityResponseSchema =
+  SobaNameAvailabilityResponseSchema.clone().openapi('Forms_NameAvailabilityResponse');
 
 export const FormVersionIdParamsSchema = z
   .object({
@@ -199,6 +213,41 @@ const VERSION_CONFLICT = "Not the form's current version";
 const SCHEMA_WRITE_CONFLICT = `${VERSION_CONFLICT}, not a draft, or its schema is being saved`;
 
 export const registerFormsOpenApi = (registry: OpenAPIRegistry) => {
+  const nameAvailable = {
+    description: 'Whether the name is free',
+    content: { 'application/json': { schema: FormNameAvailabilityResponseSchema } },
+  };
+  registry.registerPath({
+    method: 'get',
+    path: `${FORMS_PATH}/name-availability`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    description:
+      "Whether a new form's name is free among the workspace's forms, for a live check as the name is typed. Matches case insensitively.",
+    request: { query: NewFormNameAvailabilityQuerySchema },
+    responses: {
+      200: nameAvailable,
+      400: { description: 'Invalid query' },
+      403: { description: 'Caller lacks form_create and design_create in the workspace' },
+    },
+  });
+
+  registry.registerPath({
+    method: 'get',
+    path: `${FORM_PATH}/name-availability`,
+    tags: [TAG],
+    security: [{ bearerAuth: [] }],
+    description:
+      "Whether a form's new name is free among the other forms in its workspace, for a live check as the name is typed. Matches case insensitively.",
+    request: { params: FormIdParamsSchema, query: FormNameAvailabilityQuerySchema },
+    responses: {
+      200: nameAvailable,
+      400: { description: 'Invalid query' },
+      403: { description: 'Caller lacks form_update on the form' },
+      404: { description: FORM_NOT_FOUND },
+    },
+  });
+
   registry.registerPath({
     method: 'get',
     path: FORMS_PATH,

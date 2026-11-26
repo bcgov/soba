@@ -12,7 +12,10 @@ import {
 import { CenteredProgress } from '@/app/ui/base/CenteredProgress';
 import { useKeycloak } from '@/lib/hooks/useKeycloak';
 import { useNotificationStore } from '@/lib/hooks/useNotificationStore';
-import { apiErrorMessage, messageForDataError } from '@/src/shared/api/dataError';
+import { apiErrorMessage, isConflict, messageForDataError } from '@/src/shared/api/dataError';
+import { useNameCheck } from '@/src/shared/api/useNameCheck';
+import { NameCheckAnnouncement } from '@/src/components/NameCheckAnnouncement';
+import { checkWorkspaceGroupName } from '../data/api';
 import { useAuthErrorDefaults } from '@/src/shared/api/useDataErrorNotice';
 import { useSortLocale } from '@/src/shared/list/useSortLocale';
 import type { Dictionary } from '@/src/types/dictionary';
@@ -121,7 +124,20 @@ function GroupFields({ dict, workspaceId, group, roles, onDone }: Readonly<Group
   // A system group is protected: shown for reference, with nothing to save.
   const isSystem = group?.system === true;
   const trimmedName = name.trim();
-  const canSave = Boolean(token) && trimmedName.length > 0 && !saving && !isSystem;
+  const nameCheck = useNameCheck({
+    name,
+    scope: isSystem ? null : ['workspace-group', workspaceId],
+    savedName: seed?.name,
+    check: (authToken, checked) =>
+      checkWorkspaceGroupName(authToken, workspaceId, { name: checked, excludeId: seed?.id }),
+    labels: {
+      checking: dict.general.nameChecking,
+      available: dict.general.nameAvailable,
+      unavailable: dict.general.nameUnavailable,
+    },
+  });
+  const canSave =
+    Boolean(token) && trimmedName.length > 0 && !saving && !isSystem && !nameCheck.blocksSave;
 
   const save = async () => {
     if (!token || !canSave) return;
@@ -133,6 +149,8 @@ function GroupFields({ dict, workspaceId, group, roles, onDone }: Readonly<Group
       addNotification({ text: group ? t.updateSuccess : t.createSuccess, type: 'success' });
       onDone();
     } catch (err: unknown) {
+      // Someone else just took this name: check it again, so it stops saying "Available".
+      if (isConflict(err)) nameCheck.revalidate();
       // A coded refusal, such as a name already in use, says why; anything else is generic.
       addNotification({
         text: apiErrorMessage(err, dict.apiErrors) ?? (group ? t.updateError : t.createError),
@@ -170,8 +188,12 @@ function GroupFields({ dict, workspaceId, group, roles, onDone }: Readonly<Group
         isRequired
         maxLength={WORKSPACE_GROUP_NAME_MAX_LENGTH}
         isDisabled={saving || isSystem}
+        isInvalid={nameCheck.status === 'unavailable'}
+        description={nameCheck.description}
+        errorMessage={nameCheck.errorMessage}
         data-testid="group-name-input"
       />
+      <NameCheckAnnouncement announcement={nameCheck.announcement} testId="group-name-status" />
       <CheckboxGroup
         label={t.roles}
         description={t.rolesHelp}
