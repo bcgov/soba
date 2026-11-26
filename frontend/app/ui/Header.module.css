@@ -97,13 +97,6 @@
   --bs-btn-active-border-color: var(--app-border);
 }
 
-:global(.btn).dropdownToggle.languageSelectorToggle {
-  --bs-btn-border-radius: var(--layout-border-radius-medium);
-  --bs-btn-bg: var(--surface-color-secondary-button-default);
-  --bs-btn-hover-bg: var(--surface-color-secondary-button-hover);
-  --bs-btn-active-bg: var(--surface-color-secondary-pressed);
-}
-
 :global(.btn).dropdownToggle:focus-visible {
   /* Keyboard focus needs a clearly visible ring; the surface-pinning rules
      above otherwise leave focus indistinguishable from the resting state. */

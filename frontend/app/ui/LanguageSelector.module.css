@@ -1,0 +1,10 @@
+:global(.btn.dropdown-toggle).languageSelectorToggle {
+  --bs-btn-border-radius: var(--layout-border-radius-medium);
+  --bs-btn-bg: var(--surface-color-secondary-button-default);
+  --bs-btn-hover-bg: var(--surface-color-secondary-button-hover);
+  --bs-btn-active-bg: var(--surface-color-secondary-pressed);
+}
+
+:global(.dropdown-menu).menu {
+  --bs-dropdown-min-width: 100%;
+}

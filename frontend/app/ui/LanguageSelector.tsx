@@ -1,7 +1,8 @@
 'use client';
 
 import { Dropdown } from 'react-bootstrap';
-import styles from './Header.module.css';
+import headerStyles from './Header.module.css';
+import styles from './LanguageSelector.module.css';
 
 export type LanguageOption = { value: string; label: string };
 
@@ -24,13 +25,13 @@ export function LanguageSelector({
         id="lang-selector"
         data-testid="lang-selector"
         aria-label={`${label}: ${selectedLabel}`}
-        className={`${styles.dropdownToggle} ${styles.languageSelectorToggle}`}
+        className={`${headerStyles.dropdownToggle} ${styles.languageSelectorToggle}`}
         variant="outline-secondary"
         size="sm"
       >
         {selectedLabel}
       </Dropdown.Toggle>
-      <Dropdown.Menu style={{ minWidth: '100%' }}>
+      <Dropdown.Menu className={styles.menu}>
         {options.map((option) => (
           <Dropdown.Item
             as="button"
