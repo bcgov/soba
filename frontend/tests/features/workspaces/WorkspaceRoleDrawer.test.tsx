@@ -56,7 +56,7 @@ const role = (
   system = true,
 ): WorkspaceRole => ({ roleCode, name, system, permissions });
 
-const FORM_ADMIN = role('form_admin', 'Form admin', ['*']);
+const FORM_ADMIN = role('form_admin', 'Form administrator', ['*']);
 const FORM_SUBMITTER = role('form_submitter', 'Form submitter', [
   'document_template_read',
   'submission_create',
@@ -131,11 +131,11 @@ describe('WorkspaceRoleDrawer', () => {
     );
   });
 
-  it('lists each role by the name shown, with its type and permission count', async () => {
+  it('lists each role by its stored name, with its type and permission count', async () => {
     renderDrawer();
 
     expect(await screen.findByTestId('role-name-form_admin')).toHaveTextContent(
-      dict.workspaces.groups.roleNames.form_admin,
+      'Form administrator',
     );
     expect(mockApi.listWorkspaceRoles).toHaveBeenCalledWith('token', WORKSPACE_ID);
     expect(screen.getByTestId('role-type-form_admin')).toHaveTextContent(t.types.fixed);
@@ -169,46 +169,46 @@ describe('WorkspaceRoleDrawer', () => {
     expect(screen.queryByTestId('view-role-button-custom-1')).not.toBeInTheDocument();
   });
 
-  it('orders by the name shown, and reverses when the name header is pressed', async () => {
+  it('orders by stored name, and reverses when the name header is pressed', async () => {
     const user = userEvent.setup();
     const view = renderDrawer();
     await screen.findByTestId('role-name-form_admin');
 
     expect(shownNames()).toEqual([
       'Auditor',
-      'Form Administrator',
-      'Form Designer',
-      'Form Submitter',
-      'Team Manager',
+      'Form administrator',
+      'Form designer',
+      'Form submitter',
+      'Team manager',
     ]);
 
     await user.click(screen.getByTestId('datatable-sort-name'));
     await view.rerender();
 
     expect(shownNames()).toEqual([
-      'Team Manager',
-      'Form Submitter',
-      'Form Designer',
-      'Form Administrator',
+      'Team manager',
+      'Form submitter',
+      'Form designer',
+      'Form administrator',
       'Auditor',
     ]);
   });
 
-  it('orders by the French names in French', async () => {
+  it('shows and orders the stored names in French too', async () => {
     mockLocale.value = 'fr';
     mockApi.listWorkspaceRoles.mockResolvedValue({ items: FIXED });
     renderDrawer({ ...fr, locale: 'fr' } as unknown as Dictionary);
     await screen.findByTestId('role-name-form_admin');
 
     expect(shownNames()).toEqual([
-      'Administrateur de formulaire',
-      'Concepteur de formulaire',
-      "Gestionnaire d'équipe",
-      'Soumetteur de formulaire',
+      'Form administrator',
+      'Form designer',
+      'Form submitter',
+      'Team manager',
     ]);
   });
 
-  it('searches the name shown, not the stored name', async () => {
+  it('searches the stored name, not the translated label', async () => {
     mockLocale.value = 'fr';
     const frDict = { ...fr, locale: 'fr' } as unknown as Dictionary;
     const user = userEvent.setup();
@@ -216,12 +216,12 @@ describe('WorkspaceRoleDrawer', () => {
     await screen.findByTestId('role-name-form_admin');
     const box = within(screen.getByTestId('search-ws-roles-text')).getByRole('textbox');
 
-    await typeSearch(user, box, 'administrateur');
+    await typeSearch(user, box, 'form admin');
     await view.rerender();
-    expect(shownNames()).toEqual(['Administrateur de formulaire']);
+    expect(shownNames()).toEqual(['Form administrator']);
 
     await user.clear(box);
-    await typeSearch(user, box, 'form admin');
+    await typeSearch(user, box, 'administrateur');
     await view.rerender();
     expect(await screen.findByText(frDict.workspaces.roles.empty)).toBeInTheDocument();
   });

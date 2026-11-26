@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Accordion, Button, ButtonGroup } from '@bcgov/design-system-react-components';
-import { matchesSearchTerm } from '@soba/lib/sort';
+import { compareTextForSort, matchesSearchTerm } from '@soba/lib/sort';
 import { ListPageToolbar } from '@/src/components/ListPageLayout';
 import { DataTable, type Column } from '@/src/components/DataTable';
 import { RowActionButton } from '@/src/components/RowActionButton';
@@ -20,7 +20,6 @@ import type { Dictionary } from '@/src/types/dictionary';
 import type { WorkspaceRole } from '@/src/types/workspaceRoles';
 import { useWorkspaceRoles } from '../data/useWorkspaceRoles';
 import { useWorkspaceRolesWriter } from '../data/useWorkspaceRolesWriter';
-import { groupRoleLabel, rolesByLabel } from '../groupRoleLabel';
 import { grantsAllPermissions } from '../rolePermissions';
 import WorkspaceRoleForm from './WorkspaceRoleForm';
 
@@ -61,13 +60,13 @@ export function WorkspaceRoleDrawer({
   const [pendingDelete, setPendingDelete] = useState<WorkspaceRole | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Searched and ordered here: fixed roles show dictionary names the server does not have.
+  // Searched and ordered here, by the stored names the table shows.
   const matching = useMemo(() => {
     const direction = query.sort.endsWith(':desc') ? 'desc' : 'asc';
-    return rolesByLabel(dict, rows, locale, direction).filter((role) =>
-      matchesSearchTerm(groupRoleLabel(dict, role.roleCode, role.name), query.q),
-    );
-  }, [dict, rows, query.q, query.sort, locale]);
+    return [...rows]
+      .sort((a, b) => compareTextForSort(a.name, b.name, direction, locale, { linguistic: true }))
+      .filter((role) => matchesSearchTerm(role.name, query.q));
+  }, [rows, query.q, query.sort, locale]);
 
   const { table } = useDataTable(
     query,
@@ -112,7 +111,7 @@ export function WorkspaceRoleDrawer({
     ) => (
       <RowActionButton
         onPress={action.onPress}
-        aria-label={`${action.label}: ${groupRoleLabel(dict, role.roleCode, role.name)}`}
+        aria-label={`${action.label}: ${role.name}`}
         data-testid={`${action.testId}-${role.roleCode}`}
       >
         {action.label}
@@ -173,7 +172,7 @@ export function WorkspaceRoleDrawer({
         },
       },
     ];
-  }, [dict, t]);
+  }, [t]);
 
   const openCode = formView && formView !== 'new' ? formView.roleCode : undefined;
 
