@@ -34,6 +34,51 @@
   min-height: var(--layout-margin-xxlarge);
 }
 
+/* Multi mode: the bordered box holds the picks and the input, laid out like .input. */
+.multiField {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--layout-margin-xsmall);
+  background: var(--surface-color-forms-default);
+  border: var(--layout-border-width-small) solid var(--surface-color-border-default);
+  border-radius: var(--layout-border-radius-medium);
+  padding: var(--layout-padding-xsmall) 12px;
+  min-height: var(--layout-margin-xxlarge);
+  cursor: text;
+}
+
+.multiField:focus-within {
+  outline: var(--layout-border-width-medium) solid var(--surface-color-border-active);
+  outline-offset: var(--layout-margin-hair);
+}
+
+/* The picks wrap inside the box; BCDS sets the list to one unbroken row. */
+.multiField > :global(.bcds-react-aria-TagGroup) {
+  max-width: 100%;
+}
+
+.multiField :global(.bcds-react-aria-TagList) {
+  flex-wrap: wrap;
+  width: auto;
+  gap: var(--layout-margin-xsmall);
+}
+
+.multiInput {
+  flex: 1 1 8rem;
+  min-width: 8rem;
+  font: var(--typography-regular-body);
+  color: var(--typography-color-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: var(--layout-padding-xsmall) 0;
+}
+
+.multiInput::placeholder {
+  color: var(--typography-color-placeholder);
+}
+
 .input::placeholder {
   color: var(--typography-color-placeholder);
 }

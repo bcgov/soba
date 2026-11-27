@@ -34,8 +34,8 @@ const { mockGroupsApi, mockAccessApi, mockUserSearchApi, mockAddNotification, pi
       removeWorkspaceAccess: vi.fn(),
     },
     mockAddNotification: vi.fn(),
-    /** The person the stub picker reports when pressed. */
-    picked: { person: null as unknown },
+    /** The people the stub picker reports when pressed. */
+    picked: { people: [] as unknown[] },
   }),
 );
 
@@ -43,11 +43,11 @@ vi.mock('@/src/features/workspaces/data/api', () => mockGroupsApi);
 vi.mock('@/src/features/workspaces/data/accessApi', () => mockAccessApi);
 vi.mock('@/src/features/user-search/data/api', () => mockUserSearchApi);
 
-// The picker has its own tests; here it only reports a pick.
+// The picker has its own tests; here it only reports the people picked.
 vi.mock('@/src/features/user-search/ui/UserSearchPicker', () => ({
-  UserSearchPicker: ({ onSelect }: { onSelect: (user: unknown) => void }) => (
+  UserSearchPicker: ({ onSelect }: { onSelect: (users: unknown[]) => void }) => (
     <div data-testid="picker">
-      <button type="button" onClick={() => onSelect(picked.person)}>
+      <button type="button" onClick={() => onSelect(picked.people)}>
         pick
       </button>
     </div>
@@ -85,15 +85,15 @@ const renderForm = (membershipId?: string) => renderSignedIn(accessForm(membersh
 const groupBox = (name: string) => screen.getByRole('checkbox', { name });
 const saveButton = () => screen.getByTestId('member-submit-button');
 
-const pick = async (user: ReturnType<typeof userEvent.setup>, person: UserSearchUser) => {
-  picked.person = person;
+const pick = async (user: ReturnType<typeof userEvent.setup>, ...people: UserSearchUser[]) => {
+  picked.people = people;
   await user.click(await screen.findByRole('button', { name: 'pick' }));
 };
 
 describe('WorkspaceAccessForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    picked.person = null;
+    picked.people = [];
     mockGroupsApi.listWorkspaceGroups.mockResolvedValue(groupsPage([ADMINS, REVIEWERS]));
     mockAccessApi.getWorkspaceAccess.mockResolvedValue(REVIEWER);
   });
@@ -174,8 +174,94 @@ describe('WorkspaceAccessForm', () => {
     await pick(user, foundPerson({ sobaUserId: null, guid: null }));
     await user.click(await screen.findByRole('checkbox', { name: REVIEWERS.name }));
 
-    expect(screen.getByTestId('member-not-signed-in')).toHaveTextContent(t.notSignedInNoId);
+    expect(screen.getByTestId('member-not-signed-in-no-id')).toHaveTextContent(t.notSignedInNoId);
     expect(saveButton()).toBeDisabled();
+  });
+
+  it('adds each person picked, in the groups ticked, making users for those not signed in', async () => {
+    const user = userEvent.setup();
+    mockUserSearchApi.createUserFromSearch.mockResolvedValue({
+      userId: 'user-made',
+      created: true,
+    });
+    mockAccessApi.addWorkspaceAccess.mockResolvedValue(REVIEWER);
+    renderForm();
+
+    await pick(
+      user,
+      foundPerson(),
+      foundPerson({ subject: 'other', displayName: 'Other Person', sobaUserId: null }),
+    );
+    await user.click(await screen.findByRole('checkbox', { name: REVIEWERS.name }));
+    expect(screen.getByTestId('member-not-signed-in')).toHaveTextContent('Other Person');
+    expect(saveButton()).toHaveTextContent('Add 2 People');
+    await user.click(saveButton());
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(mockAccessApi.addWorkspaceAccess.mock.calls.map((call) => call[2])).toEqual([
+      { userId: 'user-found', groupIds: [REVIEWERS.id] },
+      { userId: 'user-made', groupIds: [REVIEWERS.id] },
+    ]);
+    expect(mockAddNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'success', text: '2 people added successfully.' }),
+    );
+  });
+
+  it('will not add several people while one cannot be made a user, and names them', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await pick(
+      user,
+      foundPerson(),
+      foundPerson({ subject: 'other', displayName: 'No Guid', sobaUserId: null, guid: null }),
+    );
+    await user.click(await screen.findByRole('checkbox', { name: REVIEWERS.name }));
+
+    expect(screen.getByTestId('member-not-signed-in-no-id')).toHaveTextContent('No Guid');
+    expect(screen.queryByTestId('member-not-signed-in')).not.toBeInTheDocument();
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('names who could not be added, keeps the form open, and only retries them', async () => {
+    const user = userEvent.setup();
+    mockAccessApi.addWorkspaceAccess
+      .mockResolvedValueOnce(REVIEWER)
+      .mockRejectedValueOnce(
+        new ApiError('This person already has access to the workspace', 409, 'member_exists'),
+      )
+      .mockResolvedValueOnce(REVIEWER);
+    renderForm();
+
+    await pick(
+      user,
+      foundPerson(),
+      foundPerson({ subject: 'other', displayName: 'Other Person', sobaUserId: 'user-other' }),
+    );
+    await user.click(await screen.findByRole('checkbox', { name: REVIEWERS.name }));
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockAddNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'error',
+          text: `Other Person: ${dict.apiErrors.member_exists}`,
+        }),
+      ),
+    );
+    expect(mockAddNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'success', text: t.addSuccess }),
+    );
+    expect(onDone).not.toHaveBeenCalled();
+
+    await user.click(saveButton());
+
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(mockAccessApi.addWorkspaceAccess).toHaveBeenCalledTimes(3);
+    expect(mockAccessApi.addWorkspaceAccess).toHaveBeenLastCalledWith('token', WORKSPACE_ID, {
+      userId: 'user-other',
+      groupIds: [REVIEWERS.id],
+    });
   });
 
   it('says why when the directory account cannot be confirmed, and adds no one', async () => {
