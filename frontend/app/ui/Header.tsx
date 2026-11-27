@@ -152,7 +152,11 @@ function Header({ designMode }: Readonly<HeaderProps>) {
 
     const authenticatedUserMenu = displayName ? (
       <Dropdown>
-        <Dropdown.Toggle className={styles.userDrop} data-testid="user-dropdown" id="dropdown-user">
+        <Dropdown.Toggle
+          className={`${styles.dropdownToggle} ${styles.userDrop}`}
+          data-testid="user-dropdown"
+          id="dropdown-user"
+        >
           <FaUser className="align-text-top" aria-hidden="true" />
           <span className={styles.limitText + ' ms-2 me-2'}>{displayName}</span>
         </Dropdown.Toggle>

@@ -1,10 +1,11 @@
 'use client';
 
+import { Dropdown } from 'react-bootstrap';
+import headerStyles from './Header.module.css';
 import styles from './LanguageSelector.module.css';
 
 export type LanguageOption = { value: string; label: string };
 
-/** Native select avoids React Aria auto-ids that can mismatch between SSR and hydration. */
 export function LanguageSelector({
   locale,
   label,
@@ -16,20 +17,34 @@ export function LanguageSelector({
   options: LanguageOption[];
   onChange: (locale: string) => void;
 }>) {
+  const selectedLabel = options.find((option) => option.value === locale)?.label ?? locale;
+
   return (
-    <select
-      id="lang-selector"
-      data-testid="lang-selector"
-      aria-label={label}
-      className={`form-select form-select-sm mr-2 ${styles.langSelect}`}
-      value={locale}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+    <Dropdown className="mr-2" align="end">
+      <Dropdown.Toggle
+        id="lang-selector"
+        data-testid="lang-selector"
+        aria-label={`${label}: ${selectedLabel}`}
+        className={`${headerStyles.dropdownToggle} ${styles.languageSelectorToggle}`}
+        variant="outline-secondary"
+        size="sm"
+      >
+        {selectedLabel}
+      </Dropdown.Toggle>
+      <Dropdown.Menu className={styles.menu}>
+        {options.map((option) => (
+          <Dropdown.Item
+            as="button"
+            className="px-2"
+            key={option.value}
+            active={option.value === locale}
+            aria-current={option.value === locale ? 'true' : undefined}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </Dropdown.Item>
+        ))}
+      </Dropdown.Menu>
+    </Dropdown>
   );
 }

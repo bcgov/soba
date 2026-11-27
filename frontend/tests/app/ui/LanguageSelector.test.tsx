@@ -11,17 +11,18 @@ const options = [
 describe('LanguageSelector', () => {
   it('renders the provided options and reflects the current locale', () => {
     render(<LanguageSelector locale="fr" label={LABEL} options={options} onChange={() => {}} />);
-    const select = screen.getByTestId('lang-selector') as HTMLSelectElement;
-    expect(select).toHaveAttribute('aria-label', LABEL);
-    expect(select.value).toBe('fr');
-    expect(screen.getByRole('option', { name: 'EN' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'FR' })).toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: `${LABEL}: FR` });
+    expect(toggle).toHaveTextContent('FR');
+    fireEvent.click(toggle);
+    expect(screen.getByRole('button', { name: 'EN' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'FR' })).toHaveAttribute('aria-current', 'true');
   });
 
   it('calls onChange with the selected value', () => {
     const onChange = vi.fn();
     render(<LanguageSelector locale="en" label={LABEL} options={options} onChange={onChange} />);
-    fireEvent.change(screen.getByTestId('lang-selector'), { target: { value: 'fr' } });
+    fireEvent.click(screen.getByTestId('lang-selector'));
+    fireEvent.click(screen.getByRole('button', { name: 'FR' }));
     expect(onChange).toHaveBeenCalledWith('fr');
   });
 });
