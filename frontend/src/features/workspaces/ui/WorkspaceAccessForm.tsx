@@ -30,6 +30,11 @@ import styles from './WorkspaceForm.module.css';
 /** The groups API's largest page; a workspace with more lists only these. */
 const GROUP_CHOICES_LIMIT = 100;
 
+const keyOf = (person: UserSearchUser) => `${person.identityProvider}:${person.subject}`;
+
+const nameOf = (person: UserSearchUser) =>
+  person.displayName ?? person.email ?? person.username ?? person.subject;
+
 export interface WorkspaceAccessFormProps {
   dict: Dictionary;
   workspaceId: string;
@@ -39,7 +44,7 @@ export interface WorkspaceAccessFormProps {
 }
 
 /**
- * Add a person to the workspace in the groups chosen, or change a member's groups. An edit reads
+ * Add people to the workspace in the groups chosen, or change a member's groups. An edit reads
  * the member on their own rather than taking the list's row, so the fields start from their groups
  * as they are now.
  */
@@ -147,7 +152,11 @@ function MemberFields({
   const scope: UserSearchScope = { kind: 'workspace', id: workspaceId };
   const userWriter = useUserFromSearchWriter(scope);
 
-  const [picked, setPicked] = useState<UserSearchUser | null>(null);
+  const [picked, setPicked] = useState<UserSearchUser[]>([]);
+  /** Users made for picked people, so trying again after a failed add only adds. */
+  const [madeIds, setMadeIds] = useState<Record<string, string>>({});
+  /** People added by an earlier try that failed for others; trying again skips them. */
+  const [addedKeys, setAddedKeys] = useState<string[]>([]);
   const [groupIds, setGroupIds] = useState<string[]>(
     () => member?.groups.map((group) => group.id) ?? [],
   );
@@ -157,28 +166,76 @@ function MemberFields({
   // A group deleted while the form is open drops out of the choices and of what is saved.
   const chosen = groupIds.filter((id) => choices.some((group) => group.id === id));
 
-  // Someone who has never signed in has no SOBA user; adding them makes one from the directory,
+  // Someone who has never signed in has no user; adding them makes one from the directory,
   // which needs the directory's guid for them.
-  const userId = picked?.sobaUserId ?? null;
-  const notSignedIn = picked !== null && userId === null;
-  const directoryGuid = (notSignedIn && picked.guid) || null;
-  const hasPerson = member !== null || userId !== null || directoryGuid !== null;
-  const canSave = Boolean(token) && hasPerson && chosen.length > 0 && !saving;
+  const userIdOf = (person: UserSearchUser): string | undefined =>
+    person.sobaUserId ?? madeIds[keyOf(person)];
+  const notSignedIn = picked.filter((person) => !userIdOf(person));
+  const withGuid = notSignedIn.filter((person) => person.guid);
+  const withoutGuid = notSignedIn.filter((person) => !person.guid);
+  const hasPeople = member !== null || (picked.length > 0 && withoutGuid.length === 0);
+  const canSave = Boolean(token) && hasPeople && chosen.length > 0 && !saving;
+  // One person keeps the singular wording; several are named.
+  const single = picked.length === 1;
 
-  /**
-   * The SOBA user to add: the picked person's own, or one made for them. A made user is kept on
-   * the pick, so trying again after the add fails goes straight to the add.
-   */
-  const userIdToAdd = async (activeToken: string): Promise<string> => {
-    if (userId) return userId;
-    if (!picked || !directoryGuid) throw new Error('No person to add');
-    const made = await userWriter.create(activeToken, {
-      identityProvider: picked.identityProvider,
-      guid: directoryGuid,
+  /** The user to add: the picked person's own, or one made for them. */
+  const userIdToAdd = async (
+    activeToken: string,
+    person: UserSearchUser,
+    made: Record<string, string>,
+  ): Promise<string> => {
+    const existing = person.sobaUserId ?? made[keyOf(person)];
+    if (existing) return existing;
+    if (!person.guid) throw new Error('No person to add');
+    const created = await userWriter.create(activeToken, {
+      identityProvider: person.identityProvider,
+      guid: person.guid,
     });
-    if (made.status !== 'applied') throw new Error('The SOBA user was not made');
-    setPicked({ ...picked, sobaUserId: made.value.userId });
-    return made.value.userId;
+    if (created.status !== 'applied') throw new Error('The SOBA user was not made');
+    made[keyOf(person)] = created.value.userId;
+    return created.value.userId;
+  };
+
+  /** A refusal's own reason, such as a person who already has access; anything else is generic. */
+  const failureText = (err: unknown, fallback: string) =>
+    apiErrorMessage(err, dict.apiErrors) ?? fallback;
+
+  const addPicked = async (activeToken: string) => {
+    const made = { ...madeIds };
+    const added = [...addedKeys];
+    const failures: { person: UserSearchUser; err: unknown }[] = [];
+    const toAdd = picked.filter((person) => !added.includes(keyOf(person)));
+    // Each person is added on their own, so one refusal leaves the others added.
+    const results = await Promise.allSettled(
+      toAdd.map(async (person) =>
+        writer.add(activeToken, await userIdToAdd(activeToken, person, made), chosen),
+      ),
+    );
+    results.forEach((result, index) => {
+      const person = toAdd[index];
+      if (result.status === 'fulfilled') added.push(keyOf(person));
+      else failures.push({ person, err: result.reason });
+    });
+    setMadeIds(made);
+    setAddedKeys(added);
+
+    const addedNow = picked.filter((person) => added.includes(keyOf(person))).length;
+    const successText =
+      addedNow === 1 ? t.addSuccess : t.addSuccessMany.replace('{count}', String(addedNow));
+    if (failures.length === 0) {
+      addNotification({ text: successText, type: 'success' });
+      onDone();
+      return;
+    }
+    if (addedNow > 0) addNotification({ text: successText, type: 'success' });
+    for (const { person, err } of failures) {
+      const reason = failureText(err, t.addError);
+      addNotification({
+        text: single ? reason : `${nameOf(person)}: ${reason}`,
+        type: 'error',
+        consoleError: err,
+      });
+    }
   };
 
   const save = async () => {
@@ -186,20 +243,20 @@ function MemberFields({
     setSaving(true);
     try {
       if (member) {
-        await writer.setGroups(token, member.membershipId, chosen);
+        try {
+          await writer.setGroups(token, member.membershipId, chosen);
+          addNotification({ text: t.updateSuccess, type: 'success' });
+          onDone();
+        } catch (err: unknown) {
+          addNotification({
+            text: failureText(err, t.updateError),
+            type: 'error',
+            consoleError: err,
+          });
+        }
       } else {
-        await writer.add(token, await userIdToAdd(token), chosen);
+        await addPicked(token);
       }
-      addNotification({ text: member ? t.updateSuccess : t.addSuccess, type: 'success' });
-      onDone();
-    } catch (err: unknown) {
-      // A coded refusal, such as a person who already has access, says why; anything else is
-      // generic.
-      addNotification({
-        text: apiErrorMessage(err, dict.apiErrors) ?? (member ? t.updateError : t.addError),
-        type: 'error',
-        consoleError: err,
-      });
     } finally {
       setSaving(false);
     }
@@ -209,8 +266,12 @@ function MemberFields({
     truncated: groupsTruncated,
     limit: GROUP_CHOICES_LIMIT,
   });
-  let saveLabel = member ? t.save : t.add;
+  let saveLabel = t.save;
+  if (!member) {
+    saveLabel = picked.length > 1 ? t.addMany.replace('{count}', String(picked.length)) : t.add;
+  }
   if (saving) saveLabel = t.saving;
+  const names = (people: UserSearchUser[]) => people.map(nameOf).join(', ');
 
   return (
     <>
@@ -223,7 +284,7 @@ function MemberFields({
         // Outside the form: Enter in the search box picks a person rather than submitting.
         <div className="mb-4">
           <p>{t.searchStep}</p>
-          <UserSearchPicker scope={scope} onSelect={setPicked} />
+          <UserSearchPicker scope={scope} multi={true} onSelect={setPicked} />
         </div>
       )}
       <Form
@@ -233,12 +294,26 @@ function MemberFields({
           void save();
         }}
       >
-        {notSignedIn && (
+        {withGuid.length > 0 && (
           <InlineAlert
             title={t.notSignedInTitle}
-            description={directoryGuid ? t.notSignedIn : t.notSignedInNoId}
+            description={
+              single ? t.notSignedIn : t.notSignedInMany.replace('{names}', names(withGuid))
+            }
             variant="info"
             data-testid="member-not-signed-in"
+          />
+        )}
+        {withoutGuid.length > 0 && (
+          <InlineAlert
+            title={t.notSignedInTitle}
+            description={
+              single
+                ? t.notSignedInNoId
+                : t.notSignedInNoIdMany.replace('{names}', names(withoutGuid))
+            }
+            variant="info"
+            data-testid="member-not-signed-in-no-id"
           />
         )}
         <CheckboxGroup

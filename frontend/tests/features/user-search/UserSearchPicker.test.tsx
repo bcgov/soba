@@ -165,6 +165,79 @@ describe('UserSearchPicker', () => {
     expect(lastInput()?.term).toBe('alice@example.co');
   });
 
+  it('gathers picks as tags in multi mode, clearing the input for the next search', async () => {
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+    render(<UserSearchPicker scope={scope} multi onSelect={onSelect} />);
+
+    await user.type(input(), 'smi');
+    await user.click(await screen.findByTestId('user-search-option-f0e1d2c3@azureidir'));
+
+    expect(onSelect).toHaveBeenLastCalledWith([alice]);
+    expect(input()).toHaveValue('');
+    expect(screen.getByTestId('user-search-chosen-f0e1d2c3@azureidir')).toHaveTextContent(
+      'Smith, Alice CITZ:EX',
+    );
+
+    await user.type(input(), 'smi');
+    // Someone already chosen cannot be picked twice.
+    expect(await screen.findByTestId('user-search-option-f0e1d2c3@azureidir')).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await user.click(screen.getByTestId('user-search-option-a9b8c7d6@azureidir'));
+
+    expect(onSelect).toHaveBeenLastCalledWith([alice, bob]);
+    expect(screen.getByRole('grid', { name: 'People to add (2)' })).toBeInTheDocument();
+  });
+
+  it('shows the picks inside the field, before the input', async () => {
+    const user = userEvent.setup();
+    render(<UserSearchPicker scope={scope} multi />);
+
+    await user.type(input(), 'smi');
+    await user.click(await screen.findByTestId('user-search-option-f0e1d2c3@azureidir'));
+
+    const chosen = screen.getByTestId('user-search-chosen');
+    expect(chosen.parentElement).toBe(input().parentElement);
+    expect(chosen.compareDocumentPosition(input()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The placeholder gives way to the picks.
+    expect(input()).not.toHaveAttribute('placeholder');
+  });
+
+  it('takes off the last pick on Backspace in an empty input', async () => {
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+    render(<UserSearchPicker scope={scope} multi onSelect={onSelect} />);
+
+    await user.type(input(), 'smi');
+    await user.click(await screen.findByTestId('user-search-option-f0e1d2c3@azureidir'));
+    await user.type(input(), 'smi');
+    await user.click(await screen.findByTestId('user-search-option-a9b8c7d6@azureidir'));
+    await user.click(input());
+    await user.keyboard('{Backspace}');
+
+    expect(onSelect).toHaveBeenLastCalledWith([alice]);
+    expect(screen.queryByTestId('user-search-chosen-a9b8c7d6@azureidir')).not.toBeInTheDocument();
+  });
+
+  it('drops a removed tag from the picks in multi mode', async () => {
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+    render(<UserSearchPicker scope={scope} multi onSelect={onSelect} />);
+
+    await user.type(input(), 'smi');
+    await user.click(await screen.findByTestId('user-search-option-f0e1d2c3@azureidir'));
+    await user.type(input(), 'smi');
+    await user.click(await screen.findByTestId('user-search-option-a9b8c7d6@azureidir'));
+
+    const aliceTag = screen.getByTestId('user-search-chosen-f0e1d2c3@azureidir');
+    await user.click(within(aliceTag).getByRole('button'));
+
+    expect(onSelect).toHaveBeenLastCalledWith([bob]);
+    expect(screen.queryByTestId('user-search-chosen-f0e1d2c3@azureidir')).not.toBeInTheDocument();
+  });
+
   it('says while a search is pending, even with people already listed', async () => {
     found = { ...found, isSearching: true };
     const user = userEvent.setup();

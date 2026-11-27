@@ -1,6 +1,6 @@
 'use client';
 
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ComboBox,
   ComboBoxStateContext,
@@ -11,7 +11,7 @@ import {
   Popover,
   type Key,
 } from 'react-aria-components';
-import { Select } from '@bcgov/design-system-react-components';
+import { Select, TagGroup, TagList } from '@bcgov/design-system-react-components';
 import { useDictionary } from '@/app/[lang]/Providers';
 import { messageForDataError } from '@/src/shared/api/dataError';
 import type { Dictionary } from '@/src/types/dictionary';
@@ -84,6 +84,19 @@ function OpenOnResults({ users }: Readonly<{ users: readonly UserSearchUser[] }>
   return null;
 }
 
+function useWidthOf(element: HTMLElement | null): string | undefined {
+  const [width, setWidth] = useState<string>();
+  useEffect(() => {
+    if (!element) return;
+    const measure = () => setWidth(`${element.getBoundingClientRect().width}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [element]);
+  return width;
+}
+
 function PersonOption({
   user,
   accountType,
@@ -106,19 +119,30 @@ function PersonOption({
  * Finds a person across every identity provider searchable in the scope. Picking one reports it
  * through `onSelect`; nothing is saved.
  */
-export function UserSearchPicker({
-  scope,
-  onSelect,
-}: Readonly<{
-  scope: UserSearchScope;
-  onSelect?: (user: UserSearchUser | null) => void;
-}>) {
+export type UserSearchPickerProps = Readonly<
+  { scope: UserSearchScope } & (
+    | { multi?: false; onSelect?: (user: UserSearchUser | null) => void }
+    /** Picks gather as removable tags; `onSelect` gets the whole list after each change. */
+    | { multi: true; onSelect?: (users: UserSearchUser[]) => void }
+  )
+>;
+
+export function UserSearchPicker(props: UserSearchPickerProps) {
+  const { scope } = props;
   const dict = useDictionary();
   const text = dict.userSearch;
   const capabilities = useUserSearchCapabilities(scope);
   const [chosenField, setChosenField] = useState<UserSearchField>('email');
   const [term, setTerm] = useState('');
   const [selected, setSelected] = useState<UserSearchUser | null>(null);
+  // Multi mode keeps its picks here, not in the combo box: the box's items are the current
+  // results, so an earlier pick would drop out of its collection at the next search.
+  const [chosen, setChosen] = useState<UserSearchUser[]>([]);
+  // Held in state, so the width is measured once the field mounts after capabilities load.
+  const [multiBox, setMultiBox] = useState<HTMLDivElement | null>(null);
+  const multiBoxRef = useMemo(() => ({ current: multiBox }), [multiBox]);
+  const multiBoxWidth = useWidthOf(multiBox);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const providers = capabilities.identityProviders;
   // A search covers the account types that accept its field.
@@ -131,7 +155,24 @@ export function UserSearchPicker({
 
   function clearSelection() {
     setSelected(null);
-    onSelect?.(null);
+    if (!props.multi) props.onSelect?.(null);
+  }
+
+  function changeChosen(next: UserSearchUser[]) {
+    setChosen(next);
+    if (props.multi) props.onSelect?.(next);
+  }
+
+  function pick(user: UserSearchUser) {
+    if (props.multi) {
+      if (!chosen.some((person) => keyOf(person) === keyOf(user))) changeChosen([...chosen, user]);
+      // Clear for the next search.
+      setTerm('');
+      return;
+    }
+    setSelected(user);
+    setTerm(inputTextOf(user, field));
+    props.onSelect?.(user);
   }
 
   function restart() {
@@ -170,29 +211,80 @@ export function UserSearchPicker({
           className={styles.comboBox}
           items={search.users}
           inputValue={term}
+          // Multi mode holds no selection, so the box never writes a pick back into the input.
+          value={props.multi ? null : undefined}
+          disabledKeys={chosen.map(keyOf)}
           onInputChange={(value) => {
             setTerm(value);
             if (selected && value !== inputTextOf(selected, field)) clearSelection();
           }}
-          onSelectionChange={(key: Key | null) => {
+          onChange={(key: Key | null) => {
             const user = search.users.find((candidate) => keyOf(candidate) === key);
-            if (!user) return;
-            setSelected(user);
-            setTerm(inputTextOf(user, field));
-            onSelect?.(user);
+            if (user) pick(user);
           }}
           menuTrigger="input"
           allowsCustomValue
         >
           <OpenOnResults users={search.users} />
           <Label className={styles.label}>{text.inputLabel}</Label>
-          <Input
-            className={styles.input}
-            placeholder={text.placeholder}
-            maxLength={MAX_LENGTH[field]}
-            data-testid="user-search-input"
-          />
-          <Popover className={styles.popover}>
+          {props.multi ? (
+            // The picks sit in the field before the input, which takes the rest of the row.
+            <div
+              ref={setMultiBox}
+              className={styles.multiField}
+              onClick={(event) => {
+                // A press on the field's empty space types into the input, as a text box would.
+                if (event.target === event.currentTarget) inputRef.current?.focus();
+              }}
+            >
+              {chosen.length > 0 && (
+                <TagGroup
+                  aria-label={text.chosen.replace('{count}', String(chosen.length))}
+                  onRemove={(keys) =>
+                    changeChosen(chosen.filter((person) => !keys.has(keyOf(person))))
+                  }
+                  data-testid="user-search-chosen"
+                >
+                  <TagList
+                    items={chosen.map((person) => ({
+                      id: keyOf(person),
+                      textValue: nameOf(person),
+                      'data-testid': `user-search-chosen-${person.subject}`,
+                    }))}
+                  />
+                </TagGroup>
+              )}
+              <Input
+                ref={inputRef}
+                className={styles.multiInput}
+                placeholder={chosen.length > 0 ? undefined : text.placeholder}
+                maxLength={MAX_LENGTH[field]}
+                data-testid="user-search-input"
+                onKeyDown={(event) => {
+                  // Backspace in an empty input takes off the last pick.
+                  if (event.key === 'Backspace' && term === '' && chosen.length > 0) {
+                    changeChosen(chosen.slice(0, -1));
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            <Input
+              className={styles.input}
+              placeholder={text.placeholder}
+              maxLength={MAX_LENGTH[field]}
+              data-testid="user-search-input"
+            />
+          )}
+          <Popover
+            className={styles.popover}
+            // The combo box anchors its list to the input; with picks before it, the input is
+            // only part of the field, so the list hangs from the whole field instead.
+            {...(props.multi && {
+              triggerRef: multiBoxRef,
+              style: { '--trigger-width': multiBoxWidth } as React.CSSProperties,
+            })}
+          >
             <ListBox<UserSearchUser> className={styles.listBox}>
               {(user) => (
                 <ListBoxItem
